@@ -8,7 +8,7 @@ Platform E-Learning Biologi berbasis web yang dibangun menggunakan Nuxt 3.
 - Sistem autentikasi multi-user (Admin, Guru, Siswa)
 - Autentikasi dengan JWT atau google OAuth
 - Fitur Guru:
-  - Manajemen kelas X
+  - Manajemen kelas 
   - Manajemen materi pembelajaran
   - Manajemen kuis
   - Analisis performa siswa
