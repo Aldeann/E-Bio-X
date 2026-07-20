@@ -1,12 +1,13 @@
-from flask import request, jsonify
+from flask import request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from googleapiclient.http import MediaIoBaseUpload
+from werkzeug.utils import secure_filename
 from src.models.material import Material
 from src.config.database import db
-from src.config.drive import drive_service
 from datetime import datetime
 from dotenv import load_dotenv
+import traceback
 import os
+import uuid
 import re
 
 load_dotenv()
@@ -25,24 +26,26 @@ def upload_material():
     if not all([title, course_id, file]):
         return jsonify({'error': 'Title, course_id, and file are required'}), 400
 
-    file_metadata = {
-        'name': file.filename,
-        'parents': [os.getenv("GOOGLE_DRIVE_FOLDER_ID")]
-    }
+    upload_folder = current_app.config['UPLOAD_FOLDER']
 
-    media = MediaIoBaseUpload(file.stream, mimetype=file.mimetype, resumable=False)
+    original_name = secure_filename(file.filename)
+    ext = original_name.rsplit('.', 1)[-1].lower() if '.' in original_name else ''
+    unique_name = f"{uuid.uuid4().hex}_{original_name}" if ext else uuid.uuid4().hex
+    save_path = os.path.join(upload_folder, unique_name)
 
-    uploaded = drive_service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields='id, webViewLink'
-    ).execute()
+    try:
+        file.save(save_path)
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": "Gagal menyimpan file"}), 500
+
+    file_url = f"{request.host_url}uploads/{unique_name}"
 
     new_material = Material(
         title=title,
         content=content,
         course_id=course_id,
-        file_url=uploaded['webViewLink'],
+        file_url=file_url,
         uploaded_at=datetime.utcnow()
     )
     db.session.add(new_material)
@@ -60,10 +63,10 @@ def upload_material():
 @jwt_required()
 def get_material_by_id(material_id):
     material = Material.query.get(material_id)
-    
+
     if not material:
         return jsonify({'error': 'Material not found'}), 404
-    
+
     return jsonify({
         'id': material.id,
         'title': material.title,
@@ -71,8 +74,8 @@ def get_material_by_id(material_id):
         'file_url': material.file_url,
         'course_id': material.course_id,
         'uploaded_at': material.uploaded_at,
-    }), 200    
-    
+    }), 200
+
 @jwt_required()
 def get_material_by_course(course_id):
     materials = Material.query.filter_by(course_id=course_id).all()
@@ -91,7 +94,7 @@ def get_material_by_course(course_id):
     return jsonify({
         'message': 'Materials retrieved successfully',
         'data': result,
-    }), 200 
+    }), 200
 
 @jwt_required()
 def get_all_material():
@@ -105,7 +108,7 @@ def get_all_material():
             'course': material.course.name,
             'uploaded_at': material.uploaded_at,
         } for material in materials
-    ]), 200 
+    ]), 200
 
 @jwt_required()
 def delete_material(material_id):
@@ -113,20 +116,17 @@ def delete_material(material_id):
     if not material:
         return jsonify({'error': 'Material not found'}), 404
 
-    match = re.search(r'/d/([a-zA-Z0-9_-]+)', material.file_url)
-    if match:
-        file_id = match.group(1)
-    
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    filename = os.path.basename(material.file_url)
+    file_path = os.path.join(upload_folder, filename)
+
     db.session.delete(material)
     db.session.commit()
-    
-    if file_id:
+
+    if os.path.exists(file_path):
         try:
-            drive_service.files().delete(fileId=file_id).execute()
+            os.remove(file_path)
         except Exception as e:
-            print("Failed to delete from Google Drive:", e)
-            return jsonify({'error': 'Failed to delete from Google Drive'}), 500
-    else:
-        return jsonify({'error': 'Invalid file URL'}), 400
+            print("Failed to delete file from disk:", e)
 
     return jsonify({'message': 'Material deleted successfully'}), 200
