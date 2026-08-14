@@ -1,9 +1,10 @@
 <template>
   <div class="max-w-3xl mx-auto">
     <button
-      @click="router.back()"
+      v-if="thread"
+      @click="goBack"
       class="flex items-center gap-1 text-green-600 dark:text-green-400 hover:underline text-sm mb-4">
-      <Icon name="material-symbols:arrow-back-ios-new" class="w-4 h-4" /> Kembali
+      <Icon name="material-symbols:arrow-back-ios-new" class="w-4 h-4" /> Kembali ke Forum
     </button>
 
     <div v-if="loading" class="animate-pulse space-y-4">
@@ -92,7 +93,7 @@ import { useSwal } from "~/utils/swal";
 const props = defineProps({
   courseId: {
     type: [String, Number],
-    required: true,
+    required: false,
   },
   threadId: {
     type: [String, Number],
@@ -109,6 +110,15 @@ const router = useRouter();
 const thread = ref(null);
 const loading = ref(true);
 const replyContent = ref("");
+
+const goBack = () => {
+  const courseId = props.courseId || thread.value?.course_id;
+  if (courseId) {
+    router.push(`/${useCookie("role").value}/course/${courseId}`);
+  } else {
+    router.back();
+  }
+};
 
 const fetchThread = async () => {
   loading.value = true;

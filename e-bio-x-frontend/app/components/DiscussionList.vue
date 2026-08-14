@@ -166,7 +166,7 @@ const createThread = async () => {
 };
 
 const openThread = (threadId) => {
-  router.push(`/${role}/course/${props.courseId}/discussion/${threadId}`);
+  router.push(`/${role}/discussion/${threadId}`);
 };
 
 const deleteThread = async (thread) => {
