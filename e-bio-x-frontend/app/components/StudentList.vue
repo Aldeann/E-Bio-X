@@ -69,31 +69,41 @@ const handleRemoveStudent = async (student) => {
 
 const emit = defineEmits(['studentRemoved']);
 
-const columns = [
-  { header: "Username", accessorKey: "name" },
-  { header: "Email", accessorKey: "email" },
-  {
-    header: "Quiz Scores",
-    accessorKey: "quizes",
-    cell: ({ row }) => {
-      const quizes = row.original.quizes;
-      if (!quizes || quizes.length === 0) return "Belum ada kuis dikerjakan";
-      return `
-        <div class="flex flex-col gap-2">
-          ${quizes
-            .map(
-              (q) => `
-                <div class="bg-green-50 dark:bg-green-800 border border-green-200 dark:border-green-600 rounded-lg p-2">
-                  <div class="font-semibold text-green-700 dark:text-green-300">${q.title}</div>
-                  <div class="text-gray-900 dark:text-gray-100">Skor: ${q.score.toFixed(2)}</div>
-                  <div class="text-gray-900 dark:text-gray-100">Cluster: ${q.cluster}</div>
-                </div>
-              `
-            )
-            .join("")}
-        </div>
-      `;
+const isStudent = computed(() => role === "student");
+
+const columns = computed(() => {
+  if (isStudent.value) {
+    return [
+      { header: "Username", accessorKey: "name" },
+    ];
+  }
+
+  return [
+    { header: "Username", accessorKey: "name" },
+    { header: "Email", accessorKey: "email" },
+    {
+      header: "Quiz Scores",
+      accessorKey: "quizes",
+      cell: ({ row }) => {
+        const quizes = row.original.quizes;
+        if (!quizes || quizes.length === 0) return "Belum ada kuis dikerjakan";
+        return `
+          <div class="flex flex-col gap-2">
+            ${quizes
+              .map(
+                (q) => `
+                  <div class="bg-green-50 dark:bg-green-800 border border-green-200 dark:border-green-600 rounded-lg p-2">
+                    <div class="font-semibold text-green-700 dark:text-green-300">${q.title}</div>
+                    <div class="text-gray-900 dark:text-gray-100">Skor: ${q.score.toFixed(2)}</div>
+                    <div class="text-gray-900 dark:text-gray-100">Cluster: ${q.cluster}</div>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+        `;
+      },
     },
-  },
-];
+  ];
+});
 </script>
