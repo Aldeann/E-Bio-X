@@ -7,3 +7,4 @@ from .question import Question
 from .option import Option
 from .submission import Submission
 from .answer import Answer
+from .discussion import DiscussionThread, DiscussionReply

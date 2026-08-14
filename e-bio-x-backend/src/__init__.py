@@ -33,6 +33,7 @@ def create_app():
     from src.controllers.material_controller import upload_material, get_all_material, get_material_by_id, get_material_by_course, delete_material
     from src.controllers.quiz_controller import create_quiz, get_quiz_by_id, delete_quiz, get_quizzes_by_course, submit_quiz, remove_sumbission, get_submission_by_quiz, toggle_open_quiz, edit_quiz_title, edit_question, edit_option
     from src.controllers.analysis_controller import analyze_quiz, get_analyze
+    from src.controllers.discussion_controller import get_threads_by_course, create_thread, get_thread_by_id, create_reply, delete_thread, delete_reply, toggle_pin_thread
     
     # Register routes
     app.add_url_rule('/api/google-login', view_func=google_login, methods=['POST'])
@@ -75,6 +76,14 @@ def create_app():
     
     app.add_url_rule('/api/analysis/<quiz_id>', view_func=get_analyze, methods=['GET'])
     app.add_url_rule('/api/analysis/<quiz_id>', view_func=analyze_quiz, methods=['POST'])
+    
+    app.add_url_rule('/api/discussions/<course_id>', view_func=get_threads_by_course, methods=['GET'])
+    app.add_url_rule('/api/discussions/<course_id>', view_func=create_thread, methods=['POST'])
+    app.add_url_rule('/api/discussions/thread/<thread_id>', view_func=get_thread_by_id, methods=['GET'])
+    app.add_url_rule('/api/discussions/thread/<thread_id>', view_func=delete_thread, methods=['DELETE'])
+    app.add_url_rule('/api/discussions/thread/<thread_id>/pin', view_func=toggle_pin_thread, methods=['PUT'])
+    app.add_url_rule('/api/discussions/thread/<thread_id>/reply', view_func=create_reply, methods=['POST'])
+    app.add_url_rule('/api/discussions/reply/<reply_id>', view_func=delete_reply, methods=['DELETE'])
     
     return app
 

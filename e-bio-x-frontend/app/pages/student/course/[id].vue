@@ -37,12 +37,24 @@
         <Icon name="hugeicons:quiz-04" />
         Kuis
       </button>
+      <button
+        @click="activeTab = 'forum'"
+        :class="[
+          'flex items-center gap-1 px-3 py-2 border rounded-lg text-sm font-medium whitespace-nowrap',
+          activeTab === 'forum'
+            ? 'bg-white dark:bg-gray-900 dark:text-green-200 text-green-600 border-green-300 shadow'
+            : 'bg-gray-100 text-gray-600 border-gray-200 dark:border-green-800 dark:text-green-200 dark:bg-gray-800',
+        ]">
+        <Icon name="mdi:forum-outline" />
+        Forum
+      </button>
     </div>
 
     <div class="mb-3">
       <MaterialList v-if="activeTab === 'materi'" :courseId="courseId"/>
       <QuizList v-if="activeTab === 'kuis'" :courseId="Number(courseId)"/>
       <StudentList v-if="activeTab === 'siswa'" :students="course.students" :courseId="Number(courseId)"/>
+      <DiscussionList v-if="activeTab === 'forum'" :courseId="courseId"/>
     </div>
   </div>
 </template>

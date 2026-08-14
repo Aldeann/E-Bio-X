@@ -59,6 +59,17 @@
         <Icon name="fluent:quiz-new-24-filled" />
         Buat Kuis
       </button>
+      <button
+        @click="activeTab = 'forum'"
+        :class="[
+          'flex items-center gap-1 px-3 py-2 border rounded-lg text-sm font-medium whitespace-nowrap',
+          activeTab === 'forum'
+            ? 'bg-white dark:bg-gray-900 dark:text-green-200 text-green-600 border-green-300 shadow shadow-green-300'
+            : 'bg-gray-100 text-gray-600 border-gray-200 dark:border-green-800 dark:text-green-200 dark:bg-gray-800',
+        ]">
+        <Icon name="mdi:forum-outline" />
+        Forum
+      </button>
     </div>
 
     <div class="mb-3">
@@ -73,6 +84,7 @@
       />
       <QuizCreate v-if="activeTab === 'buat-kuis'" class="mb-3" :courseId="Number(courseId)" />
       <QuizList v-if="activeTab === 'kuis'" class="mb-3" :courseId="Number(courseId)" />
+      <DiscussionList v-if="activeTab === 'forum'" class="mb-3" :courseId="courseId" />
     </div>
   </div>
 </template>
