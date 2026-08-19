@@ -2,6 +2,10 @@ from .user import User
 from .course import Course
 from .enrollment import Enrollment
 from .material import Material
+from .material_section import MaterialSection
+from .material_content import MaterialContent
+from .material_file import MaterialFile
+from .material_progress import MaterialProgress
 from .quiz import Quiz
 from .question import Question
 from .option import Option

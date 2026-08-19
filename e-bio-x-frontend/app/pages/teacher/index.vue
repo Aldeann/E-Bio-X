@@ -6,11 +6,19 @@
         <span class="text-green-700 dark:text-green-500">{{ useCookie("username").value }}</span
         >!
       </h2>
-      <button
-        class="bg-green-600 hover:bg-green-700 hover:shadow hover:shadow-green-300 text-white px-4 py-2 rounded"
-        @click="showCreateClassSwal">
-        + Buat Kelas Baru
-      </button>
+      <div class="flex flex-wrap gap-2">
+        <button
+          class="bg-green-600 hover:bg-green-700 hover:shadow hover:shadow-green-300 text-white px-4 py-2 rounded"
+          @click="showCreateClassSwal">
+          + Buat Kelas Baru
+        </button>
+        <NuxtLink
+          to="/teacher/materials"
+          class="bg-white dark:bg-gray-900 border border-green-600 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-gray-800 px-4 py-2 rounded flex items-center gap-1">
+          <Icon name="material-symbols:menu-book" class="w-4 h-4" />
+          Materi Pembelajaran
+        </NuxtLink>
+      </div>
     </div>
 
     <h4 class="text-lg font-medium mb-4">Kelas Saya</h4>

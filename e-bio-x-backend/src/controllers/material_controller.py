@@ -2,6 +2,11 @@ from flask import request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 from src.models.material import Material
+from src.models.material_section import MaterialSection
+from src.models.material_content import MaterialContent
+from src.models.material_file import MaterialFile
+from src.models.material_progress import MaterialProgress
+from src.models.user import User
 from src.config.database import db
 from datetime import datetime
 from dotenv import load_dotenv
@@ -12,8 +17,264 @@ import re
 
 load_dotenv()
 
+ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png', 'webp', 'mp4'}
+MAX_FILE_SIZE = 40 * 1024 * 1024  # 40 MB per file
+
+REQUIRED_FIELDS = ['title', 'description', 'phase', 'topic', 'learning_objectives']
+
+
+def _get_current_user():
+    user_id = get_jwt_identity()
+    return User.query.get(user_id) if user_id else None
+
+
+def _is_owner(material, user):
+    return material.teacher_id == user.id
+
+
+def _can_manage(material, user):
+    return user.role == 'admin' or _is_owner(material, user)
+
+
+def _can_view_detail(material, user):
+    if user.role == 'student':
+        return material.status == 'published'
+    return True
+
+
+def _allowed_file(filename):
+    if not filename:
+        return False
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    return ext in ALLOWED_EXTENSIONS
+
+
+def _upload_folder():
+    folder = current_app.config.get('UPLOAD_FOLDER')
+    if not folder:
+        folder = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'uploads')
+    return folder
+
+
+def _save_uploaded_file(file):
+    original_name = secure_filename(file.filename)
+    if not original_name:
+        original_name = 'file'
+    ext = original_name.rsplit('.', 1)[-1].lower() if '.' in original_name else ''
+    unique_name = f"{uuid.uuid4().hex}_{original_name}" if ext else uuid.uuid4().hex
+    upload_folder = _upload_folder()
+    os.makedirs(upload_folder, exist_ok=True)
+    save_path = os.path.join(upload_folder, unique_name)
+    file.save(save_path)
+
+    if os.path.getsize(save_path) > MAX_FILE_SIZE:
+        os.remove(save_path)
+        return None, f'Ukuran file melebihi batas maksimal 40MB'
+
+    file_url = f"{request.host_url}uploads/{unique_name}"
+    return {'name': unique_name, 'path': save_path, 'url': file_url}, None
+
+
+def _serialize_material_list(material, include_analytics=False):
+    description = material.description or material.content
+    item = {
+        'id': material.id,
+        'title': material.title,
+        'description': description,
+        'file_url': material.file_url,
+        'course': material.course.name if material.course else None,
+        'course_id': material.course_id,
+        'subject': material.subject,
+        'phase': material.phase,
+        'class_level': material.class_level,
+        'topic': material.topic,
+        'difficulty': material.difficulty,
+        'estimated_time': material.estimated_time,
+        'thumbnail_url': material.thumbnail_url,
+        'status': material.status,
+        'teacher_id': material.teacher_id,
+        'uploaded_at': material.uploaded_at.isoformat() if material.uploaded_at else None,
+        'created_at': material.uploaded_at.isoformat() if material.uploaded_at else None,
+        'updated_at': material.updated_at.isoformat() if material.updated_at else None,
+        'section_count': len(material.sections),
+        'content_count': sum(len(s.contents) for s in material.sections),
+    }
+    if include_analytics:
+        stats = _compute_analytics(material)
+        item.update(stats)
+    return item
+
+
+def _serialize_content(content, include_answers=True):
+    data = dict(content.data) if isinstance(content.data, dict) else {}
+    if not include_answers:
+        data.pop('correct_answer', None)
+        if content.type == 'quiz' and isinstance(data.get('questions'), list):
+            for q in data['questions']:
+                if isinstance(q, dict):
+                    q.pop('correct_answer', None)
+    return {
+        'id': content.id,
+        'type': content.type,
+        'data': data,
+        'position': content.position,
+    }
+
+
+def _serialize_material_detail(material, include_answers=True, include_analytics=False):
+    sections = []
+    for section in material.sections:
+        sections.append({
+            'id': section.id,
+            'title': section.title,
+            'position': section.position,
+            'contents': [_serialize_content(c, include_answers) for c in section.contents],
+        })
+
+    result = {
+        'id': material.id,
+        'title': material.title,
+        'description': material.description or material.content,
+        'content': material.content,
+        'file_url': material.file_url,
+        'subject': material.subject,
+        'phase': material.phase,
+        'class_level': material.class_level,
+        'topic': material.topic,
+        'learning_objectives': material.learning_objectives,
+        'estimated_time': material.estimated_time,
+        'difficulty': material.difficulty,
+        'thumbnail_url': material.thumbnail_url,
+        'status': material.status,
+        'course_id': material.course_id,
+        'teacher_id': material.teacher_id,
+        'teacher_name': material.teacher.name if material.teacher else None,
+        'uploaded_at': material.uploaded_at.isoformat() if material.uploaded_at else None,
+        'created_at': material.uploaded_at.isoformat() if material.uploaded_at else None,
+        'updated_at': material.updated_at.isoformat() if material.updated_at else None,
+        'sections': sections,
+        'files': [
+            {
+                'id': f.id,
+                'original_name': f.original_name,
+                'file_name': f.file_name,
+                'file_size': f.file_size,
+                'file_type': f.file_type,
+                'file_url': f.file_url,
+            }
+            for f in material.files
+        ],
+    }
+    if include_analytics:
+        result['analytics'] = _compute_analytics(material)
+    return result
+
+
+def _compute_analytics(material):
+    section_ids = [s.id for s in material.sections]
+    total_sections = len(section_ids)
+    rows = []
+    if total_sections > 0:
+        rows = MaterialProgress.query.filter(
+            MaterialProgress.material_id == material.id
+        ).all()
+
+    students_map = {}
+    for row in rows:
+        if row.student_id not in students_map:
+            students_map[row.student_id] = set()
+        students_map[row.student_id].add(row.section_id)
+
+    student_names = {}
+    for sid in students_map:
+        student = User.query.get(sid)
+        student_names[sid] = student.name if student else 'Siswa'
+
+    students_count = len(students_map)
+
+    if total_sections == 0 or students_count == 0:
+        completion = 0.0
+    else:
+        completion = sum(
+            (len(secs) / total_sections) * 100 for secs in students_map.values()
+        ) / students_count
+
+    students_list = [
+        {
+            'student_id': sid,
+            'name': student_names[sid],
+            'completed': len(secs),
+            'total': total_sections,
+            'percentage': round((len(secs) / total_sections) * 100, 1) if total_sections else 0,
+        }
+        for sid, secs in students_map.items()
+    ]
+
+    return {
+        'students': students_count,
+        'completion_percentage': round(completion, 1),
+        'students_list': students_list,
+    }
+
+
+# ============================================================
+# CREATE MATERIAL
+# ============================================================
+
 @jwt_required()
 def upload_material():
+    if request.is_json:
+        return _create_material_json()
+    return _create_material_form()
+
+
+def _create_material_json():
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    if user.role not in ('teacher', 'admin'):
+        return jsonify({'error': 'Hanya guru yang dapat membuat materi'}), 403
+
+    data = request.get_json(silent=True) or {}
+    for field in REQUIRED_FIELDS:
+        if not data.get(field):
+            return jsonify({'error': f'{field.replace("_", " ").capitalize()} wajib diisi'}), 400
+
+    try:
+        course_id = data.get('course_id')
+        if course_id is not None:
+            course_id = int(course_id)
+
+        material = Material(
+            title=data['title'].strip(),
+            description=data.get('description', '').strip(),
+            subject=data.get('subject') or None,
+            phase=data['phase'].strip(),
+            class_level=data.get('class_level') or None,
+            topic=data['topic'].strip(),
+            learning_objectives=data['learning_objectives'].strip(),
+            estimated_time=data.get('estimated_time') or None,
+            difficulty=data.get('difficulty') or None,
+            thumbnail_url=data.get('thumbnail_url') or None,
+            status=data.get('status') if data.get('status') in ('draft', 'published') else 'draft',
+            course_id=course_id,
+            teacher_id=user.id,
+            content=data.get('description', '').strip(),
+            updated_at=datetime.utcnow(),
+        )
+        db.session.add(material)
+        db.session.commit()
+        return jsonify({
+            'message': 'Materi berhasil dibuat',
+            'material': _serialize_material_detail(material, include_analytics=True),
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        traceback.print_exc()
+        return jsonify({'error': f'Gagal membuat materi: {str(e)}'}), 500
+
+
+def _create_material_form():
     title = request.form.get('title')
     content = request.form.get('content')
     try:
@@ -26,30 +287,45 @@ def upload_material():
     if not all([title, course_id, file]):
         return jsonify({'error': 'Title, course_id, and file are required'}), 400
 
-    upload_folder = current_app.config['UPLOAD_FOLDER']
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
 
-    original_name = secure_filename(file.filename)
-    ext = original_name.rsplit('.', 1)[-1].lower() if '.' in original_name else ''
-    unique_name = f"{uuid.uuid4().hex}_{original_name}" if ext else uuid.uuid4().hex
-    save_path = os.path.join(upload_folder, unique_name)
+    if not _allowed_file(file.filename):
+        return jsonify({'error': 'Tipe file tidak diizinkan'}), 400
+
+    saved, err = _save_uploaded_file(file)
+    if err:
+        return jsonify({'error': err}), 400
 
     try:
-        file.save(save_path)
+        new_material = Material(
+            title=title,
+            content=content,
+            course_id=course_id,
+            file_url=saved['url'],
+            teacher_id=user.id,
+            status='published',
+            uploaded_at=datetime.utcnow()
+        )
+        db.session.add(new_material)
+        db.session.commit()
+
+        db.session.add(MaterialFile(
+            material_id=new_material.id,
+            original_name=file.filename,
+            file_name=saved['name'],
+            file_size=os.path.getsize(saved['path']),
+            file_type=file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else '',
+            file_url=saved['url'],
+        ))
+        db.session.commit()
     except Exception as e:
+        db.session.rollback()
+        if os.path.exists(saved['path']):
+            os.remove(saved['path'])
         traceback.print_exc()
         return jsonify({"error": "Gagal menyimpan file"}), 500
-
-    file_url = f"{request.host_url}uploads/{unique_name}"
-
-    new_material = Material(
-        title=title,
-        content=content,
-        course_id=course_id,
-        file_url=file_url,
-        uploaded_at=datetime.utcnow()
-    )
-    db.session.add(new_material)
-    db.session.commit()
 
     return jsonify({
         'message': 'Material uploaded',
@@ -60,25 +336,57 @@ def upload_material():
         }
     }), 201
 
+
+# ============================================================
+# READ MATERIAL
+# ============================================================
+
+@jwt_required()
+def get_all_material():
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    if user.role == 'admin':
+        materials = Material.query.all()
+        return jsonify([_serialize_material_list(m) for m in materials]), 200
+    elif user.role == 'teacher':
+        materials = Material.query.filter_by(teacher_id=user.id).all()
+        return jsonify([_serialize_material_list(m, include_analytics=True) for m in materials]), 200
+    else:
+        materials = Material.query.filter_by(status='published').all()
+        return jsonify([_serialize_material_list(m) for m in materials]), 200
+
+
 @jwt_required()
 def get_material_by_id(material_id):
-    material = Material.query.get(material_id)
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
 
+    material = Material.query.get(material_id)
     if not material:
         return jsonify({'error': 'Material not found'}), 404
 
-    return jsonify({
-        'id': material.id,
-        'title': material.title,
-        'description': material.content,
-        'file_url': material.file_url,
-        'course_id': material.course_id,
-        'uploaded_at': material.uploaded_at,
-    }), 200
+    if not _can_view_detail(material, user):
+        return jsonify({'error': 'Materi belum dipublikasikan'}), 403
+
+    if user.role == 'student':
+        return jsonify(_serialize_material_detail(material, include_answers=False)), 200
+
+    include_analytics = user.role == 'admin' or _is_owner(material, user)
+    return jsonify(_serialize_material_detail(material, include_answers=True, include_analytics=include_analytics)), 200
+
 
 @jwt_required()
 def get_material_by_course(course_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
     materials = Material.query.filter_by(course_id=course_id).all()
+    if user.role == 'student':
+        materials = [m for m in materials if m.status == 'published']
 
     result = []
     for material in materials:
@@ -89,6 +397,7 @@ def get_material_by_course(course_id):
             'file_url': material.file_url,
             'course_id': material.course_id,
             'uploaded_at': material.uploaded_at,
+            'status': material.status,
         })
 
     return jsonify({
@@ -96,31 +405,444 @@ def get_material_by_course(course_id):
         'data': result,
     }), 200
 
-@jwt_required()
-def get_all_material():
-    materials = Material.query.all()
-
-    return jsonify([{
-            'id': material.id,
-            'title': material.title,
-            'description': material.content,
-            'file_url': material.file_url,
-            'course': material.course.name,
-            'uploaded_at': material.uploaded_at,
-        } for material in materials
-    ]), 200
 
 @jwt_required()
-def delete_material(material_id):
+def get_material_analytics(material_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
     material = Material.query.get(material_id)
     if not material:
         return jsonify({'error': 'Material not found'}), 404
 
-    upload_folder = current_app.config['UPLOAD_FOLDER']
-    filename = os.path.basename(material.file_url)
-    file_path = os.path.join(upload_folder, filename)
+    if not _can_manage(material, user):
+        return jsonify({'error': 'Anda tidak berhak mengakses materi ini'}), 403
+
+    return jsonify({
+        'id': material.id,
+        'title': material.title,
+        'analytics': _compute_analytics(material),
+    }), 200
+
+
+# ============================================================
+# UPDATE / DELETE MATERIAL
+# ============================================================
+
+@jwt_required()
+def update_material(material_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    material = Material.query.get(material_id)
+    if not material:
+        return jsonify({'error': 'Material not found'}), 404
+
+    if not _can_manage(material, user):
+        return jsonify({'error': 'Anda hanya dapat mengubah materi milik sendiri'}), 403
+
+    data = request.get_json(silent=True) or {}
+    editable = ['title', 'description', 'subject', 'phase', 'class_level', 'topic',
+                'learning_objectives', 'estimated_time', 'difficulty', 'thumbnail_url']
+
+    for field in editable:
+        if field in data and data[field] is not None:
+            setattr(material, field, str(data[field]).strip())
+
+    material.updated_at = datetime.utcnow()
+    if not material.content:
+        material.content = material.description
+
+    db.session.commit()
+    return jsonify({
+        'message': 'Materi berhasil diperbarui',
+        'material': _serialize_material_detail(material, include_analytics=True),
+    }), 200
+
+
+@jwt_required()
+def delete_material(material_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    material = Material.query.get(material_id)
+    if not material:
+        return jsonify({'error': 'Material not found'}), 404
+
+    if not _can_manage(material, user):
+        return jsonify({'error': 'Anda hanya dapat menghapus materi milik sendiri'}), 403
+
+    upload_folder = _upload_folder()
+
+    disk_files = []
+    if material.file_url:
+        disk_files.append(os.path.basename(material.file_url))
+    for f in material.files:
+        disk_files.append(f.file_name)
 
     db.session.delete(material)
+    db.session.commit()
+
+    for filename in disk_files:
+        file_path = os.path.join(upload_folder, filename)
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                print("Failed to delete file from disk:", e)
+
+    return jsonify({'message': 'Material deleted successfully'}), 200
+
+
+# ============================================================
+# PUBLISH / UNPUBLISH
+# ============================================================
+
+@jwt_required()
+def publish_material(material_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    material = Material.query.get(material_id)
+    if not material:
+        return jsonify({'error': 'Material not found'}), 404
+
+    if not _can_manage(material, user):
+        return jsonify({'error': 'Anda tidak berhak mempublish materi ini'}), 403
+
+    data = request.get_json(silent=True) or {}
+    requested = data.get('status')
+    if requested in ('draft', 'published'):
+        material.status = requested
+    else:
+        material.status = 'draft' if material.status == 'published' else 'published'
+
+    material.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify({
+        'message': f'Materi berhasil {"dipublikasikan" if material.status == "published" else "disimpan sebagai draft"}',
+        'status': material.status,
+    }), 200
+
+
+# ============================================================
+# SECTIONS
+# ============================================================
+
+@jwt_required()
+def create_section(material_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    material = Material.query.get(material_id)
+    if not material:
+        return jsonify({'error': 'Material not found'}), 404
+
+    if not _can_manage(material, user):
+        return jsonify({'error': 'Anda hanya dapat mengubah materi milik sendiri'}), 403
+
+    data = request.get_json(silent=True) or {}
+    title = (data.get('title') or '').strip()
+    if not title:
+        return jsonify({'error': 'Judul section wajib diisi'}), 400
+
+    max_pos = max([s.position for s in material.sections], default=-1)
+    section = MaterialSection(
+        material_id=material.id,
+        title=title,
+        position=max_pos + 1,
+    )
+    db.session.add(section)
+    db.session.commit()
+
+    return jsonify({'message': 'Section berhasil dibuat', 'section': {
+        'id': section.id, 'title': section.title, 'position': section.position, 'contents': [],
+    }}), 201
+
+
+@jwt_required()
+def update_section(section_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    section = MaterialSection.query.get(section_id)
+    if not section:
+        return jsonify({'error': 'Section not found'}), 404
+
+    if not _can_manage(section.material, user):
+        return jsonify({'error': 'Anda hanya dapat mengubah materi milik sendiri'}), 403
+
+    data = request.get_json(silent=True) or {}
+    if 'title' in data and data['title'] is not None:
+        title = str(data['title']).strip()
+        if not title:
+            return jsonify({'error': 'Judul section wajib diisi'}), 400
+        section.title = title
+    if 'position' in data and data['position'] is not None:
+        section.position = int(data['position'])
+
+    db.session.commit()
+    return jsonify({'message': 'Section berhasil diperbarui', 'section': {
+        'id': section.id, 'title': section.title, 'position': section.position,
+    }}), 200
+
+
+@jwt_required()
+def delete_section(section_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    section = MaterialSection.query.get(section_id)
+    if not section:
+        return jsonify({'error': 'Section not found'}), 404
+
+    if not _can_manage(section.material, user):
+        return jsonify({'error': 'Anda hanya dapat mengubah materi milik sendiri'}), 403
+
+    material = section.material
+    db.session.delete(section)
+    db.session.commit()
+
+    for i, s in enumerate(sorted(material.sections, key=lambda x: x.position)):
+        s.position = i
+    db.session.commit()
+
+    return jsonify({'message': 'Section berhasil dihapus'}), 200
+
+
+@jwt_required()
+def reorder_sections(material_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    material = Material.query.get(material_id)
+    if not material:
+        return jsonify({'error': 'Material not found'}), 404
+
+    if not _can_manage(material, user):
+        return jsonify({'error': 'Anda hanya dapat mengubah materi milik sendiri'}), 403
+
+    data = request.get_json(silent=True) or {}
+    section_ids = data.get('section_ids') or []
+    section_map = {s.id: s for s in material.sections}
+
+    for i, sid in enumerate(section_ids):
+        section = section_map.get(int(sid))
+        if section:
+            section.position = i
+
+    db.session.commit()
+    return jsonify({'message': 'Urutan section berhasil diperbarui'}), 200
+
+
+# ============================================================
+# CONTENT BLOCKS
+# ============================================================
+
+@jwt_required()
+def create_content(section_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    section = MaterialSection.query.get(section_id)
+    if not section:
+        return jsonify({'error': 'Section not found'}), 404
+
+    if not _can_manage(section.material, user):
+        return jsonify({'error': 'Anda hanya dapat mengubah materi milik sendiri'}), 403
+
+    data = request.get_json(silent=True) or {}
+    block_type = data.get('type')
+    block_data = data.get('data') or {}
+    allowed_types = ['text', 'heading', 'image', 'video', 'pdf', 'link', 'box', 'question', 'quiz']
+
+    if block_type not in allowed_types:
+        return jsonify({'error': f'Tipe komponen "{block_type}" tidak dikenal'}), 400
+
+    max_pos = max([c.position for c in section.contents], default=-1)
+    content = MaterialContent(
+        section_id=section.id,
+        type=block_type,
+        data=block_data,
+        position=max_pos + 1,
+    )
+    db.session.add(content)
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Komponen berhasil ditambahkan',
+        'content': _serialize_content(content),
+    }), 201
+
+
+@jwt_required()
+def update_content(content_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    content = MaterialContent.query.get(content_id)
+    if not content:
+        return jsonify({'error': 'Content not found'}), 404
+
+    if not _can_manage(content.section.material, user):
+        return jsonify({'error': 'Anda hanya dapat mengubah materi milik sendiri'}), 403
+
+    data = request.get_json(silent=True) or {}
+    if 'type' in data and data['type']:
+        allowed_types = ['text', 'heading', 'image', 'video', 'pdf', 'link', 'box', 'question', 'quiz']
+        if data['type'] not in allowed_types:
+            return jsonify({'error': f'Tipe komponen "{data["type"]}" tidak dikenal'}), 400
+        content.type = data['type']
+    if 'data' in data and isinstance(data['data'], dict):
+        content.data = data['data']
+
+    db.session.commit()
+    return jsonify({
+        'message': 'Komponen berhasil diperbarui',
+        'content': _serialize_content(content),
+    }), 200
+
+
+@jwt_required()
+def delete_content(content_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    content = MaterialContent.query.get(content_id)
+    if not content:
+        return jsonify({'error': 'Content not found'}), 404
+
+    if not _can_manage(content.section.material, user):
+        return jsonify({'error': 'Anda hanya dapat mengubah materi milik sendiri'}), 403
+
+    section = content.section
+    db.session.delete(content)
+    db.session.commit()
+
+    for i, c in enumerate(sorted(section.contents, key=lambda x: x.position)):
+        c.position = i
+    db.session.commit()
+
+    return jsonify({'message': 'Komponen berhasil dihapus'}), 200
+
+
+@jwt_required()
+def reorder_contents(section_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    section = MaterialSection.query.get(section_id)
+    if not section:
+        return jsonify({'error': 'Section not found'}), 404
+
+    if not _can_manage(section.material, user):
+        return jsonify({'error': 'Anda hanya dapat mengubah materi milik sendiri'}), 403
+
+    data = request.get_json(silent=True) or {}
+    content_ids = data.get('content_ids') or []
+    content_map = {c.id: c for c in section.contents}
+
+    for i, cid in enumerate(content_ids):
+        content = content_map.get(int(cid))
+        if content:
+            content.position = i
+
+    db.session.commit()
+    return jsonify({'message': 'Urutan komponen berhasil diperbarui'}), 200
+
+
+# ============================================================
+# FILES
+# ============================================================
+
+@jwt_required()
+def upload_material_file(material_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    material = Material.query.get(material_id)
+    if not material:
+        return jsonify({'error': 'Material not found'}), 404
+
+    if not _can_manage(material, user):
+        return jsonify({'error': 'Anda hanya dapat mengubah materi milik sendiri'}), 403
+
+    file = request.files.get('file')
+    if not file:
+        return jsonify({'error': 'File tidak ditemukan'}), 400
+
+    if not _allowed_file(file.filename):
+        return jsonify({'error': 'Tipe file tidak diizinkan (pdf, jpg, jpeg, png, webp, mp4)'}), 400
+
+    saved, err = _save_uploaded_file(file)
+    if err:
+        return jsonify({'error': err}), 400
+
+    try:
+        new_file = MaterialFile(
+            material_id=material.id,
+            original_name=file.filename,
+            file_name=saved['name'],
+            file_size=os.path.getsize(saved['path']),
+            file_type=file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else '',
+            file_url=saved['url'],
+        )
+        db.session.add(new_file)
+        db.session.commit()
+    except Exception as e:
+        if os.path.exists(saved['path']):
+            os.remove(saved['path'])
+        db.session.rollback()
+        traceback.print_exc()
+        return jsonify({'error': 'Gagal menyimpan file'}), 500
+
+    return jsonify({
+        'message': 'File berhasil diunggah',
+        'file': {
+            'id': new_file.id,
+            'original_name': new_file.original_name,
+            'file_name': new_file.file_name,
+            'file_size': new_file.file_size,
+            'file_type': new_file.file_type,
+            'file_url': new_file.file_url,
+        },
+    }), 201
+
+
+@jwt_required()
+def delete_material_file(material_id, file_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    material = Material.query.get(material_id)
+    if not material:
+        return jsonify({'error': 'Material not found'}), 404
+
+    if not _can_manage(material, user):
+        return jsonify({'error': 'Anda hanya dapat mengubah materi milik sendiri'}), 403
+
+    material_file = MaterialFile.query.filter_by(id=file_id, material_id=material_id).first()
+    if not material_file:
+        return jsonify({'error': 'File not found'}), 404
+
+    file_path = os.path.join(_upload_folder(), material_file.file_name)
+
+    db.session.delete(material_file)
     db.session.commit()
 
     if os.path.exists(file_path):
@@ -129,4 +851,52 @@ def delete_material(material_id):
         except Exception as e:
             print("Failed to delete file from disk:", e)
 
-    return jsonify({'message': 'Material deleted successfully'}), 200
+    return jsonify({'message': 'File berhasil dihapus'}), 200
+
+
+# ============================================================
+# PROGRESS (siswa)
+# ============================================================
+
+@jwt_required()
+def record_progress(material_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    if user.role != 'student':
+        return jsonify({'error': 'Hanya siswa yang dapat mencatat progress'}), 403
+
+    material = Material.query.get(material_id)
+    if not material:
+        return jsonify({'error': 'Material not found'}), 404
+
+    if material.status != 'published':
+        return jsonify({'error': 'Materi belum dipublikasikan'}), 403
+
+    data = request.get_json(silent=True) or {}
+    section_id = data.get('section_id')
+    if not section_id:
+        return jsonify({'error': 'section_id wajib diisi'}), 400
+
+    section = MaterialSection.query.filter_by(id=section_id, material_id=material.id).first()
+    if not section:
+        return jsonify({'error': 'Section tidak ditemukan pada materi ini'}), 404
+
+    existing = MaterialProgress.query.filter_by(
+        material_id=material.id, section_id=section.id, student_id=user.id
+    ).first()
+    if existing:
+        return jsonify({'message': 'Progress sudah tercatat', 'recorded': False}), 200
+
+    try:
+        db.session.add(MaterialProgress(
+            material_id=material.id,
+            section_id=section.id,
+            student_id=user.id,
+        ))
+        db.session.commit()
+        return jsonify({'message': 'Progress tercatat', 'recorded': True}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Gagal mencatat progress: {str(e)}'}), 500

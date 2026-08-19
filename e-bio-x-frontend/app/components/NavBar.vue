@@ -9,6 +9,19 @@
         >
           <Icon name="material-symbols:arrow-back-ios-new" class="w-4 h-4" />
         </button>
+
+        <nav
+          v-if="role"
+          class="hidden sm:flex items-center gap-1 text-sm font-medium"
+        >
+          <NuxtLink
+            :to="materialsLink"
+            class="px-3 py-1.5 rounded-lg hover:bg-white/15 transition flex items-center gap-1"
+          >
+            <Icon name="material-symbols:menu-book" class="w-4 h-4" />
+            Materi
+          </NuxtLink>
+        </nav>
       </div>
 
       <div v-if="username" class="relative flex items-center space-x-2">
@@ -50,7 +63,7 @@
 <script setup>
 import Cookies from "js-cookie";
 import { useCookie } from "#app";
-import { ref, onMounted, onBeforeUnmount, watch } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useSwal } from "~/utils/swal";
 
@@ -59,6 +72,15 @@ const swal = useSwal();
 
 const usernameCookie = useCookie("username");
 const username = ref(usernameCookie || "E-Bio X");
+
+const roleCookie = useCookie("role");
+const role = computed(() => roleCookie.value || null);
+const materialsLink = computed(() => {
+  if (role.value === "teacher") return "/teacher/materials";
+  if (role.value === "student") return "/student/materials";
+  if (role.value === "admin") return "/admin/materials";
+  return "/";
+});
 
 const dropdownOpen = ref(false);
 const dropdown = ref(null);

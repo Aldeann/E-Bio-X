@@ -30,7 +30,13 @@ def create_app():
     # Import routes
     from src.controllers.user_controller import google_login, login, get_all_users, create_user, update_user, update_user_me, delete_user
     from src.controllers.course_controller import create_course, get_courses, get_teacher_courses, get_student_courses, delete_course, enroll, out, get_course_by_id, kick
-    from src.controllers.material_controller import upload_material, get_all_material, get_material_by_id, get_material_by_course, delete_material
+    from src.controllers.material_controller import (
+        upload_material, get_all_material, get_material_by_id, get_material_by_course, delete_material,
+        update_material, publish_material, get_material_analytics,
+        create_section, update_section, delete_section, reorder_sections,
+        create_content, update_content, delete_content, reorder_contents,
+        upload_material_file, delete_material_file, record_progress,
+    )
     from src.controllers.quiz_controller import create_quiz, get_quiz_by_id, delete_quiz, get_quizzes_by_course, submit_quiz, remove_sumbission, get_submission_by_quiz, toggle_open_quiz, edit_quiz_title, edit_question, edit_option
     from src.controllers.analysis_controller import analyze_quiz, get_analyze
     from src.controllers.discussion_controller import get_threads_by_course, create_thread, get_thread_by_id, create_reply, delete_thread, delete_reply, toggle_pin_thread
@@ -60,7 +66,21 @@ def create_app():
     app.add_url_rule('/api/materials', view_func=upload_material, methods=['POST'])
     app.add_url_rule('/api/materials', view_func=get_all_material, methods=['GET'])
     app.add_url_rule('/api/materials/<material_id>', view_func=get_material_by_id, methods=['GET'])
+    app.add_url_rule('/api/materials/<material_id>', view_func=update_material, methods=['PUT'])
     app.add_url_rule('/api/materials/<material_id>', view_func=delete_material, methods=['DELETE'])
+    app.add_url_rule('/api/materials/<material_id>/publish', view_func=publish_material, methods=['PATCH'])
+    app.add_url_rule('/api/materials/<material_id>/analytics', view_func=get_material_analytics, methods=['GET'])
+    app.add_url_rule('/api/materials/<material_id>/sections', view_func=create_section, methods=['POST'])
+    app.add_url_rule('/api/materials/<material_id>/sections/reorder', view_func=reorder_sections, methods=['POST'])
+    app.add_url_rule('/api/sections/<section_id>', view_func=update_section, methods=['PUT'])
+    app.add_url_rule('/api/sections/<section_id>', view_func=delete_section, methods=['DELETE'])
+    app.add_url_rule('/api/sections/<section_id>/contents', view_func=create_content, methods=['POST'])
+    app.add_url_rule('/api/sections/<section_id>/contents/reorder', view_func=reorder_contents, methods=['POST'])
+    app.add_url_rule('/api/contents/<content_id>', view_func=update_content, methods=['PUT'])
+    app.add_url_rule('/api/contents/<content_id>', view_func=delete_content, methods=['DELETE'])
+    app.add_url_rule('/api/materials/<material_id>/files', view_func=upload_material_file, methods=['POST'])
+    app.add_url_rule('/api/materials/<material_id>/files/<file_id>', view_func=delete_material_file, methods=['DELETE'])
+    app.add_url_rule('/api/materials/<material_id>/progress', view_func=record_progress, methods=['POST'])
     
     app.add_url_rule('/api/quiz', view_func=create_quiz, methods=['POST'])
     app.add_url_rule('/api/quiz/<quiz_id>', view_func=get_quiz_by_id, methods=['GET'])
