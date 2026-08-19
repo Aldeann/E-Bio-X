@@ -7,6 +7,10 @@ from src.models.material_section import MaterialSection
 from src.models.material_content import MaterialContent
 from src.models.material_file import MaterialFile
 from src.models.material_progress import MaterialProgress
+from src.models.material_student_state import MaterialStudentState
+from src.models.material_bookmark import MaterialBookmark
+from src.models.student_note import StudentNote
+from src.models.student_answer import StudentAnswer
 from src.models.user import User
 from src.models.course import Course
 from src.models.enrollment import Enrollment
@@ -116,7 +120,32 @@ def _save_uploaded_file(file):
     return {'name': unique_name, 'path': save_path, 'url': file_url}, None
 
 
-def _serialize_material_list(material, include_analytics=False):
+def _student_progress_map(user, material_ids):
+    if not material_ids:
+        return {}
+    rows = MaterialProgress.query.filter(
+        MaterialProgress.student_id == user.id,
+        MaterialProgress.material_id.in_(material_ids),
+    ).all()
+    result = {}
+    for r in rows:
+        result.setdefault(r.material_id, set()).add(r.section_id)
+    return result
+
+
+def _student_progress_info(material, done_section_ids):
+    total = len(material.sections)
+    done = len(done_section_ids)
+    percentage = round((done / total) * 100) if total else 0
+    return {
+        'completed': done,
+        'total': total,
+        'percentage': percentage,
+        'finished': total > 0 and done >= total,
+    }
+
+
+def _serialize_material_list(material, include_analytics=False, student_progress=None):
     description = material.description or material.content
     item = {
         'id': material.id,
@@ -142,6 +171,8 @@ def _serialize_material_list(material, include_analytics=False):
         'section_count': len(material.sections),
         'content_count': sum(len(s.contents) for s in material.sections),
     }
+    if student_progress is not None:
+        item['student_progress'] = student_progress
     if include_analytics:
         stats = _compute_analytics(material)
         item.update(stats)
@@ -419,7 +450,14 @@ def get_all_material():
             m for m in materials
             if not m.course_links or any(c.id in enrolled_ids for c in m.course_links)
         ]
-        return jsonify([_serialize_material_list(m) for m in materials]), 200
+        progress_map = _student_progress_map(user, [m.id for m in materials])
+        return jsonify([
+            _serialize_material_list(
+                m,
+                student_progress=_student_progress_info(m, progress_map.get(m.id, set())),
+            )
+            for m in materials
+        ]), 200
 
 
 @jwt_required()
@@ -987,3 +1025,353 @@ def record_progress(material_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Gagal mencatat progress: {str(e)}'}), 500
+
+
+# ============================================================
+# STUDENT LEARNING (state, bookmark, note, answer)
+# ============================================================
+
+def _student_learning_guard(material_id):
+    user = _get_current_user()
+    if not user:
+        return None, None, jsonify({'error': 'User not found'}), 404
+    if user.role != 'student':
+        return None, None, jsonify({'error': 'Endpoint ini khusus siswa'}), 403
+
+    material = Material.query.get(material_id)
+    if not material:
+        return None, None, jsonify({'error': 'Material not found'}), 404
+    if material.status != 'published':
+        return None, None, jsonify({'error': 'Materi belum dipublikasikan'}), 403
+    if not _can_student_access(material, user):
+        return None, None, jsonify({'error': 'Materi hanya untuk kelas yang diikuti'}), 403
+
+    return user, material, None, None
+
+
+def _student_state_payload(material_id, user):
+    done_ids = {
+        r.section_id for r in MaterialProgress.query.filter_by(
+            material_id=material_id, student_id=user.id
+        ).all()
+    }
+    material = Material.query.get(material_id)
+    progress = _student_progress_info(material, done_ids)
+    state = MaterialStudentState.query.filter_by(
+        material_id=material_id, student_id=user.id
+    ).first()
+    last_section = state.last_section if state and state.last_section_id else None
+    return {
+        'material_id': material_id,
+        'student_progress': progress,
+        'completed_section_ids': sorted(done_ids),
+        'last_section_id': last_section.id if last_section else None,
+        'last_section_title': last_section.title if last_section else None,
+        'completed': bool(state.completed if state else False) or progress['finished'],
+        'last_accessed': state.last_accessed.isoformat() if state and state.last_accessed else None,
+    }
+
+
+@jwt_required()
+def get_material_student_state(material_id):
+    user, material, err, code = _student_learning_guard(material_id)
+    if err:
+        return err, code
+    return jsonify(_student_state_payload(material_id, user)), 200
+
+
+@jwt_required()
+def update_material_student_state(material_id):
+    user, material, err, code = _student_learning_guard(material_id)
+    if err:
+        return err, code
+
+    data = request.get_json(silent=True) or {}
+    state = MaterialStudentState.query.filter_by(
+        material_id=material.id, student_id=user.id
+    ).first()
+    if not state:
+        state = MaterialStudentState(material_id=material.id, student_id=user.id, completed=False)
+        db.session.add(state)
+
+    section_id = data.get('section_id')
+    if section_id is not None:
+        section = MaterialSection.query.filter_by(id=int(section_id), material_id=material.id).first()
+        if not section:
+            return jsonify({'error': 'Section tidak ditemukan pada materi ini'}), 404
+        state.last_section_id = section.id
+
+    state.last_accessed = datetime.utcnow()
+
+    if data.get('completed') is True:
+        state.completed = True
+        state.completed_at = state.completed_at or datetime.utcnow()
+
+    done_ids = {
+        r.section_id for r in MaterialProgress.query.filter_by(
+            material_id=material.id, student_id=user.id
+        ).all()
+    }
+    progress = _student_progress_info(material, done_ids)
+    if progress['finished']:
+        state.completed = True
+        state.completed_at = state.completed_at or datetime.utcnow()
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Gagal menyimpan posisi belajar: {str(e)}'}), 500
+
+    return jsonify({'message': 'Posisi belajar tersimpan', 'state': _student_state_payload(material.id, user)}), 200
+
+
+@jwt_required()
+def submit_student_answer(material_id):
+    user, material, err, code = _student_learning_guard(material_id)
+    if err:
+        return err, code
+
+    data = request.get_json(silent=True) or {}
+    section_id = data.get('section_id')
+    content_id = data.get('content_id')
+    selected_answer = data.get('selected_answer')
+
+    if section_id is None or content_id is None or selected_answer is None:
+        return jsonify({'error': 'section_id, content_id, dan selected_answer wajib diisi'}), 400
+
+    section = MaterialSection.query.filter_by(id=int(section_id), material_id=material.id).first()
+    if not section:
+        return jsonify({'error': 'Section tidak ditemukan pada materi ini'}), 404
+
+    content = MaterialContent.query.filter_by(id=int(content_id), section_id=section.id).first()
+    if not content:
+        return jsonify({'error': 'Content tidak ditemukan pada section ini'}), 404
+
+    content_data = dict(content.data) if isinstance(content.data, dict) else {}
+    expected = content_data.get('correct_answer')
+    explanation = content_data.get('explanation')
+    question_index = data.get('question_index')
+    if expected is None and isinstance(content_data.get('questions'), list):
+        questions = content_data['questions']
+        if question_index is not None and 0 <= int(question_index) < len(questions):
+            expected = questions[int(question_index)].get('correct_answer')
+            explanation = questions[int(question_index)].get('explanation')
+        else:
+            for q in questions:
+                if isinstance(q, dict) and q.get('correct_answer') is not None:
+                    expected = q.get('correct_answer')
+                    explanation = q.get('explanation')
+                    break
+
+    selected = int(selected_answer)
+    is_correct = (expected is not None and selected == int(expected))
+    if expected is None:
+        is_correct = bool(data.get('is_correct', False))
+
+    try:
+        db.session.add(StudentAnswer(
+            student_id=user.id,
+            material_id=material.id,
+            section_id=section.id,
+            content_id=content.id,
+            selected_answer=selected,
+            is_correct=is_correct,
+        ))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Gagal menyimpan jawaban: {str(e)}'}), 500
+
+    return jsonify({
+        'message': 'Jawaban tersimpan',
+        'correct': is_correct,
+        'explanation': explanation or None,
+    }), 201
+
+
+@jwt_required()
+def get_material_bookmarks(material_id):
+    user, material, err, code = _student_learning_guard(material_id)
+    if err:
+        return err, code
+
+    bookmarks = MaterialBookmark.query.filter_by(
+        material_id=material.id, student_id=user.id
+    ).all()
+    result = [{
+        'id': b.id,
+        'section_id': b.section_id,
+        'content_id': b.content_id,
+        'section_title': b.section.title if b.section else None,
+        'created_at': b.created_at.isoformat() if b.created_at else None,
+    } for b in bookmarks]
+    return jsonify(result), 200
+
+
+@jwt_required()
+def create_material_bookmark(material_id):
+    user, material, err, code = _student_learning_guard(material_id)
+    if err:
+        return err, code
+
+    data = request.get_json(silent=True) or {}
+    section_id = data.get('section_id')
+    content_id = data.get('content_id')
+
+    if content_id is not None:
+        content = MaterialContent.query.get(int(content_id))
+        if not content:
+            return jsonify({'error': 'Content tidak ditemukan'}), 404
+        section_id = content.section_id
+    elif section_id is not None:
+        section = MaterialSection.query.filter_by(id=int(section_id), material_id=material.id).first()
+        if not section:
+            return jsonify({'error': 'Section tidak ditemukan pada materi ini'}), 404
+    else:
+        return jsonify({'error': 'section_id atau content_id wajib diisi'}), 400
+
+    existing = MaterialBookmark.query.filter_by(
+        student_id=user.id, material_id=material.id,
+        section_id=section_id, content_id=content_id,
+    ).first()
+    if existing:
+        return jsonify({'message': 'Bookmark sudah tersimpan', 'bookmark': {'id': existing.id}}), 200
+
+    bookmark = MaterialBookmark(
+        student_id=user.id, material_id=material.id,
+        section_id=section_id, content_id=content_id,
+    )
+    db.session.add(bookmark)
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Gagal menyimpan bookmark: {str(e)}'}), 500
+
+    return jsonify({'message': 'Bookmark tersimpan', 'bookmark': {
+        'id': bookmark.id, 'section_id': bookmark.section_id, 'content_id': bookmark.content_id,
+    }}), 201
+
+
+@jwt_required()
+def delete_material_bookmark(material_id, bookmark_id):
+    user, material, err, code = _student_learning_guard(material_id)
+    if err:
+        return err, code
+
+    bookmark = MaterialBookmark.query.filter_by(id=bookmark_id, material_id=material.id, student_id=user.id).first()
+    if not bookmark:
+        return jsonify({'error': 'Bookmark tidak ditemukan'}), 404
+
+    db.session.delete(bookmark)
+    db.session.commit()
+    return jsonify({'message': 'Bookmark dihapus'}), 200
+
+
+@jwt_required()
+def get_material_notes(material_id):
+    user, material, err, code = _student_learning_guard(material_id)
+    if err:
+        return err, code
+
+    notes = StudentNote.query.filter_by(
+        material_id=material.id, student_id=user.id
+    ).order_by(StudentNote.updated_at.desc()).all()
+    result = [{
+        'id': n.id,
+        'section_id': n.section_id,
+        'content_id': n.content_id,
+        'section_title': n.section.title if n.section else None,
+        'note': n.note,
+        'created_at': n.created_at.isoformat() if n.created_at else None,
+        'updated_at': n.updated_at.isoformat() if n.updated_at else None,
+    } for n in notes]
+    return jsonify(result), 200
+
+
+@jwt_required()
+def create_material_note(material_id):
+    user, material, err, code = _student_learning_guard(material_id)
+    if err:
+        return err, code
+
+    data = request.get_json(silent=True) or {}
+    note_text = (data.get('note') or '').strip()
+    if not note_text:
+        return jsonify({'error': 'Isi catatan tidak boleh kosong'}), 400
+
+    section_id = data.get('section_id')
+    content_id = data.get('content_id')
+
+    if content_id is not None:
+        content = MaterialContent.query.get(int(content_id))
+        if not content:
+            return jsonify({'error': 'Content tidak ditemukan'}), 404
+        section_id = content.section_id
+    elif section_id is not None:
+        section = MaterialSection.query.filter_by(id=int(section_id), material_id=material.id).first()
+        if not section:
+            return jsonify({'error': 'Section tidak ditemukan pada materi ini'}), 404
+
+    existing = StudentNote.query.filter_by(
+        student_id=user.id, material_id=material.id,
+        section_id=section_id, content_id=content_id,
+    ).first()
+    try:
+        if existing:
+            existing.note = note_text
+            existing.updated_at = datetime.utcnow()
+            db.session.commit()
+            return jsonify({'message': 'Catatan diperbarui', 'note': {'id': existing.id}}), 200
+
+        note = StudentNote(
+            student_id=user.id, material_id=material.id,
+            section_id=section_id, content_id=content_id, note=note_text,
+        )
+        db.session.add(note)
+        db.session.commit()
+        return jsonify({'message': 'Catatan tersimpan', 'note': {'id': note.id}}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Gagal menyimpan catatan: {str(e)}'}), 500
+
+
+@jwt_required()
+def update_student_note(note_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    if user.role != 'student':
+        return jsonify({'error': 'Endpoint ini khusus siswa'}), 403
+
+    note = StudentNote.query.filter_by(id=note_id, student_id=user.id).first()
+    if not note:
+        return jsonify({'error': 'Catatan tidak ditemukan'}), 404
+
+    data = request.get_json(silent=True) or {}
+    note_text = (data.get('note') or '').strip()
+    if not note_text:
+        return jsonify({'error': 'Isi catatan tidak boleh kosong'}), 400
+
+    note.note = note_text
+    note.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({'message': 'Catatan diperbarui'}), 200
+
+
+@jwt_required()
+def delete_student_note(note_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    if user.role != 'student':
+        return jsonify({'error': 'Endpoint ini khusus siswa'}), 403
+
+    note = StudentNote.query.filter_by(id=note_id, student_id=user.id).first()
+    if not note:
+        return jsonify({'error': 'Catatan tidak ditemukan'}), 404
+
+    db.session.delete(note)
+    db.session.commit()
+    return jsonify({'message': 'Catatan dihapus'}), 200

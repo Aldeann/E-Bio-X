@@ -6,6 +6,10 @@ from .material_section import MaterialSection
 from .material_content import MaterialContent
 from .material_file import MaterialFile
 from .material_progress import MaterialProgress
+from .material_student_state import MaterialStudentState
+from .material_bookmark import MaterialBookmark
+from .student_note import StudentNote
+from .student_answer import StudentAnswer
 from .quiz import Quiz
 from .question import Question
 from .option import Option

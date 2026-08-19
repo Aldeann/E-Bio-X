@@ -1,12 +1,22 @@
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
 const props = defineProps({
   block: { type: Object, required: true },
   interactive: { type: Boolean, default: false },
+  materialId: { type: [Number, String], default: null },
+  sectionId: { type: [Number, String], default: null },
 });
 
+const emit = defineEmits(["submitted"]);
+
+const config = useRuntimeConfig();
+const token = useCookie("access_token").value;
+
 const data = computed(() => (props.block && props.block.data) || {});
+
+const externalResults = ref({});
+const submitting = ref(null);
 
 const isYoutube = computed(() => {
   const url = data.value.url || "";
@@ -41,6 +51,36 @@ const boxIcon = computed(() => {
   };
   return variants[data.value.variant] || variants.info;
 });
+
+const handleSubmit = async (key, selected, questionIndex = null) => {
+  if (!props.materialId) return;
+  submitting.value = key;
+  try {
+    const res = await $fetch(
+      `${config.public.backend}/api/materials/${props.materialId}/answers`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: {
+          section_id: props.sectionId,
+          content_id: props.block.id,
+          selected_answer: selected,
+          ...(questionIndex !== null ? { question_index: questionIndex } : {}),
+        },
+      }
+    );
+    externalResults.value[key] = {
+      correct: !!res.correct,
+      explanation: res.explanation || "",
+    };
+    emit("submitted", { content_id: props.block.id, ...res });
+  } catch (e) {
+    const msg = e && e.data && e.data.error ? e.data.error : "Gagal mengirim jawaban.";
+    externalResults.value[key] = { correct: false, explanation: msg };
+  } finally {
+    submitting.value = null;
+  }
+};
 </script>
 
 <template>
@@ -151,7 +191,11 @@ const boxIcon = computed(() => {
         :correct-answer="data.correct_answer ?? null"
         :explanation="data.explanation || ''"
         :interactive="interactive"
+        :external-result="externalResults['q-' + block.id] || null"
+        @submit="(sel) => handleSubmit('q-' + block.id, sel)"
+        @answered="(r) => emit('submitted', { content_id: block.id, ...r })"
       />
+      <p v-if="submitting === 'q-' + block.id" class="text-xs text-gray-400 mt-2">Menilai jawaban...</p>
     </div>
 
     <!-- Quiz -->
@@ -178,7 +222,16 @@ const boxIcon = computed(() => {
             :correct-answer="q.correct_answer ?? null"
             :explanation="q.explanation || ''"
             :interactive="interactive"
+            :external-result="externalResults['z-' + block.id + '-' + qi] || null"
+            @submit="(sel) => handleSubmit('z-' + block.id + '-' + qi, sel, qi)"
+            @answered="(r) => emit('submitted', { content_id: block.id, question_index: qi, ...r })"
           />
+          <p
+            v-if="submitting === 'z-' + block.id + '-' + qi"
+            class="text-xs text-gray-400 mt-2"
+          >
+            Menilai jawaban...
+          </p>
         </div>
       </div>
     </div>

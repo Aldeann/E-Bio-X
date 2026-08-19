@@ -36,6 +36,9 @@ def create_app():
         create_section, update_section, delete_section, reorder_sections,
         create_content, update_content, delete_content, reorder_contents,
         upload_material_file, delete_material_file, record_progress,
+        get_material_student_state, update_material_student_state, submit_student_answer,
+        get_material_bookmarks, create_material_bookmark, delete_material_bookmark,
+        get_material_notes, create_material_note, update_student_note, delete_student_note,
     )
     from src.controllers.quiz_controller import create_quiz, get_quiz_by_id, delete_quiz, get_quizzes_by_course, submit_quiz, remove_sumbission, get_submission_by_quiz, toggle_open_quiz, edit_quiz_title, edit_question, edit_option
     from src.controllers.analysis_controller import analyze_quiz, get_analyze
@@ -81,6 +84,16 @@ def create_app():
     app.add_url_rule('/api/materials/<material_id>/files', view_func=upload_material_file, methods=['POST'])
     app.add_url_rule('/api/materials/<material_id>/files/<file_id>', view_func=delete_material_file, methods=['DELETE'])
     app.add_url_rule('/api/materials/<material_id>/progress', view_func=record_progress, methods=['POST'])
+    app.add_url_rule('/api/materials/<material_id>/state', view_func=get_material_student_state, methods=['GET'])
+    app.add_url_rule('/api/materials/<material_id>/state', view_func=update_material_student_state, methods=['POST'])
+    app.add_url_rule('/api/materials/<material_id>/answers', view_func=submit_student_answer, methods=['POST'])
+    app.add_url_rule('/api/materials/<material_id>/bookmarks', view_func=get_material_bookmarks, methods=['GET'])
+    app.add_url_rule('/api/materials/<material_id>/bookmarks', view_func=create_material_bookmark, methods=['POST'])
+    app.add_url_rule('/api/materials/<material_id>/bookmarks/<bookmark_id>', view_func=delete_material_bookmark, methods=['DELETE'])
+    app.add_url_rule('/api/materials/<material_id>/notes', view_func=get_material_notes, methods=['GET'])
+    app.add_url_rule('/api/materials/<material_id>/notes', view_func=create_material_note, methods=['POST'])
+    app.add_url_rule('/api/notes/<note_id>', view_func=update_student_note, methods=['PUT'])
+    app.add_url_rule('/api/notes/<note_id>', view_func=delete_student_note, methods=['DELETE'])
     
     app.add_url_rule('/api/quiz', view_func=create_quiz, methods=['POST'])
     app.add_url_rule('/api/quiz/<quiz_id>', view_func=get_quiz_by_id, methods=['GET'])
