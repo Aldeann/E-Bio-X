@@ -11,6 +11,7 @@ class StudentAnswer(db.Model):
     content_id = db.Column(db.Integer, db.ForeignKey('material_contents.id'), nullable=False)
     selected_answer = db.Column(db.Integer, nullable=False)
     is_correct = db.Column(db.Boolean, nullable=False)
+    question_index = db.Column(db.Integer, nullable=True)
     answered_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     student = db.relationship('User', backref=db.backref('material_answers', lazy=True, cascade="all, delete-orphan"))

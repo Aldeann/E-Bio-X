@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 
 const route = useRoute();
 const config = useRuntimeConfig();
@@ -16,6 +16,44 @@ const notes = ref([]);
 const quizzes = ref([]);
 const sidebarOpen = ref(false);
 const showCompletion = ref(false);
+const heartbeatTimer = ref(null);
+const viewedContentIds = ref(new Set());
+
+const signalActivity = async (eventType, sectionId = null, contentId = null, data = null) => {
+  try {
+    await $fetch(`${config.public.backend}/api/materials/${route.params.id}/activity`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: { event_type: eventType, section_id: sectionId, content_id: contentId, data },
+    });
+  } catch (e) {
+    // aktivitas bersifat opsional, jangan ganggu alur belajar
+  }
+};
+
+const pingSession = async () => {
+  try {
+    await $fetch(`${config.public.backend}/api/materials/${route.params.id}/session/ping`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: {},
+    });
+  } catch (e) {
+    // heartbeat opsional
+  }
+};
+
+watch(activeSectionId, (id, oldId) => {
+  if (!id) return;
+  const sec = sections.value.find((s) => s.id === id);
+  signalActivity("section_opened", id);
+  (sec?.contents || []).forEach((c) => {
+    if (!viewedContentIds.value.has(c.id)) {
+      viewedContentIds.value.add(c.id);
+      signalActivity("content_viewed", id, c.id);
+    }
+  });
+});
 
 const sections = computed(() => material.value?.sections || []);
 const activeIndex = computed(() =>
@@ -235,7 +273,17 @@ const toggleBookmark = async () => {
 
 const refreshNotes = () => refetchLearningData(false);
 
-onMounted(fetchDetail);
+onMounted(async () => {
+  await fetchDetail();
+  await pingSession();
+  signalActivity("material_opened", activeSectionId.value);
+  heartbeatTimer.value = setInterval(pingSession, 60000);
+});
+
+onUnmounted(() => {
+  if (heartbeatTimer.value) clearInterval(heartbeatTimer.value);
+  signalActivity("material_closed", activeSectionId.value);
+});
 
 definePageMeta({
   middleware: "auth",

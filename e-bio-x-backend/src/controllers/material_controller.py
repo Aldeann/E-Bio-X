@@ -15,6 +15,7 @@ from src.models.user import User
 from src.models.course import Course
 from src.models.enrollment import Enrollment
 from src.config.database import db
+from src.services.learning_analytics_service import log_activity, mark_content_viewed
 from datetime import datetime
 from dotenv import load_dotenv
 import traceback
@@ -1021,6 +1022,8 @@ def record_progress(material_id):
             student_id=user.id,
         ))
         db.session.commit()
+        log_activity(user.id, material.id, 'section_opened', section_id=section.id, silent=True)
+        log_activity(user.id, material.id, 'section_completed', section_id=section.id, silent=True)
         return jsonify({'message': 'Progress tercatat', 'recorded': True}), 201
     except Exception as e:
         db.session.rollback()
@@ -1119,6 +1122,9 @@ def update_material_student_state(material_id):
 
     try:
         db.session.commit()
+        if state.completed:
+            log_activity(user.id, material.id, 'material_completed',
+                         section_id=state.last_section_id, silent=True)
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Gagal menyimpan posisi belajar: {str(e)}'}), 500
@@ -1177,8 +1183,12 @@ def submit_student_answer(material_id):
             content_id=content.id,
             selected_answer=selected,
             is_correct=is_correct,
+            question_index=data.get('question_index'),
         ))
         db.session.commit()
+        mark_content_viewed(user.id, material.id, content.id, silent=True)
+        log_activity(user.id, material.id, 'question_answered', section_id=section.id, content_id=content.id,
+                     data={'correct': is_correct, 'question_index': data.get('question_index')}, silent=True)
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Gagal menyimpan jawaban: {str(e)}'}), 500

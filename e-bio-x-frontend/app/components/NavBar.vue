@@ -15,6 +15,22 @@
           class="hidden sm:flex items-center gap-1 text-sm font-medium"
         >
           <NuxtLink
+            v-if="role === 'student'"
+            :to="'/student/dashboard'"
+            class="px-3 py-1.5 rounded-lg hover:bg-white/15 transition flex items-center gap-1"
+          >
+            <Icon name="material-symbols:dashboard" class="w-4 h-4" />
+            Dashboard
+          </NuxtLink>
+          <NuxtLink
+            v-if="role === 'teacher'"
+            :to="'/teacher/analytics'"
+            class="px-3 py-1.5 rounded-lg hover:bg-white/15 transition flex items-center gap-1"
+          >
+            <Icon name="material-symbols:monitoring" class="w-4 h-4" />
+            Analitik
+          </NuxtLink>
+          <NuxtLink
             :to="materialsLink"
             class="px-3 py-1.5 rounded-lg hover:bg-white/15 transition flex items-center gap-1"
           >

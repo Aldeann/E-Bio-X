@@ -18,3 +18,7 @@ from .answer import Answer
 from .question_bank import QuestionBank
 from .question_bank_option import QuestionBankOption
 from .discussion import DiscussionThread, DiscussionReply
+from .learning_session import LearningSession
+from .learning_activity import LearningActivity
+from .video_progress import VideoProgress
+from .student_content_track import StudentContentTrack

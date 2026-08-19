@@ -52,6 +52,19 @@ def create_app():
     )
     from src.controllers.analysis_controller import analyze_quiz, get_analyze
     from src.controllers.discussion_controller import get_threads_by_course, create_thread, get_thread_by_id, create_reply, delete_thread, delete_reply, toggle_pin_thread
+    from src.controllers.learning_tracking_controller import (
+        ping_session, log_material_event, post_video_progress,
+        get_video_progress, get_content_track,
+    )
+    from src.controllers.progress_analytics_controller import (
+        get_student_dashboard, get_student_progress_list, get_student_material_detail,
+        get_student_quiz_performance, get_student_activity,
+        get_teacher_analytics_overview, get_teacher_analytics_options,
+        get_teacher_analytics_materials, get_teacher_analytics_material, get_teacher_analytics_quiz,
+        get_teacher_analytics_students, get_teacher_analytics_student,
+        get_teacher_analytics_topics, get_teacher_analytics_difficulty,
+        post_student_features, get_feature_dataset,
+    )
     
     # Register routes
     app.add_url_rule('/api/google-login', view_func=google_login, methods=['POST'])
@@ -96,6 +109,11 @@ def create_app():
     app.add_url_rule('/api/materials/<material_id>/state', view_func=get_material_student_state, methods=['GET'])
     app.add_url_rule('/api/materials/<material_id>/state', view_func=update_material_student_state, methods=['POST'])
     app.add_url_rule('/api/materials/<material_id>/answers', view_func=submit_student_answer, methods=['POST'])
+    app.add_url_rule('/api/materials/<material_id>/session/ping', view_func=ping_session, methods=['POST'])
+    app.add_url_rule('/api/materials/<material_id>/activity', view_func=log_material_event, methods=['POST'])
+    app.add_url_rule('/api/materials/<material_id>/video-progress', view_func=post_video_progress, methods=['POST'])
+    app.add_url_rule('/api/materials/<material_id>/video-progress', view_func=get_video_progress, methods=['GET'])
+    app.add_url_rule('/api/materials/<material_id>/content-track', view_func=get_content_track, methods=['GET'])
     app.add_url_rule('/api/materials/<material_id>/bookmarks', view_func=get_material_bookmarks, methods=['GET'])
     app.add_url_rule('/api/materials/<material_id>/bookmarks', view_func=create_material_bookmark, methods=['POST'])
     app.add_url_rule('/api/materials/<material_id>/bookmarks/<bookmark_id>', view_func=delete_material_bookmark, methods=['DELETE'])
@@ -145,6 +163,25 @@ def create_app():
     app.add_url_rule('/api/student/attempts/<attempt_id>/answer', view_func=save_student_answer, methods=['POST'])
     app.add_url_rule('/api/student/attempts/<attempt_id>/submit', view_func=submit_student_attempt, methods=['POST'])
     app.add_url_rule('/api/student/attempts/<attempt_id>/result', view_func=get_student_attempt_result, methods=['GET'])
+
+    app.add_url_rule('/api/student/dashboard', view_func=get_student_dashboard, methods=['GET'])
+    app.add_url_rule('/api/student/progress', view_func=get_student_progress_list, methods=['GET'])
+    app.add_url_rule('/api/student/progress/<material_id>', view_func=get_student_material_detail, methods=['GET'])
+    app.add_url_rule('/api/student/performance', view_func=get_student_quiz_performance, methods=['GET'])
+    app.add_url_rule('/api/student/activity', view_func=get_student_activity, methods=['GET'])
+
+    app.add_url_rule('/api/teacher/analytics', view_func=get_teacher_analytics_overview, methods=['GET'])
+    app.add_url_rule('/api/teacher/analytics/options', view_func=get_teacher_analytics_options, methods=['GET'])
+    app.add_url_rule('/api/teacher/analytics/materials', view_func=get_teacher_analytics_materials, methods=['GET'])
+    app.add_url_rule('/api/teacher/analytics/materials/<material_id>', view_func=get_teacher_analytics_material, methods=['GET'])
+    app.add_url_rule('/api/teacher/analytics/quizzes/<quiz_id>', view_func=get_teacher_analytics_quiz, methods=['GET'])
+    app.add_url_rule('/api/teacher/analytics/students', view_func=get_teacher_analytics_students, methods=['GET'])
+    app.add_url_rule('/api/teacher/analytics/students/<student_id>', view_func=get_teacher_analytics_student, methods=['GET'])
+    app.add_url_rule('/api/teacher/analytics/topics', view_func=get_teacher_analytics_topics, methods=['GET'])
+    app.add_url_rule('/api/teacher/analytics/difficulty', view_func=get_teacher_analytics_difficulty, methods=['GET'])
+
+    app.add_url_rule('/api/analytics/features/<material_id>', view_func=post_student_features, methods=['POST'])
+    app.add_url_rule('/api/analytics/dataset', view_func=get_feature_dataset, methods=['GET'])
     
     app.add_url_rule('/api/discussions/<course_id>', view_func=get_threads_by_course, methods=['GET'])
     app.add_url_rule('/api/discussions/<course_id>', view_func=create_thread, methods=['POST'])

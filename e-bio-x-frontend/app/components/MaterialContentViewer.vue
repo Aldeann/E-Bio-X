@@ -17,6 +17,49 @@ const data = computed(() => (props.block && props.block.data) || {});
 
 const externalResults = ref({});
 const submitting = ref(null);
+const videoEl = ref(null);
+const lastVideoReport = ref(0);
+
+const reportVideo = async () => {
+  const v = videoEl.value;
+  if (!v || !props.materialId) return;
+  const now = Date.now();
+  if (now - lastVideoReport.value < 15000 && !v.ended) return;
+  lastVideoReport.value = now;
+  const dur = Math.round(v.duration || 0);
+  const pos = Math.round(v.currentTime || 0);
+  const watched = Math.round(v.currentTime || 0);
+  const completed = !!(v.ended || (v.duration && v.currentTime >= v.duration - 1));
+  try {
+    await $fetch(`${config.public.backend}/api/materials/${props.materialId}/video-progress`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: {
+        section_id: props.sectionId,
+        content_id: props.block.id,
+        video_duration: dur,
+        watched_duration: watched,
+        last_position: pos,
+        completed,
+      },
+    });
+  } catch (e) {
+    // tracking video opsional
+  }
+};
+
+const signalPdfOpened = async () => {
+  if (!props.materialId) return;
+  try {
+    await $fetch(`${config.public.backend}/api/materials/${props.materialId}/activity`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: { event_type: "pdf_opened", section_id: props.sectionId, content_id: props.block.id },
+    });
+  } catch (e) {
+    // opsional
+  }
+};
 
 const isYoutube = computed(() => {
   const url = data.value.url || "";
@@ -136,9 +179,13 @@ const handleSubmit = async (key, selected, questionIndex = null) => {
       ></iframe>
       <video
         v-else-if="data.url"
+        ref="videoEl"
         :src="data.url"
         controls
         class="w-full rounded-xl shadow-md bg-black"
+        @timeupdate="reportVideo"
+        @ended="reportVideo"
+        @pause="reportVideo"
       ></video>
     </div>
 
@@ -147,6 +194,7 @@ const handleSubmit = async (key, selected, questionIndex = null) => {
       <a
         :href="data.url"
         target="_blank"
+        @click="signalPdfOpened"
         class="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold"
       >
         <Icon name="mdi:file-pdf-box" class="w-5 h-5" />

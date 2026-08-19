@@ -1410,6 +1410,10 @@ def start_student_attempt(quiz_id):
     )
     db.session.add(sub)
     db.session.commit()
+    from src.services.learning_analytics_service import log_activity
+    if quiz.material_id:
+        log_activity(user.id, quiz.material_id, 'quiz_started',
+                     section_id=quiz.section_id, data={'quiz_id': quiz.id}, silent=True)
     return jsonify(_attempt_payload(quiz, sub, include_answers=True)), 201
 
 
@@ -1495,6 +1499,11 @@ def submit_student_attempt(attempt_id):
     deadline = _deadline_for(quiz, sub)
     status = 'timeout' if (deadline is not None and datetime.utcnow() > deadline) else 'submitted'
     _grade_submission(sub, status=status)
+    from src.services.learning_analytics_service import log_activity
+    if quiz.material_id:
+        log_activity(user.id, quiz.material_id, 'quiz_submitted',
+                     section_id=quiz.section_id, data={'quiz_id': quiz.id, 'status': status,
+                                                        'percentage': sub.percentage}, silent=True)
     return jsonify({'message': 'Kuis berhasil dikumpulkan', 'result': _result_payload(quiz, sub, include_detail=True)}), 200
 
 
