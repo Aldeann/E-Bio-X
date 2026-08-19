@@ -41,6 +41,15 @@ def create_app():
         get_material_notes, create_material_note, update_student_note, delete_student_note,
     )
     from src.controllers.quiz_controller import create_quiz, get_quiz_by_id, delete_quiz, get_quizzes_by_course, submit_quiz, remove_sumbission, get_submission_by_quiz, toggle_open_quiz, edit_quiz_title, edit_question, edit_option
+    from src.controllers.quiz_controller import (
+        get_teacher_quizzes, create_quiz_teacher, get_teacher_quiz, update_quiz_teacher,
+        set_quiz_status, delete_quiz_teacher, add_quiz_question, update_quiz_question,
+        delete_quiz_question, duplicate_quiz_question, reorder_quiz_questions,
+        get_question_bank, create_question_bank, update_question_bank, delete_question_bank,
+        get_quiz_analytics,
+        get_student_quizzes, get_student_quiz, start_student_attempt, get_student_attempt,
+        save_student_answer, submit_student_attempt, get_student_attempt_result, get_student_quiz_result,
+    )
     from src.controllers.analysis_controller import analyze_quiz, get_analyze
     from src.controllers.discussion_controller import get_threads_by_course, create_thread, get_thread_by_id, create_reply, delete_thread, delete_reply, toggle_pin_thread
     
@@ -109,6 +118,33 @@ def create_app():
     
     app.add_url_rule('/api/analysis/<quiz_id>', view_func=get_analyze, methods=['GET'])
     app.add_url_rule('/api/analysis/<quiz_id>', view_func=analyze_quiz, methods=['POST'])
+
+    # ===== Interactive quiz system (materials-linked) =====
+    app.add_url_rule('/api/teacher/quizzes', view_func=get_teacher_quizzes, methods=['GET'])
+    app.add_url_rule('/api/teacher/quizzes', view_func=create_quiz_teacher, methods=['POST'])
+    app.add_url_rule('/api/teacher/quizzes/<quiz_id>', view_func=get_teacher_quiz, methods=['GET'])
+    app.add_url_rule('/api/teacher/quizzes/<quiz_id>', view_func=update_quiz_teacher, methods=['PUT'])
+    app.add_url_rule('/api/teacher/quizzes/<quiz_id>', view_func=delete_quiz_teacher, methods=['DELETE'])
+    app.add_url_rule('/api/teacher/quizzes/<quiz_id>/publish', view_func=set_quiz_status, methods=['POST'])
+    app.add_url_rule('/api/teacher/quizzes/<quiz_id>/questions', view_func=add_quiz_question, methods=['POST'])
+    app.add_url_rule('/api/teacher/quizzes/<quiz_id>/questions/reorder', view_func=reorder_quiz_questions, methods=['POST'])
+    app.add_url_rule('/api/teacher/quizzes/<quiz_id>/analytics', view_func=get_quiz_analytics, methods=['GET'])
+    app.add_url_rule('/api/questions/<question_id>', view_func=update_quiz_question, methods=['PUT'])
+    app.add_url_rule('/api/questions/<question_id>', view_func=delete_quiz_question, methods=['DELETE'])
+    app.add_url_rule('/api/questions/<question_id>/duplicate', view_func=duplicate_quiz_question, methods=['POST'])
+    app.add_url_rule('/api/teacher/question-bank', view_func=get_question_bank, methods=['GET'])
+    app.add_url_rule('/api/teacher/question-bank', view_func=create_question_bank, methods=['POST'])
+    app.add_url_rule('/api/teacher/question-bank/<bank_id>', view_func=update_question_bank, methods=['PUT'])
+    app.add_url_rule('/api/teacher/question-bank/<bank_id>', view_func=delete_question_bank, methods=['DELETE'])
+
+    app.add_url_rule('/api/student/quizzes', view_func=get_student_quizzes, methods=['GET'])
+    app.add_url_rule('/api/student/quizzes/<quiz_id>', view_func=get_student_quiz, methods=['GET'])
+    app.add_url_rule('/api/student/quizzes/<quiz_id>/start', view_func=start_student_attempt, methods=['POST'])
+    app.add_url_rule('/api/student/quizzes/<quiz_id>/result', view_func=get_student_quiz_result, methods=['GET'])
+    app.add_url_rule('/api/student/attempts/<attempt_id>', view_func=get_student_attempt, methods=['GET'])
+    app.add_url_rule('/api/student/attempts/<attempt_id>/answer', view_func=save_student_answer, methods=['POST'])
+    app.add_url_rule('/api/student/attempts/<attempt_id>/submit', view_func=submit_student_attempt, methods=['POST'])
+    app.add_url_rule('/api/student/attempts/<attempt_id>/result', view_func=get_student_attempt_result, methods=['GET'])
     
     app.add_url_rule('/api/discussions/<course_id>', view_func=get_threads_by_course, methods=['GET'])
     app.add_url_rule('/api/discussions/<course_id>', view_func=create_thread, methods=['POST'])

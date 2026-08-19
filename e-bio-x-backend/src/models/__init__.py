@@ -15,4 +15,6 @@ from .question import Question
 from .option import Option
 from .submission import Submission
 from .answer import Answer
+from .question_bank import QuestionBank
+from .question_bank_option import QuestionBankOption
 from .discussion import DiscussionThread, DiscussionReply

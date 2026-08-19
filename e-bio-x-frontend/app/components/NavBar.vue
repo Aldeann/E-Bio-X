@@ -21,6 +21,13 @@
             <Icon name="material-symbols:menu-book" class="w-4 h-4" />
             Materi
           </NuxtLink>
+          <NuxtLink
+            :to="quizzesLink"
+            class="px-3 py-1.5 rounded-lg hover:bg-white/15 transition flex items-center gap-1"
+          >
+            <Icon name="material-symbols:quiz" class="w-4 h-4" />
+            Kuis
+          </NuxtLink>
         </nav>
       </div>
 
@@ -79,6 +86,12 @@ const materialsLink = computed(() => {
   if (role.value === "teacher") return "/teacher/materials";
   if (role.value === "student") return "/student/materials";
   if (role.value === "admin") return "/admin/materials";
+  return "/";
+});
+
+const quizzesLink = computed(() => {
+  if (role.value === "teacher") return "/teacher/quizzes";
+  if (role.value === "student") return "/student/quizzes";
   return "/";
 });
 

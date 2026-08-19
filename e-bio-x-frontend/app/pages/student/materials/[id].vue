@@ -13,6 +13,7 @@ const activeSectionId = ref(null);
 const studentState = ref(null);
 const bookmarks = ref([]);
 const notes = ref([]);
+const quizzes = ref([]);
 const sidebarOpen = ref(false);
 const showCompletion = ref(false);
 
@@ -34,6 +35,22 @@ const noteFor = (contentId) =>
   notes.value.find(
     (n) => n.section_id === activeSectionId.value && n.content_id === contentId
   ) || null;
+
+const quizStatusLabel = (q) =>
+  q.student_status === "in_progress"
+    ? "Sedang Berjalan"
+    : q.student_status === "completed"
+    ? (q.passed ? "Lulus" : "Belum Lulus")
+    : "Belum Dikerjakan";
+
+const quizStatusClass = (q) =>
+  q.student_status === "in_progress"
+    ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-400"
+    : q.student_status === "completed"
+    ? (q.passed
+        ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-400"
+        : "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-400")
+    : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300";
 
 const refetchLearningData = async (withState = true) => {
   const tasks = [];
@@ -65,6 +82,15 @@ const fetchDetail = async () => {
     );
     material.value = detail;
     await refetchLearningData(true);
+
+    try {
+      quizzes.value = await $fetch(
+        `${config.public.backend}/api/student/quizzes?material_id=${route.params.id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch (e) {
+      quizzes.value = [];
+    }
 
     const listed = [];
     const last = studentState.value?.last_section_id;
@@ -266,6 +292,54 @@ definePageMeta({
           {{ line }}
         </li>
       </ul>
+    </div>
+
+    <div
+      v-if="quizzes.length"
+      class="mb-6 rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-4"
+    >
+      <p class="font-semibold text-sm text-green-800 dark:text-green-200 flex items-center gap-1 mb-3">
+        <Icon name="material-symbols:quiz" class="w-4 h-4" />
+        Kuis Terkait
+      </p>
+      <div class="space-y-3">
+        <div
+          v-for="qz in quizzes"
+          :key="qz.id"
+          class="flex flex-wrap items-center gap-3 bg-white dark:bg-gray-900 border border-green-200 dark:border-green-800 rounded-lg p-3"
+        >
+          <div class="flex-1 min-w-0">
+            <p class="font-semibold text-sm">{{ qz.title }}</p>
+            <div class="flex flex-wrap gap-1.5 text-xs mt-1">
+              <span class="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                {{ qz.question_count }} soal
+              </span>
+              <span class="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                {{ qz.duration || "-" }} menit
+              </span>
+              <span
+                class="px-2 py-0.5 rounded-full"
+                :class="quizStatusClass(qz)"
+              >
+                {{ quizStatusLabel(qz) }}
+              </span>
+            </div>
+          </div>
+          <NuxtLink
+            v-if="qz.student_status === 'completed'"
+            :to="`/student/quizzes/${qz.id}/result`"
+            class="text-sm px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-green-600 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-gray-700 transition text-center"
+          >
+            Lihat Hasil
+          </NuxtLink>
+          <NuxtLink
+            :to="`/student/quizzes/${qz.id}`"
+            class="text-sm px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition text-center"
+          >
+            {{ qz.student_status === 'in_progress' ? 'Lanjutkan' : 'Kerjakan Kuis' }}
+          </NuxtLink>
+        </div>
+      </div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-[290px_1fr] gap-6 items-start">
