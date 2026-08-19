@@ -5,12 +5,20 @@
         <h2 class="text-2xl font-semibold">Manajemen Kuis</h2>
         <p class="text-sm text-gray-500">Buat, publikasikan, dan pantau kuis interaktif materi.</p>
       </div>
-      <NuxtLink
-        to="/teacher/quizzes/create"
-        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center gap-1 shadow-md shadow-green-300/50"
-      >
-        <Icon name="material-symbols:add" class="w-5 h-5" /> Buat Kuis
-      </NuxtLink>
+      <div class="flex gap-2">
+        <NuxtLink
+          to="/teacher/question-bank"
+          class="border border-green-600 text-green-700 dark:text-green-400 px-4 py-2 rounded-lg hover:bg-green-50 dark:hover:bg-gray-800 transition flex items-center gap-1"
+        >
+          <Icon name="material-symbols:database" class="w-5 h-5" /> Bank Soal
+        </NuxtLink>
+        <NuxtLink
+          to="/teacher/quizzes/create"
+          class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center gap-1 shadow-md shadow-green-300/50"
+        >
+          <Icon name="material-symbols:add" class="w-5 h-5" /> Buat Kuis
+        </NuxtLink>
+      </div>
     </div>
 
     <div v-if="loading" class="text-gray-500 text-center py-10">Memuat kuis...</div>
