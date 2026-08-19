@@ -31,6 +31,14 @@
             Analitik
           </NuxtLink>
           <NuxtLink
+            v-if="role === 'teacher'"
+            :to="'/teacher/analytics/ml'"
+            class="px-3 py-1.5 rounded-lg hover:bg-white/15 transition flex items-center gap-1"
+          >
+            <Icon name="material-symbols:psychology" class="w-4 h-4" />
+            ML Insights
+          </NuxtLink>
+          <NuxtLink
             :to="materialsLink"
             class="px-3 py-1.5 rounded-lg hover:bg-white/15 transition flex items-center gap-1"
           >

@@ -1125,6 +1125,11 @@ def update_material_student_state(material_id):
         if state.completed:
             log_activity(user.id, material.id, 'material_completed',
                          section_id=state.last_section_id, silent=True)
+            try:
+                from src.ml.recommendation import mark_completed
+                mark_completed(user.id, material.id)
+            except Exception:
+                db.session.rollback()
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Gagal menyimpan posisi belajar: {str(e)}'}), 500

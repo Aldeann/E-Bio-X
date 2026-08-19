@@ -29,6 +29,96 @@
         </div>
       </div>
 
+      <!-- Recommendations -->
+      <div v-if="recommendationsLoaded" class="mb-8">
+        <div class="flex items-center justify-between mb-3">
+          <h4 class="text-lg font-semibold text-green-700 dark:text-green-400 flex items-center gap-2">
+            <Icon name="material-symbols:auto-awesome" class="w-5 h-5" />
+            Rekomendasi Belajar Anda
+          </h4>
+          <span class="text-xs text-gray-400">Berdasarkan perkembangan belajarmu</span>
+        </div>
+
+        <div
+          v-if="profile && profile.status === 'READY'"
+          class="rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-4 mb-4"
+        >
+          <div class="flex flex-wrap items-center gap-2 mb-1">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-600 text-white">
+              Penguasaan: {{ profile.mastery_label }}
+            </span>
+            <span
+              v-if="profile.cluster_label"
+              class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white dark:bg-gray-800 border border-green-200 dark:border-green-800"
+            >
+              {{ clusterLabel(profile.cluster_label) }}
+            </span>
+          </div>
+          <p v-if="profile.message" class="text-sm text-green-800 dark:text-green-200 mt-1">
+            {{ profile.message }}
+          </p>
+        </div>
+
+        <div
+          v-else-if="profile && profile.status !== 'READY'"
+          class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 mb-4"
+        >
+          <p class="text-sm text-gray-600 dark:text-gray-300">
+            <Icon name="material-symbols:info" class="w-4 h-4 inline -mt-0.5" />
+            {{ profile.message || "Belum cukup data untuk menentukan profil belajar." }}
+          </p>
+        </div>
+
+        <div v-if="recommendations.length" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div
+            v-for="(r, i) in recommendations"
+            :key="r.material_id"
+            class="rounded-xl border border-green-200 dark:border-green-800 bg-white dark:bg-gray-900 p-4 flex flex-col"
+          >
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-green-600 text-white text-xs flex items-center justify-center shrink-0">
+                {{ i + 1 }}
+              </span>
+              <p class="font-semibold text-gray-800 dark:text-gray-100 truncate flex-1">{{ r.title }}</p>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">
+              Topik: {{ r.topic || "-" }} <span v-if="r.phase">· Fase {{ r.phase }}</span>
+              <span v-if="r.estimated_time"> · ⏱ {{ r.estimated_time }}</span>
+            </p>
+            <div v-if="r.mastery != null" class="flex items-center gap-2 mt-2">
+              <div class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  class="h-full rounded-full"
+                  :class="masteryBar(r.mastery)"
+                  :style="{ width: Math.min(r.mastery, 100) + '%' }"
+                ></div>
+              </div>
+              <span class="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                Penguasaan {{ Math.round(r.mastery) }}%
+              </span>
+            </div>
+            <ul v-if="r.reasons && r.reasons.length" class="mt-2 space-y-1 flex-1">
+              <li
+                v-for="(reason, ri) in r.reasons"
+                :key="ri"
+                class="text-xs text-gray-600 dark:text-gray-300 flex items-start gap-1"
+              >
+                <Icon name="material-symbols:check-circle" class="w-3.5 h-3.5 text-green-600 mt-0.5 shrink-0" />
+                {{ reason }}
+              </li>
+            </ul>
+            <button
+              @click="openMaterial(r)"
+              class="mt-3 w-full px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold flex items-center justify-center gap-1"
+            >
+              <Icon name="material-symbols:play-arrow" class="w-4 h-4" />
+              Pelajari Sekarang
+            </button>
+          </div>
+        </div>
+        <p v-else class="text-sm text-gray-500">Belum ada rekomendasi materi untuk Anda.</p>
+      </div>
+
       <!-- Continue learning -->
       <div v-if="data.continue_learning && data.continue_learning.length" class="mb-8">
         <h4 class="text-lg font-semibold text-green-700 dark:text-green-400 mb-3 flex items-center gap-2">
@@ -121,6 +211,56 @@ const toast = useToast();
 
 const data = ref(null);
 const loading = ref(true);
+const profile = ref(null);
+const recommendations = ref([]);
+const recommendationsLoaded = ref(false);
+
+const clusterLabelMap = {
+  "High Achievement": "Pencapaian Tinggi",
+  "Active Learner": "Pembelajar Aktif",
+  "Moderate Learner": "Pembelajar Sedang",
+  "Needs Support": "Perlu Pendampingan",
+  "Low Activity": "Aktivitas Rendah",
+};
+
+const clusterLabel = (label) => clusterLabelMap[label] || label;
+
+const masteryBar = (v) => {
+  if (v >= 75) return "bg-green-600";
+  if (v >= 60) return "bg-amber-500";
+  return "bg-red-500";
+};
+
+const loadRecs = async () => {
+  try {
+    const [prof, recs] = await Promise.all([
+      $fetch(`${config.public.backend}/api/student/learning-profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => null),
+      $fetch(`${config.public.backend}/api/student/recommendations`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => ({ recommendations: [] })),
+    ]);
+    profile.value = prof;
+    recommendations.value = recs.recommendations || [];
+  } catch (e) {
+    recommendations.value = [];
+  } finally {
+    recommendationsLoaded.value = true;
+  }
+};
+
+const openMaterial = async (r) => {
+  try {
+    await $fetch(`${config.public.backend}/api/student/recommendations/click`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: { material_id: r.material_id },
+    });
+  } finally {
+    navigateTo(`/student/materials/${r.material_id}`);
+  }
+};
 
 const formatSeconds = (s) => {
   s = s || 0;
@@ -177,6 +317,7 @@ const load = async () => {
 };
 
 load();
+loadRecs();
 
 definePageMeta({
   middleware: "auth",

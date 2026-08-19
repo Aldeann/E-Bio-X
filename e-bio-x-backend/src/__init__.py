@@ -65,6 +65,11 @@ def create_app():
         get_teacher_analytics_topics, get_teacher_analytics_difficulty,
         post_student_features, get_feature_dataset,
     )
+    from src.controllers.ml_controller import (
+        get_student_learning_profile, get_student_recommendations, post_recommendation_click,
+        get_teacher_ml_analytics, get_teacher_ml_mastery, get_teacher_ml_clusters,
+        train_ml, retrain_ml, predict_student,
+    )
     
     # Register routes
     app.add_url_rule('/api/google-login', view_func=google_login, methods=['POST'])
@@ -182,6 +187,17 @@ def create_app():
 
     app.add_url_rule('/api/analytics/features/<material_id>', view_func=post_student_features, methods=['POST'])
     app.add_url_rule('/api/analytics/dataset', view_func=get_feature_dataset, methods=['GET'])
+
+    # ===== Machine Learning (Tahap 5) =====
+    app.add_url_rule('/api/student/learning-profile', view_func=get_student_learning_profile, methods=['GET'])
+    app.add_url_rule('/api/student/recommendations', view_func=get_student_recommendations, methods=['GET'])
+    app.add_url_rule('/api/student/recommendations/click', view_func=post_recommendation_click, methods=['POST'])
+    app.add_url_rule('/api/teacher/analytics/ml', view_func=get_teacher_ml_analytics, methods=['GET'])
+    app.add_url_rule('/api/teacher/analytics/ml/mastery', view_func=get_teacher_ml_mastery, methods=['GET'])
+    app.add_url_rule('/api/teacher/analytics/ml/clusters', view_func=get_teacher_ml_clusters, methods=['GET'])
+    app.add_url_rule('/api/ml/train', view_func=train_ml, methods=['POST'])
+    app.add_url_rule('/api/ml/retrain', view_func=retrain_ml, methods=['POST'])
+    app.add_url_rule('/api/ml/predict/<student_id>', view_func=predict_student, methods=['POST'])
     
     app.add_url_rule('/api/discussions/<course_id>', view_func=get_threads_by_course, methods=['GET'])
     app.add_url_rule('/api/discussions/<course_id>', view_func=create_thread, methods=['POST'])

@@ -22,3 +22,6 @@ from .learning_session import LearningSession
 from .learning_activity import LearningActivity
 from .video_progress import VideoProgress
 from .student_content_track import StudentContentTrack
+from .ml_model import MlModel
+from .student_learning_profile import StudentLearningProfile
+from .recommendation import Recommendation

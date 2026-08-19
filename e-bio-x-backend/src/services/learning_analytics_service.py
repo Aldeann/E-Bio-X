@@ -71,6 +71,7 @@ ALLOWED_EVENT_TYPES = {
     'material_completed',
     'note_created',
     'bookmark_created',
+    'recommendation_clicked',
 }
 
 

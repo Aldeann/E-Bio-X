@@ -76,3 +76,7 @@ migrations/
 
 # File upload
 src/config/credentials.json
+
+# ML artifacts
+/models/
+src/models/*.joblib
