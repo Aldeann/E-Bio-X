@@ -1,12 +1,15 @@
 from flask import request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from sqlalchemy import or_
 from werkzeug.utils import secure_filename
-from src.models.material import Material
+from src.models.material import Material, material_courses
 from src.models.material_section import MaterialSection
 from src.models.material_content import MaterialContent
 from src.models.material_file import MaterialFile
 from src.models.material_progress import MaterialProgress
 from src.models.user import User
+from src.models.course import Course
+from src.models.enrollment import Enrollment
 from src.config.database import db
 from datetime import datetime
 from dotenv import load_dotenv
@@ -40,6 +43,44 @@ def _can_view_detail(material, user):
     if user.role == 'student':
         return material.status == 'published'
     return True
+
+
+def _can_student_access(material, user):
+    if material.status != 'published':
+        return False
+    if material.course_links:
+        enrolled_ids = {e.course_id for e in user.enrollments}
+        return any(c.id in enrolled_ids for c in material.course_links)
+    return True
+
+
+def _parse_course_ids(data):
+    course_ids = data.get('course_ids')
+    if course_ids is not None:
+        if isinstance(course_ids, str):
+            try:
+                course_ids = [int(x) for x in course_ids.split(',') if x.strip()]
+            except ValueError:
+                return None
+        elif isinstance(course_ids, list):
+            course_ids = [int(x) for x in course_ids if str(x).isdigit()]
+        else:
+            return None
+        return list(dict.fromkeys(course_ids))
+    return None
+
+
+def _resolve_owned_course_ids(user, course_ids):
+    if course_ids is None:
+        return None
+    query = Course.query.filter(Course.id.in_(course_ids))
+    if user.role != 'admin':
+        query = query.filter(Course.teacher_id == user.id)
+    return [c.id for c in query.all()]
+
+
+def _student_course_ids(user):
+    return [e.course_id for e in Enrollment.query.filter_by(student_id=user.id).all()]
 
 
 def _allowed_file(filename):
@@ -84,6 +125,8 @@ def _serialize_material_list(material, include_analytics=False):
         'file_url': material.file_url,
         'course': material.course.name if material.course else None,
         'course_id': material.course_id,
+        'courses': [c.name for c in material.course_links],
+        'course_ids': [c.id for c in material.course_links],
         'subject': material.subject,
         'phase': material.phase,
         'class_level': material.class_level,
@@ -147,6 +190,8 @@ def _serialize_material_detail(material, include_answers=True, include_analytics
         'thumbnail_url': material.thumbnail_url,
         'status': material.status,
         'course_id': material.course_id,
+        'courses': [c.name for c in material.course_links],
+        'course_ids': [c.id for c in material.course_links],
         'teacher_id': material.teacher_id,
         'teacher_name': material.teacher.name if material.teacher else None,
         'uploaded_at': material.uploaded_at.isoformat() if material.uploaded_at else None,
@@ -245,6 +290,16 @@ def _create_material_json():
         if course_id is not None:
             course_id = int(course_id)
 
+        course_ids = _parse_course_ids(data)
+        if 'course_ids' in data and course_ids is None:
+            return jsonify({'error': 'course_ids harus berupa daftar id kelas'}), 400
+        owned = _resolve_owned_course_ids(user, course_ids)
+        if course_ids and not owned:
+            return jsonify({'error': 'Kelas tidak ditemukan atau bukan milik Anda'}), 400
+
+        if course_id is None and owned:
+            course_id = owned[0]
+
         material = Material(
             title=data['title'].strip(),
             description=data.get('description', '').strip(),
@@ -263,6 +318,10 @@ def _create_material_json():
             updated_at=datetime.utcnow(),
         )
         db.session.add(material)
+        db.session.flush()
+        if owned:
+            linked = Course.query.filter(Course.id.in_(owned)).all()
+            material.course_links.extend(linked)
         db.session.commit()
         return jsonify({
             'message': 'Materi berhasil dibuat',
@@ -354,7 +413,12 @@ def get_all_material():
         materials = Material.query.filter_by(teacher_id=user.id).all()
         return jsonify([_serialize_material_list(m, include_analytics=True) for m in materials]), 200
     else:
+        enrolled_ids = _student_course_ids(user)
         materials = Material.query.filter_by(status='published').all()
+        materials = [
+            m for m in materials
+            if not m.course_links or any(c.id in enrolled_ids for c in m.course_links)
+        ]
         return jsonify([_serialize_material_list(m) for m in materials]), 200
 
 
@@ -372,6 +436,8 @@ def get_material_by_id(material_id):
         return jsonify({'error': 'Materi belum dipublikasikan'}), 403
 
     if user.role == 'student':
+        if not _can_student_access(material, user):
+            return jsonify({'error': 'Materi hanya untuk kelas yang diikuti'}), 403
         return jsonify(_serialize_material_detail(material, include_answers=False)), 200
 
     include_analytics = user.role == 'admin' or _is_owner(material, user)
@@ -384,20 +450,30 @@ def get_material_by_course(course_id):
     if not user:
         return jsonify({'error': 'User not found'}), 404
 
-    materials = Material.query.filter_by(course_id=course_id).all()
+    materials = Material.query.outerjoin(
+        material_courses, Material.id == material_courses.c.material_id
+    ).filter(
+        or_(Material.course_id == course_id, material_courses.c.course_id == course_id)
+    ).all()
+    materials = list({m.id: m for m in materials}.values())
+
     if user.role == 'student':
         materials = [m for m in materials if m.status == 'published']
 
     result = []
     for material in materials:
+        is_interactive = material.file_url is None
         result.append({
             'id': material.id,
             'title': material.title,
-            'description': material.content,
+            'description': material.description or material.content,
             'file_url': material.file_url,
             'course_id': material.course_id,
-            'uploaded_at': material.uploaded_at,
+            'category': 'interactive' if is_interactive else 'file',
             'status': material.status,
+            'section_count': len(material.sections),
+            'content_count': sum(len(s.contents) for s in material.sections),
+            'uploaded_at': material.uploaded_at,
         })
 
     return jsonify({
@@ -450,6 +526,17 @@ def update_material(material_id):
     for field in editable:
         if field in data and data[field] is not None:
             setattr(material, field, str(data[field]).strip())
+
+    if 'course_ids' in data:
+        course_ids = _parse_course_ids(data)
+        if course_ids is None:
+            return jsonify({'error': 'course_ids harus berupa daftar id kelas'}), 400
+        owned = _resolve_owned_course_ids(user, course_ids)
+        if course_ids and not owned:
+            return jsonify({'error': 'Kelas tidak ditemukan atau bukan milik Anda'}), 400
+        material.course_links = Course.query.filter(Course.id.in_(owned)).all() if owned else []
+        if 'course_id' not in data and material.course_links:
+            material.course_id = material.course_links[0].id
 
     material.updated_at = datetime.utcnow()
     if not material.content:

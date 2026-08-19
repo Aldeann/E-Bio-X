@@ -74,6 +74,19 @@ definePageMeta({
           <p class="text-sm text-gray-500 mt-1 line-clamp-2">{{ m.description }}</p>
 
           <div class="mt-3 flex flex-wrap gap-2 text-xs">
+            <span
+              v-for="c in m.courses"
+              :key="c"
+              class="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+            >
+              {{ c }}
+            </span>
+            <span
+              v-if="!m.courses || m.courses.length === 0"
+              class="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300"
+            >
+              Umum
+            </span>
             <span class="px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
               {{ m.subject }}
             </span>

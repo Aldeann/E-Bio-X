@@ -1,6 +1,12 @@
 from src.config.database import db
 from datetime import datetime
 
+material_courses = db.Table(
+    'material_courses',
+    db.Column('material_id', db.Integer, db.ForeignKey('materials.id'), primary_key=True),
+    db.Column('course_id', db.Integer, db.ForeignKey('courses.id'), primary_key=True),
+)
+
 class Material(db.Model):
     __tablename__ = 'materials'
 
@@ -25,6 +31,7 @@ class Material(db.Model):
     updated_at = db.Column(db.DateTime, nullable=True)
 
     course = db.relationship('Course', backref=db.backref('materials', lazy=True, cascade="all, delete-orphan"))
+    course_links = db.relationship('Course', secondary=material_courses, backref=db.backref('linked_materials', lazy=True))
     teacher = db.relationship('User', foreign_keys=[teacher_id], backref=db.backref('teacher_materials', lazy=True))
     sections = db.relationship('MaterialSection', backref='material', lazy=True, cascade="all, delete-orphan", order_by="MaterialSection.position")
     files = db.relationship('MaterialFile', backref='material', lazy=True, cascade="all, delete-orphan")

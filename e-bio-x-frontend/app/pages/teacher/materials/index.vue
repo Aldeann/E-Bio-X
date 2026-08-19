@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useSwal } from "~/utils/swal";
 
 const config = useRuntimeConfig();
@@ -9,6 +9,18 @@ const toast = useToast();
 
 const materials = ref([]);
 const loading = ref(true);
+const filterCourse = ref("");
+
+const courseList = computed(() => {
+  const set = new Set();
+  materials.value.forEach((m) => (m.courses || []).forEach((c) => set.add(c)));
+  return [...set].sort();
+});
+
+const filteredMaterials = computed(() => {
+  if (!filterCourse.value) return materials.value;
+  return materials.value.filter((m) => (m.courses || []).includes(filterCourse.value));
+});
 
 const fetchData = async () => {
   loading.value = true;
@@ -120,9 +132,19 @@ definePageMeta({
       <p>Belum ada materi. Klik <span class="font-semibold">+ Buat Materi</span> untuk memulai.</p>
     </div>
 
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div v-else>
+      <div class="flex items-center gap-2 mb-4">
+        <label class="text-sm text-gray-500">Filter kelas:</label>
+        <select v-model="filterCourse" class="border border-gray-300 dark:border-gray-700 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-900">
+          <option value="">Semua kelas</option>
+          <option v-for="c in courseList" :key="c" :value="c">{{ c }}</option>
+        </select>
+        <span class="text-xs text-gray-400">{{ filteredMaterials.length }} materi</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <div
-        v-for="m in materials"
+        v-for="m in filteredMaterials"
         :key="m.id"
         class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden flex flex-col shadow-sm hover:shadow-md transition"
       >
@@ -164,6 +186,23 @@ definePageMeta({
             {{ m.subject }} · Fase {{ m.phase }}{{ m.class_level ? " · " + m.class_level : "" }}
           </p>
           <p class="text-xs text-gray-400">Topik: {{ m.topic || "-" }}</p>
+
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            <span
+              v-for="c in m.courses"
+              :key="c"
+              class="px-2 py-0.5 text-[10px] rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 inline-flex items-center gap-1"
+            >
+              <Icon name="material-symbols:groups" class="w-3 h-3" />
+              {{ c }}
+            </span>
+            <span
+              v-if="!m.courses || m.courses.length === 0"
+              class="px-2 py-0.5 text-[10px] rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+            >
+              Umum
+            </span>
+          </div>
 
           <div class="text-xs text-gray-400 mt-1 flex flex-wrap gap-x-3">
             <span class="inline-flex items-center gap-1">
@@ -248,5 +287,6 @@ definePageMeta({
         </div>
       </div>
     </div>
+  </div>
   </div>
 </template>

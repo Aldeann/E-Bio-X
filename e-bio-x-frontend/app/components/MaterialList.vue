@@ -38,14 +38,39 @@
         <div class="flex items-center gap-3 mb-3">
           <Icon name="material-symbols:menu-book-outline-rounded" class="text-green-500 text-2xl" />
           <h3 class="text-lg font-semibold text-green-800 dark:text-green-500">{{ material.title }}</h3>
+          <span
+            v-if="useCookie('role').value === 'teacher' && material.status === 'draft'"
+            class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700"
+          >
+            draft
+          </span>
         </div>
         <p class="text-gray-600 dark:text-gray-300 mb-3 text-sm leading-relaxed">
           {{ material.description }}
         </p>
-        <p class="text-gray-400 dark:text-gray-500 mb-1 text-sm leading-relaxed">
-          {{ material.uploaded_at }}
-        </p>
+        <div class="flex items-center gap-3 mb-1 text-xs text-gray-400 dark:text-gray-500">
+          <span>{{ material.uploaded_at }}</span>
+          <span
+            v-if="material.category === 'interactive'"
+            class="px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300"
+          >
+            Interaktif · {{ material.section_count }} bagian
+          </span>
+        </div>
+        <NuxtLink
+          v-if="material.category === 'interactive'"
+          :to="
+            useCookie('role').value === 'teacher'
+              ? `/teacher/materials/builder/${material.id}`
+              : `/student/materials/${material.id}`
+          "
+          class="inline-flex items-center gap-2 text-green-500 hover:text-green-800 font-medium transition"
+        >
+          <Icon name="material-symbols:auto-stories" class="text-lg" />
+          Buka Materi
+        </NuxtLink>
         <a
+          v-else
           :href="material.file_url"
           target="_blank"
           class="inline-flex items-center gap-2 text-green-500 hover:text-green-800 font-medium transition"

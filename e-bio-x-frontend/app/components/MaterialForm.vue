@@ -15,6 +15,7 @@ const toast = useToast();
 const isEdit = computed(() => !!props.materialId);
 const saving = ref(false);
 const thumbnailFile = ref(null);
+const courseOptions = ref([]);
 
 const form = reactive({
   title: "",
@@ -28,6 +29,7 @@ const form = reactive({
   difficulty: "sedang",
   status: "draft",
   thumbnail_url: "",
+  course_ids: [],
 });
 
 const phases = ["A", "B", "C", "D", "E", "F"];
@@ -59,10 +61,28 @@ const loadDetail = async () => {
       difficulty: res.difficulty || "sedang",
       status: res.status || "draft",
       thumbnail_url: res.thumbnail_url || "",
+      course_ids: res.course_ids || [],
     });
   } catch (e) {
     toast.add({ title: "Gagal memuat data materi.", color: "red" });
   }
+};
+
+const loadCourses = async () => {
+  try {
+    const res = await $fetch(`${config.public.backend}/api/courses/teacher`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    courseOptions.value = res || [];
+  } catch (e) {
+    courseOptions.value = [];
+  }
+};
+
+const toggleCourse = (id) => {
+  const idx = form.course_ids.indexOf(id);
+  if (idx >= 0) form.course_ids.splice(idx, 1);
+  else form.course_ids.push(id);
 };
 
 const onThumbnailChange = (e) => {
@@ -152,6 +172,7 @@ const setStatus = async (status) => {
 };
 
 onMounted(() => {
+  loadCourses();
   if (isEdit.value) loadDetail();
 });
 </script>
@@ -213,6 +234,40 @@ onMounted(() => {
           class="inputClass"
           placeholder="Tulis tujuan pembelajaran, pisahkan dengan baris baru..."
         ></textarea>
+      </div>
+
+      <div>
+        <label class="labelClass">Kelas Tujuan</label>
+        <p class="text-xs text-gray-400 mb-2">
+          Pilih kelas yang dapat mengakses materi ini. Kosongkan jika materi bersifat umum.
+        </p>
+        <div
+          class="border border-gray-300 dark:border-gray-700 rounded p-3 bg-white dark:bg-gray-900 flex flex-wrap gap-2"
+        >
+          <label
+            v-for="c in courseOptions"
+            :key="c.id"
+            class="cursor-pointer flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition"
+            :class="
+              form.course_ids.includes(c.id)
+                ? 'bg-green-100 dark:bg-green-900/40 border-green-500 text-green-700 dark:text-green-300'
+                : 'border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+            "
+          >
+            <input
+              type="checkbox"
+              :value="c.id"
+              :checked="form.course_ids.includes(c.id)"
+              @change="toggleCourse(c.id)"
+              class="accent-green-600"
+            />
+            {{ c.name }}
+            <span class="text-[10px] text-gray-400">{{ c.students }} siswa</span>
+          </label>
+          <p v-if="courseOptions.length === 0" class="text-sm text-gray-400">
+            Belum ada kelas. Buat kelas terlebih dahulu di menu Kelas.
+          </p>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
