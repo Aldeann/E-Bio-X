@@ -6,6 +6,20 @@ from src.config.database import db
 from src.models.user import User
 import os
 
+def _current_user():
+    uid = get_jwt_identity()
+    return User.query.get(uid) if uid else None
+
+
+def _require_admin():
+    user = _current_user()
+    if not user:
+        return None, jsonify({"error": "User not found"}), 404
+    if user.role != 'admin':
+        return None, jsonify({"message": "Akses khusus admin"}), 403
+    return user, None, None
+
+
 def google_login():
     data = request.json
     token = data.get("token")
@@ -72,6 +86,9 @@ def login():
 
 @jwt_required()
 def get_all_users():
+    user, err, code = _require_admin()
+    if err:
+        return err, code
     users = User.query.all()
     return jsonify([{
         'id': user.id,
@@ -82,19 +99,32 @@ def get_all_users():
 
 @jwt_required()
 def create_user():
-    data = request.get_json()
-    
-    existing_user = User.query.filter_by(email=data['email']).first()
+    admin, err, code = _require_admin()
+    if err:
+        return err, code
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').strip()
+    name = (data.get('name') or '').strip()
+    role = data.get('role') or 'student'
+
+    if not email or not name:
+        return jsonify({'error': 'Email dan nama wajib diisi'}), 400
+    if role not in ('admin', 'teacher', 'student'):
+        return jsonify({'error': 'Role tidak valid'}), 400
+
+    existing_user = User.query.filter_by(email=email).first()
     if existing_user:
         return jsonify({'error': 'User with this email already exists'}), 400
-    
+
     new_user = User(
-        name=data['name'],
-        email=data['email'],
-        role=data['role']
+        name=name,
+        email=email,
+        role=role
     )
-    
-    new_user.set_password(data['password'])
+
+    password = data.get('password')
+    if password:
+        new_user.set_password(password)
     
     try:
         db.session.add(new_user)
@@ -114,6 +144,9 @@ def create_user():
 
 @jwt_required()
 def delete_user(user_id):
+    admin, err, code = _require_admin()
+    if err:
+        return err, code
     user = User.query.filter_by(id=user_id).first()
 
     if not user:
@@ -126,16 +159,21 @@ def delete_user(user_id):
 
 @jwt_required()
 def update_user(user_id):
-    data = request.get_json()
+    admin, err, code = _require_admin()
+    if err:
+        return err, code
+    data = request.get_json(silent=True) or {}
     user = User.query.filter_by(id=user_id).first()
     if not user:
         return jsonify({"message": "User not found"}), 404
 
-    if "name" in data:
+    if "name" in data and data.get("name"):
         user.name = data["name"]
-    if "password" in data:
+    if "password" in data and data.get("password"):
         user.set_password(data["password"])
     if "role" in data:
+        if data["role"] not in ('admin', 'teacher', 'student'):
+            return jsonify({"message": "Role tidak valid"}), 400
         user.role = data["role"]
 
     db.session.commit()
@@ -151,18 +189,23 @@ def update_user_me():
         return jsonify({"message": "User not found"}), 404
 
     try:
-        data = request.get_json()
-        if "name" in data:
+        data = request.get_json(silent=True) or {}
+        changed = False
+        if "name" in data and data.get("name"):
             user.name = data["name"]
-        elif "current_password" in data and "new_password" in data:
-            if not user.check_password(data["current_password"]):
-                return jsonify({"message": "Incorrect current password"}), 400
-            user.set_password(data["new_password"])
-        elif "new_password" in data:
-            user.set_password(data["new_password"])
-        else:
+            changed = True
+        if "current_password" in data or "new_password" in data:
+            new_password = data.get("new_password")
+            if new_password:
+                if user.password_hash is not None:
+                    current_password = data.get("current_password")
+                    if not current_password or not user.check_password(current_password):
+                        return jsonify({"message": "Incorrect current password"}), 400
+                user.set_password(new_password)
+                changed = True
+        if not changed:
             return jsonify({"message": "Nothing to update"}), 400
-            
+
         db.session.commit()
         return jsonify({"message": "User updated successfully"}), 200
 

@@ -4,14 +4,25 @@ from src.config.database import db
 from src.models.discussion import DiscussionThread, DiscussionReply
 from src.models.course import Course
 from src.models.enrollment import Enrollment
+from src.models.user import User
+
+
+def _is_admin(user_id):
+    user = User.query.get(user_id)
+    return bool(user and user.role == 'admin')
+
 
 def _is_member(course, user_id):
+    if _is_admin(user_id):
+        return True
     if str(course.teacher_id) == str(user_id):
         return True
     enroll = Enrollment.query.filter_by(student_id=user_id, course_id=course.id).first()
     return enroll is not None
 
 def _can_delete(author_id, course, user_id):
+    if _is_admin(user_id):
+        return True
     if str(author_id) == str(user_id):
         return True
     if str(course.teacher_id) == str(user_id):

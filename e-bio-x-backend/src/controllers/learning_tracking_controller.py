@@ -69,11 +69,17 @@ def log_material_event(material_id):
     content_id = data.get('content_id')
 
     if section_id is not None:
-        section = MaterialSection.query.filter_by(id=int(section_id), material_id=material.id).first()
+        try:
+            section = MaterialSection.query.filter_by(id=int(section_id), material_id=material.id).first()
+        except (TypeError, ValueError):
+            section = None
         if not section:
             return jsonify({'error': 'Section tidak ditemukan pada materi ini'}), 404
     if content_id is not None:
-        content = MaterialContent.query.get(int(content_id))
+        try:
+            content = MaterialContent.query.get(int(content_id))
+        except (TypeError, ValueError):
+            content = None
         if not content or content.section.material_id != material.id:
             return jsonify({'error': 'Content tidak ditemukan pada materi ini'}), 404
 
@@ -105,13 +111,21 @@ def post_video_progress(material_id):
     if content_id is None:
         return jsonify({'error': 'content_id wajib diisi'}), 400
 
-    content = MaterialContent.query.get(int(content_id))
+    try:
+        content = MaterialContent.query.get(int(content_id))
+    except (TypeError, ValueError):
+        content = None
     if not content or content.section.material_id != material.id:
         return jsonify({'error': 'Content tidak ditemukan pada materi ini'}), 404
 
-    duration = float(data.get('video_duration') or 0)
-    watched = float(data.get('watched_duration') or 0)
-    position = float(data.get('last_position') or 0)
+    try:
+        duration = float(data.get('video_duration') or 0)
+        watched = float(data.get('watched_duration') or 0)
+        position = float(data.get('last_position') or 0)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Nilai video_progress tidak valid'}), 400
+    if duration < 0 or watched < 0 or position < 0:
+        return jsonify({'error': 'Nilai video_progress tidak valid'}), 400
     completed = bool(data.get('completed')) or (duration > 0 and watched >= duration * 0.9)
 
     video = VideoProgress.query.filter_by(student_id=user.id, content_id=content.id).first()

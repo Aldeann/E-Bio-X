@@ -6,16 +6,49 @@ from src.models.question import Question
 from src.models.option import Option
 from src.models.submission import Submission
 from src.models.answer import Answer
+from src.models.enrollment import Enrollment
+from src.models.course import Course
 from src.config.database import db
+
+
+def _legacy_user():
+    uid = get_jwt_identity()
+    return User.query.get(uid) if uid else None
+
+
+def _legacy_can_manage_quiz(quiz, user):
+    if user.role == 'admin':
+        return True
+    if user.role != 'teacher':
+        return False
+    if quiz.course_id and quiz.course:
+        return str(quiz.course.teacher_id) == str(user.id)
+    return False
+
+
+def _legacy_student_enrolled(course_id, user):
+    return Enrollment.query.filter_by(student_id=user.id, course_id=course_id).first() is not None
 
 @jwt_required()
 def create_quiz():
-    data = request.get_json()
+    user = _legacy_user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if user.role not in ('teacher', 'admin'):
+        return jsonify({"error": "Akses khusus guru"}), 403
+
+    data = request.get_json() or {}
     course_id = data.get('course_id')
     title = data.get('title')
 
     if not course_id or not title:
         return jsonify({"error": "Course ID and title are required"}), 400
+
+    course = Course.query.get(course_id)
+    if not course:
+        return jsonify({"error": "Course not found"}), 404
+    if user.role != 'admin' and str(course.teacher_id) != str(user.id):
+        return jsonify({"error": "Anda tidak berhak membuat kuis di kelas ini"}), 403
 
     if Quiz.query.filter_by(title=title, course_id=course_id).first():
         return jsonify({"error": "Quiz with this title already exists"}), 400
@@ -51,9 +84,14 @@ def create_quiz():
 
 @jwt_required()
 def toggle_open_quiz(quiz_id):
+    user = _legacy_user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
     quiz = Quiz.query.get(quiz_id)
     if not quiz:
         return jsonify({"error": "Quiz not found"}), 404
+    if not _legacy_can_manage_quiz(quiz, user):
+        return jsonify({"error": "Anda tidak berhak mengelola kuis ini"}), 403
     
     try:
         quiz.is_closed = not quiz.is_closed
@@ -67,9 +105,14 @@ def toggle_open_quiz(quiz_id):
 
 @jwt_required()
 def edit_quiz_title(quiz_id):
+    user = _legacy_user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
     quiz = Quiz.query.get(quiz_id)
     if not quiz:
         return jsonify({"error": "Quiz not found"}), 404
+    if not _legacy_can_manage_quiz(quiz, user):
+        return jsonify({"error": "Anda tidak berhak mengelola kuis ini"}), 403
     
     try:
         title = request.get_json().get('title')
@@ -85,9 +128,14 @@ def edit_quiz_title(quiz_id):
 
 @jwt_required()
 def edit_question(question_id):
+    user = _legacy_user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
     question = Question.query.get(question_id)
     if not question:
         return jsonify({"error": "Question not found"}), 404
+    if not question.quiz_id or not _legacy_can_manage_quiz(question.quiz, user):
+        return jsonify({"error": "Anda tidak berhak mengelola soal ini"}), 403
     
     try:
         question_text = request.get_json().get('question_text')
@@ -103,9 +151,15 @@ def edit_question(question_id):
 
 @jwt_required()
 def edit_option(option_id):
+    user = _legacy_user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
     option = Option.query.get(option_id)
     if not option:
         return jsonify({"error": "Option not found"}), 404
+    question = Question.query.get(option.question_id)
+    if not question or not question.quiz_id or not _legacy_can_manage_quiz(question.quiz, user):
+        return jsonify({"error": "Anda tidak berhak mengelola opsi ini"}), 403
     
     try:
         data = request.get_json()
@@ -144,7 +198,22 @@ def get_quiz_by_id(quiz_id):
     if not quiz:
         return jsonify({"error": "Quiz not found"}), 404
 
-    access = user.role == 'teacher' or user.role == 'admin'
+    if user.role == 'student':
+        permitted = False
+        if quiz.course_id:
+            permitted = _legacy_student_enrolled(quiz.course_id, user)
+        elif quiz.material_id and quiz.material:
+            from src.controllers.material_controller import _can_student_access
+            permitted = quiz.material.status == 'published' and _can_student_access(quiz.material, user)
+        if not permitted:
+            return jsonify({"error": "Anda bukan anggota kelas kuis ini"}), 403
+        access = False
+    elif user.role in ('teacher', 'admin'):
+        if user.role == 'teacher' and quiz.course_id and str(quiz.course.teacher_id) != str(user.id):
+            return jsonify({"error": "Anda tidak berhak mengakses kuis ini"}), 403
+        access = True
+    else:
+        return jsonify({"error": "Akses ditolak"}), 403
 
     return jsonify({
         "quiz_id": quiz.id,
@@ -171,6 +240,21 @@ def get_quiz_by_id(quiz_id):
 
 @jwt_required()
 def get_quizzes_by_course(course_id):
+    user = _legacy_user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    course = Course.query.get(course_id)
+    if not course:
+        return jsonify({"error": "Course not found"}), 404
+    if user.role == 'student':
+        if not _legacy_student_enrolled(course_id, user):
+            return jsonify({"error": "Anda bukan anggota kelas ini"}), 403
+    elif user.role not in ('teacher', 'admin'):
+        return jsonify({"error": "Akses ditolak"}), 403
+    elif user.role == 'teacher' and str(course.teacher_id) != str(user.id):
+        return jsonify({"error": "Anda tidak berhak mengakses kelas ini"}), 403
+
     quizzes = Quiz.query.filter_by(course_id=course_id).all()
     
     for quiz in quizzes:
@@ -178,11 +262,8 @@ def get_quizzes_by_course(course_id):
         quiz.score = 0
         quiz.work_time = None
         
-        student_id = get_jwt_identity()
-        if not student_id:
-            return jsonify({"error": "Student not authenticated"}), 401
-        student = User.query.get(student_id)
-        if student.role == 'student':
+        student_id = user.id
+        if user.role == 'student':
             submission = Submission.query.filter_by(student_id=student_id, quiz_id=quiz.id).first()
             if submission:
                 quiz.is_submited = True
@@ -212,9 +293,14 @@ def get_quizzes_by_course(course_id):
 
 @jwt_required()
 def delete_quiz(quiz_id):
+    user = _legacy_user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
     quiz = Quiz.query.get(quiz_id)
     if not quiz:
         return jsonify({"error": "Quiz not found"}), 404
+    if not _legacy_can_manage_quiz(quiz, user):
+        return jsonify({"error": "Anda tidak berhak menghapus kuis ini"}), 403
 
     try:
         db.session.delete(quiz)
@@ -228,9 +314,13 @@ def delete_quiz(quiz_id):
 
 @jwt_required()
 def submit_quiz(quiz_id):
-    student_id = get_jwt_identity()
-    if not student_id:
-        return jsonify({"error": "Student not authenticated"}), 401
+    user = _legacy_user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if user.role != 'student':
+        return jsonify({"error": "Endpoint ini khusus siswa"}), 403
+    
+    student_id = user.id
     
     quiz = Quiz.query.get(quiz_id)
     if not quiz:
@@ -240,7 +330,7 @@ def submit_quiz(quiz_id):
     if submission:
         return jsonify({"error": "You have already submitted this quiz"}), 400
     
-    data = request.get_json()
+    data = request.get_json() or {}
     submited_answers = data.get('answers')
     
     if not submited_answers:
@@ -258,19 +348,23 @@ def submit_quiz(quiz_id):
 
         correct_answers = 0
         for ans in submited_answers:
-            option = Option.query.get(ans['option_id'])
-            if option and option.is_correct:
+            option = Option.query.get(ans.get('option_id'))
+            question = Question.query.get(ans.get('question_id'))
+            if not question or question.quiz_id != quiz_id or not option or option.question_id != question.id:
+                db.session.rollback()
+                return jsonify({"error": "Data jawaban tidak valid"}), 400
+            if option.is_correct:
                 correct_answers += 1
             
             answer = Answer(
                 submission_id=new_submission.id,
-                question_id=ans['question_id'],
+                question_id=question.id,
                 student_id=student_id,
-                option_id=ans['option_id']
+                option_id=option.id
             )
             db.session.add(answer)
             
-        total_questions = len(Quiz.query.get(quiz_id).questions)
+        total_questions = len(quiz.questions)
         
         if total_questions == 0:
             score = 0
@@ -318,9 +412,14 @@ def remove_sumbission(quiz_id):
  
 @jwt_required()
 def get_submission_by_quiz(quiz_id):
+    user = _legacy_user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
     quiz = Quiz.query.get(quiz_id)
     if not quiz:
         return jsonify({"error": "Quiz not found"}), 404
+    if not _legacy_can_manage_quiz(quiz, user):
+        return jsonify({"error": "Anda tidak berhak melihat submission kuis ini"}), 403
     
     submissions = Submission.query.filter_by(quiz_id=quiz_id).all()
     if not submissions:
@@ -346,11 +445,16 @@ def get_submission_by_quiz(quiz_id):
 
 @jwt_required()
 def get_my_submission_by_id(quiz_id):
+    user = _legacy_user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if user.role != 'student':
+        return jsonify({"error": "Endpoint ini khusus siswa"}), 403
     quiz = Quiz.query.get(quiz_id)
     if not quiz:
         return jsonify({"error": "Quiz not found"}), 404
     
-    submission = Submission.query.filter_by(quiz_id=quiz_id).first()
+    submission = Submission.query.filter_by(student_id=user.id, quiz_id=quiz_id).first()
     if not submission:
         return jsonify({"error": "Submission not found"}), 404
     
@@ -1293,8 +1397,12 @@ def get_student_quizzes():
     quizzes = Quiz.query.filter_by(status='published').order_by(Quiz.created_at.desc()).all()
     result = []
     for q in quizzes:
-        if material_id and q.material_id != int(material_id):
-            continue
+        if material_id:
+            try:
+                if q.material_id != int(material_id):
+                    continue
+            except (TypeError, ValueError):
+                return jsonify({'error': 'material_id tidak valid'}), 400
         if not _student_can_take(q, user):
             continue
         subs = [s for s in q.submissions if s.student_id == user.id]
@@ -1461,13 +1569,20 @@ def save_student_answer(attempt_id):
     selected_option_id = data.get('selected_option_id')
     if question_id is None:
         return jsonify({'error': 'question_id wajib diisi'}), 400
-    question = Question.query.filter_by(id=int(question_id), quiz_id=quiz.id).first()
+    try:
+        question_id = int(question_id)
+        question = Question.query.filter_by(id=question_id, quiz_id=quiz.id).first()
+    except (TypeError, ValueError):
+        question = None
     if not question:
         return jsonify({'error': 'Soal tidak ditemukan pada kuis ini'}), 404
 
     option = None
     if selected_option_id is not None:
-        option = Option.query.filter_by(id=int(selected_option_id), question_id=question.id).first()
+        try:
+            option = Option.query.filter_by(id=int(selected_option_id), question_id=question.id).first()
+        except (TypeError, ValueError):
+            option = None
         if not option:
             return jsonify({'error': 'Pilihan jawaban tidak valid'}), 400
 

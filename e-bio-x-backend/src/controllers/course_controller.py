@@ -2,23 +2,43 @@ from flask import request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.models.course import Course
 from src.models.enrollment import Enrollment
+from src.models.user import User
 from src.config.database import db
+
+
+def _user():
+    uid = get_jwt_identity()
+    return User.query.get(uid) if uid else None
+
+
+def _is_course_owner(course, user):
+    return str(course.teacher_id) == str(user.id)
+
+
+def _can_manage_course(course, user):
+    return user.role == 'admin' or _is_course_owner(course, user)
+
+
+def _is_enrolled(course, user):
+    return Enrollment.query.filter_by(student_id=user.id, course_id=course.id).first() is not None
 
 @jwt_required()
 def create_course():
-    data = request.get_json()
+    user = _user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if user.role not in ('teacher', 'admin'):
+        return jsonify({"error": "Akses khusus guru"}), 403
+
+    data = request.get_json(silent=True) or {}
     name = data.get('name')
     
     if not name:
         return jsonify({"error": "Course's name required"}), 400
     
-    teacher_id = get_jwt_identity()
-    if not teacher_id:
-        return jsonify({"error": "Teacher not authenticated"}), 401
-    
     new_course = Course(
         name=name,
-        teacher_id=teacher_id
+        teacher_id=user.id
     )
     db.session.add(new_course)
     db.session.commit()
@@ -34,6 +54,11 @@ def create_course():
 
 @jwt_required()
 def get_courses():
+    user = _user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if user.role not in ('admin', 'teacher'):
+        return jsonify({"error": "Akses khusus admin/guru"}), 403
     courses = Course.query.all()
 
     result = []
@@ -88,6 +113,11 @@ def get_student_courses():
 
 @jwt_required()
 def enroll(course_id):
+    user = _user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if user.role != 'student':
+        return jsonify({"error": "Endpoint ini khusus siswa"}), 403
     if course_id.startswith("KLS") and course_id[3:].isdigit():
         course_id = int(course_id[3:])
     else:
@@ -97,9 +127,7 @@ def enroll(course_id):
     if not course:
         return jsonify({"error": "Course not found"}), 404
     
-    student_id = get_jwt_identity()
-    if not student_id:
-        return jsonify({"error": "Student not authenticated"}), 401
+    student_id = user.id
     
     enroll = Enrollment.query.filter_by(student_id=student_id, course_id=course_id).first()
     if enroll:
@@ -118,6 +146,11 @@ def enroll(course_id):
 
 @jwt_required()
 def out(course_id):
+    user = _user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if user.role != 'student':
+        return jsonify({"error": "Endpoint ini khusus siswa"}), 403
     if course_id.startswith("KLS") and course_id[3:].isdigit():
         course_id = int(course_id[3:])
 
@@ -126,9 +159,7 @@ def out(course_id):
     if not course:
         return jsonify({"error": "Course not found"}), 404
     
-    student_id = get_jwt_identity()
-    if not student_id:
-        return jsonify({"error": "Student not authenticated"}), 401
+    student_id = user.id
     
     enroll = Enrollment.query.filter_by(student_id=student_id, course_id=course_id).first()
     if not enroll:
@@ -143,6 +174,9 @@ def out(course_id):
 
 @jwt_required()
 def kick(course_id, student_id):
+    user = _user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
     if course_id.startswith("KLS") and course_id[3:].isdigit():
         course_id = int(course_id[3:])
     course = Course.query.get(course_id)
@@ -150,8 +184,8 @@ def kick(course_id, student_id):
     if not course:
         return jsonify({"error": "Course not found"}), 404
     
-    if not student_id:
-        return jsonify({"error": "Student not authenticated"}), 401
+    if not _can_manage_course(course, user):
+        return jsonify({"error": "Anda tidak berhak mengelola kelas ini"}), 403
     
     enroll = Enrollment.query.filter_by(student_id=student_id, course_id=course_id).first()
     if not enroll:
@@ -166,21 +200,35 @@ def kick(course_id, student_id):
 
 @jwt_required()
 def get_course_by_id(course_id):
+    user = _user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
     course = Course.query.get(course_id)
     if not course:
-        jsonify({"error": "Course not found"}), 404
+        return jsonify({"error": "Course not found"}), 404
+
+    if user.role == 'student':
+        if not _is_enrolled(course, user):
+            return jsonify({"error": "Anda bukan anggota kelas ini"}), 403
+    elif user.role not in ('teacher', 'admin'):
+        return jsonify({"error": "Akses ditolak"}), 403
+
+    if user.role != 'admin' and user.role == 'teacher' and not _can_manage_course(course, user):
+        return jsonify({"error": "Anda tidak berhak mengelola kelas ini"}), 403
 
     students = []
     for enrollment in course.enrollments:
+        quiz_rows = [{
+            "title": submission.quiz.title,
+            "score": submission.score,
+            "cluster": submission.cluster,
+        } for submission in enrollment.student.quiz_results if submission.quiz.course_id == course.id] if user.role != 'student' else []
         students.append({
             "id": enrollment.student.id,
             "name": enrollment.student.name,
             "email": enrollment.student.email,
-            "quizes": [{
-                "title":submission.quiz.title,
-                "score":submission.score,
-                "cluster":submission.cluster,
-                    }for submission in enrollment.student.quiz_results if submission.quiz.course_id == course.id]
+            "quizes": quiz_rows,
         })
         
     return jsonify({
@@ -194,20 +242,27 @@ def get_course_by_id(course_id):
 
 @jwt_required()
 def delete_course(course_id):
+    user = _user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
     course = Course.query.get(course_id)
     if not course:
-        jsonify({"error": "Course not found"}), 404
+        return jsonify({"error": "Course not found"}), 404
+
+    if not _can_manage_course(course, user):
+        return jsonify({"error": "Anda tidak berhak menghapus kelas ini"}), 403
 
     try:
         for enrollment in course.enrollments:
             db.session.delete(enrollment)
         
         db.session.delete(course)
-    except:
+    except Exception:
         db.session.rollback()
         return jsonify({
-            "message":f"Failed to delete {course.name}" 
-        }), 
+            "message": f"Failed to delete {course.name}" 
+        }), 500
         
     db.session.commit()
         

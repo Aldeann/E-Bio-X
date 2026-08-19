@@ -59,6 +59,10 @@ def _can_student_access(material, user):
     return True
 
 
+def _is_enrolled(course, user):
+    return Enrollment.query.filter_by(student_id=user.id, course_id=course.id).first() is not None
+
+
 def _parse_course_ids(data):
     course_ids = data.get('course_ids')
     if course_ids is not None:
@@ -95,6 +99,29 @@ def _allowed_file(filename):
     return ext in ALLOWED_EXTENSIONS
 
 
+def _matches_signature(file, ext):
+    """Verify the real file content matches the claimed extension (magic bytes)."""
+    try:
+        head = file.read(16)
+        file.seek(0)
+    except Exception:
+        return False
+    if not head:
+        return False
+    if ext == 'pdf':
+        return head.startswith(b'%PDF')
+    if ext == 'png':
+        return head.startswith(b'\x89PNG\r\n\x1a\n')
+    if ext in ('jpg', 'jpeg'):
+        return head.startswith(b'\xff\xd8\xff')
+    if ext == 'webp':
+        return head.startswith(b'RIFF') and head[8:12] == b'WEBP'
+    if ext == 'mp4':
+        # MP4 boxes start with a 4-byte size followed by 'ftyp'
+        return len(head) >= 12 and head[4:8] == b'ftyp'
+    return False
+
+
 def _upload_folder():
     folder = current_app.config.get('UPLOAD_FOLDER')
     if not folder:
@@ -103,6 +130,9 @@ def _upload_folder():
 
 
 def _save_uploaded_file(file):
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if not _matches_signature(file, ext):
+        return None, 'Konten file tidak sesuai dengan tipe yang diizinkan'
     original_name = secure_filename(file.filename)
     if not original_name:
         original_name = 'file'
@@ -381,6 +411,14 @@ def _create_material_form():
     user = _get_current_user()
     if not user:
         return jsonify({'error': 'User not found'}), 404
+    if user.role not in ('teacher', 'admin'):
+        return jsonify({'error': 'Hanya guru yang dapat membuat materi'}), 403
+
+    course = Course.query.get(course_id)
+    if not course:
+        return jsonify({'error': 'Kelas tidak ditemukan'}), 404
+    if user.role != 'admin' and str(course.teacher_id) != str(user.id):
+        return jsonify({'error': 'Kelas bukan milik Anda'}), 403
 
     if not _allowed_file(file.filename):
         return jsonify({'error': 'Tipe file tidak diizinkan'}), 400
@@ -393,7 +431,7 @@ def _create_material_form():
         new_material = Material(
             title=title,
             content=content,
-            course_id=course_id,
+            course_id=course.id,
             file_url=saved['url'],
             teacher_id=user.id,
             status='published',
@@ -479,8 +517,12 @@ def get_material_by_id(material_id):
             return jsonify({'error': 'Materi hanya untuk kelas yang diikuti'}), 403
         return jsonify(_serialize_material_detail(material, include_answers=False)), 200
 
-    include_analytics = user.role == 'admin' or _is_owner(material, user)
-    return jsonify(_serialize_material_detail(material, include_answers=True, include_analytics=include_analytics)), 200
+    include_answers = user.role == 'admin' or _is_owner(material, user)
+    return jsonify(_serialize_material_detail(
+        material,
+        include_answers=include_answers,
+        include_analytics=include_answers,
+    )), 200
 
 
 @jwt_required()
@@ -488,6 +530,19 @@ def get_material_by_course(course_id):
     user = _get_current_user()
     if not user:
         return jsonify({'error': 'User not found'}), 404
+
+    course = Course.query.get(course_id)
+    if not course:
+        return jsonify({'error': 'Kelas tidak ditemukan'}), 404
+
+    if user.role == 'student':
+        if not _is_enrolled(course, user):
+            return jsonify({'error': 'Anda bukan anggota kelas ini'}), 403
+    elif user.role == 'teacher':
+        if str(course.teacher_id) != str(user.id):
+            return jsonify({'error': 'Anda tidak berhak mengelola kelas ini'}), 403
+    elif user.role != 'admin':
+        return jsonify({'error': 'Akses ditolak'}), 403
 
     materials = Material.query.outerjoin(
         material_courses, Material.id == material_courses.c.material_id
@@ -1151,11 +1206,17 @@ def submit_student_answer(material_id):
     if section_id is None or content_id is None or selected_answer is None:
         return jsonify({'error': 'section_id, content_id, dan selected_answer wajib diisi'}), 400
 
-    section = MaterialSection.query.filter_by(id=int(section_id), material_id=material.id).first()
+    try:
+        section = MaterialSection.query.filter_by(id=int(section_id), material_id=material.id).first()
+    except (TypeError, ValueError):
+        section = None
     if not section:
         return jsonify({'error': 'Section tidak ditemukan pada materi ini'}), 404
 
-    content = MaterialContent.query.filter_by(id=int(content_id), section_id=section.id).first()
+    try:
+        content = MaterialContent.query.filter_by(id=int(content_id), section_id=section.id).first()
+    except (TypeError, ValueError):
+        content = None
     if not content:
         return jsonify({'error': 'Content tidak ditemukan pada section ini'}), 404
 
@@ -1165,9 +1226,13 @@ def submit_student_answer(material_id):
     question_index = data.get('question_index')
     if expected is None and isinstance(content_data.get('questions'), list):
         questions = content_data['questions']
-        if question_index is not None and 0 <= int(question_index) < len(questions):
-            expected = questions[int(question_index)].get('correct_answer')
-            explanation = questions[int(question_index)].get('explanation')
+        try:
+            qi = int(question_index) if question_index is not None else None
+        except (TypeError, ValueError):
+            qi = None
+        if qi is not None and 0 <= qi < len(questions):
+            expected = questions[qi].get('correct_answer')
+            explanation = questions[qi].get('explanation')
         else:
             for q in questions:
                 if isinstance(q, dict) and q.get('correct_answer') is not None:
@@ -1175,9 +1240,17 @@ def submit_student_answer(material_id):
                     explanation = q.get('explanation')
                     break
 
-    selected = int(selected_answer)
-    is_correct = (expected is not None and selected == int(expected))
-    if expected is None:
+    try:
+        selected = int(selected_answer)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'selected_answer harus berupa angka'}), 400
+
+    try:
+        expected_int = int(expected) if expected is not None else None
+    except (TypeError, ValueError):
+        expected_int = None
+    is_correct = (expected_int is not None and selected == expected_int)
+    if expected_int is None:
         is_correct = bool(data.get('is_correct', False))
 
     try:
