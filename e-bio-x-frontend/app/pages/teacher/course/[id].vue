@@ -16,17 +16,6 @@
         Materi
       </button>
       <button
-        @click="activeTab = 'upload-materi'"
-        :class="[
-          'flex items-center gap-1 px-3 py-2 border rounded-lg text-sm font-medium whitespace-nowrap',
-          activeTab === 'upload-materi'
-            ? 'bg-white dark:bg-gray-900 dark:text-green-200 text-green-600 border-green-300 shadow shadow-green-300'
-            : 'bg-gray-100 text-gray-600 border-gray-200 dark:border-green-800 dark:text-green-200 dark:bg-gray-800',
-        ]">
-        <Icon name="material-symbols:upload-rounded" />
-        Upload
-      </button>
-      <button
         @click="activeTab = 'siswa'"
         :class="[
           'flex items-center gap-1 px-3 py-2 border rounded-lg text-sm font-medium whitespace-nowrap',
@@ -73,7 +62,16 @@
     </div>
 
     <div class="mb-3">
-      <MaterialUpload v-if="activeTab === 'upload-materi'" class="mb-3" :courseId="courseId" />
+      <div v-if="activeTab === 'materi'" class="mb-3 flex items-center justify-between">
+        <span class="text-sm text-gray-500">Materi yang terkait dengan kelas ini.</span>
+        <NuxtLink
+          :to="`/teacher/materials/create?course_id=${courseId}`"
+          class="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold"
+        >
+          <Icon name="material-symbols:add" class="w-4 h-4" />
+          Buat Materi
+        </NuxtLink>
+      </div>
       <MaterialList v-if="activeTab === 'materi'" class="mb-3" :courseId="courseId" />
       <StudentList 
         v-if="activeTab === 'siswa'" 

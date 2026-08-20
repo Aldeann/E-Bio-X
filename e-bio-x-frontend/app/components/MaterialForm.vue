@@ -77,6 +77,10 @@ const loadCourses = async () => {
   } catch (e) {
     courseOptions.value = [];
   }
+  const preselectId = Number(useRoute().query.course_id);
+  if (preselectId && courseOptions.value.some((c) => c.id === preselectId) && !form.course_ids.includes(preselectId)) {
+    form.course_ids.push(preselectId);
+  }
 };
 
 const toggleCourse = (id) => {
