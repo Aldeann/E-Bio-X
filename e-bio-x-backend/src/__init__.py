@@ -84,6 +84,13 @@ def create_app():
         get_teacher_ml_analytics, get_teacher_ml_mastery, get_teacher_ml_clusters,
         train_ml, retrain_ml, predict_student,
     )
+    from src.controllers.ai_explanation_controller import (
+        generate_question_explanation, generate_bank_explanation, batch_generate_explanations,
+        get_question_explanation, get_attempt_explanations, submit_explanation_feedback,
+        log_recommended_material_click, teacher_explanation_dashboard, teacher_explanation_detail,
+        approve_explanation, reject_explanation, regenerate_explanation, edit_explanation,
+        manual_explanation, manual_explanation_from_id,
+    )
     
     # Register routes
     app.add_url_rule('/api/google-login', view_func=google_login, methods=['POST'])
@@ -182,6 +189,24 @@ def create_app():
     app.add_url_rule('/api/student/attempts/<attempt_id>/answer', view_func=save_student_answer, methods=['POST'])
     app.add_url_rule('/api/student/attempts/<attempt_id>/submit', view_func=submit_student_attempt, methods=['POST'])
     app.add_url_rule('/api/student/attempts/<attempt_id>/result', view_func=get_student_attempt_result, methods=['GET'])
+
+    # ===== AI Quiz Explanation Engine (Prompt 12) =====
+    app.add_url_rule('/api/questions/<question_id>/explanation/generate', view_func=generate_question_explanation, methods=['POST'])
+    app.add_url_rule('/api/questions/<question_id>/explanation', view_func=get_question_explanation, methods=['GET'])
+    app.add_url_rule('/api/questions/<question_id>/explanation/manual', view_func=manual_explanation, methods=['POST'])
+    app.add_url_rule('/api/teacher/question-bank/<bank_id>/explanation/generate', view_func=generate_bank_explanation, methods=['POST'])
+    app.add_url_rule('/api/teacher/question-bank/<bank_id>/explanation/manual', view_func=manual_explanation, methods=['POST'])
+    app.add_url_rule('/api/quiz/explanations/batch', view_func=batch_generate_explanations, methods=['POST'])
+    app.add_url_rule('/api/student/attempts/<attempt_id>/explanations', view_func=get_attempt_explanations, methods=['GET'])
+    app.add_url_rule('/api/quiz/explanations/<explanation_id>/feedback', view_func=submit_explanation_feedback, methods=['POST'])
+    app.add_url_rule('/api/quiz/explanations/<explanation_id>/material-click', view_func=log_recommended_material_click, methods=['POST'])
+    app.add_url_rule('/api/quiz/explanations/<explanation_id>/manual', view_func=manual_explanation_from_id, methods=['POST'])
+    app.add_url_rule('/api/teacher/quiz/explanations', view_func=teacher_explanation_dashboard, methods=['GET'])
+    app.add_url_rule('/api/teacher/quiz/explanations/<explanation_id>', view_func=teacher_explanation_detail, methods=['GET'])
+    app.add_url_rule('/api/quiz/explanations/<explanation_id>/approve', view_func=approve_explanation, methods=['POST'])
+    app.add_url_rule('/api/quiz/explanations/<explanation_id>/reject', view_func=reject_explanation, methods=['POST'])
+    app.add_url_rule('/api/quiz/explanations/<explanation_id>/regenerate', view_func=regenerate_explanation, methods=['POST'])
+    app.add_url_rule('/api/quiz/explanations/<explanation_id>', view_func=edit_explanation, methods=['PUT'])
 
     app.add_url_rule('/api/student/dashboard', view_func=get_student_dashboard, methods=['GET'])
     app.add_url_rule('/api/student/progress', view_func=get_student_progress_list, methods=['GET'])

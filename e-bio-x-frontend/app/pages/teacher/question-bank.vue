@@ -83,6 +83,9 @@
             </ul>
           </div>
           <div class="flex gap-1 shrink-0">
+            <button class="text-amber-500 hover:text-amber-600" title="Generate Pembahasan AI" @click="generateExplanation(b)">
+              <Icon name="material-symbols:auto-awesome" class="w-5 h-5" />
+            </button>
             <button class="text-blue-500 hover:text-blue-600" title="Edit" @click="openForm(b)">
               <Icon name="material-symbols:edit" class="w-5 h-5" />
             </button>
@@ -119,6 +122,19 @@ const filters = reactive({ q: "", type: "", difficulty: "" });
 
 const typeLabel = (t) => (t === "true_false" ? "Benar/Salah" : "Pilihan Ganda");
 const difficultyLabel = (d) => (d === "easy" ? "Mudah" : d === "hard" ? "Sulit" : "Sedang");
+
+const generateExplanation = async (b) => {
+  try {
+    const payload = await $fetch(`${config.public.backend}/api/teacher/question-bank/${b.id}/explanation/generate`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    toast.add({ title: payload.message || "Pembahasan AI dibuat. Setujui di halaman Pembahasan AI.", color: "green" });
+  } catch (e) {
+    toast.add({ title: e?.data?.error || "Gagal membuat pembahasan", color: "red" });
+  }
+};
 
 const load = async () => {
   loading.value = true;

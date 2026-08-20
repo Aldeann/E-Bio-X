@@ -16,6 +16,7 @@
 
     <div v-else-if="result" class="max-w-3xl mx-auto space-y-6">
       <QuizResultView :result="result" />
+      <QuizReviewSection v-if="result.attempt_id" :attempt-id="result.attempt_id" />
       <div class="flex justify-center">
         <NuxtLink
           :to="`/student/quizzes/${quizId}`"

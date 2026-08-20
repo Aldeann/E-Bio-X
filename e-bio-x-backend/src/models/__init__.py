@@ -30,3 +30,4 @@ from .student_content_track import StudentContentTrack
 from .ml_model import MlModel
 from .student_learning_profile import StudentLearningProfile
 from .recommendation import Recommendation
+from .quiz_explanation import QuizExplanation

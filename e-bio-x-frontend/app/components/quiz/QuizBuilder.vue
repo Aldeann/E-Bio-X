@@ -140,6 +140,9 @@
                 <button class="text-blue-500 hover:text-blue-600" title="Edit" @click="openQuestionForm(q)">
                   <Icon name="material-symbols:edit" class="w-5 h-5" />
                 </button>
+                <button v-if="q.question_id" class="text-amber-500 hover:text-amber-600" title="Generate Pembahasan AI" @click="generateExplanation(q)">
+                  <Icon name="material-symbols:auto-awesome" class="w-5 h-5" />
+                </button>
                 <button class="text-purple-500 hover:text-purple-600" title="Duplikat" @click="duplicate(q)">
                   <Icon name="material-symbols:content-copy" class="w-5 h-5" />
                 </button>
@@ -290,6 +293,19 @@ const duplicate = async (q) => {
     await load();
   } catch (e) {
     toast.add({ title: e?.data?.error || "Gagal menduplikasi soal", color: "red" });
+  }
+};
+
+const generateExplanation = async (q) => {
+  try {
+    const payload = await $fetch(`${config.public.backend}/api/questions/${q.question_id}/explanation/generate`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    toast.add({ title: payload.message || "Pembahasan AI berhasil dibuat", color: "green" });
+  } catch (e) {
+    toast.add({ title: e?.data?.error || "Gagal membuat pembahasan", color: "red" });
   }
 };
 

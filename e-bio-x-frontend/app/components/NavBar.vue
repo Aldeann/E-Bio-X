@@ -59,6 +59,14 @@
             <Icon name="mdi:forum-outline" class="w-4 h-4" />
             Forum
           </NuxtLink>
+          <NuxtLink
+            v-if="role === 'teacher'"
+            to="/teacher/quiz/explanations"
+            class="px-3 py-1.5 rounded-lg hover:bg-white/15 transition flex items-center gap-1"
+          >
+            <Icon name="material-symbols:lightbulb" class="w-4 h-4" />
+            Pembahasan AI
+          </NuxtLink>
         </nav>
       </div>
 
