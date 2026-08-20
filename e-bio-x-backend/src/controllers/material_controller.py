@@ -25,7 +25,7 @@ import re
 
 load_dotenv()
 
-ALLOWED_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png', 'webp', 'mp4'}
+ALLOWED_EXTENSIONS = {'pdf', 'docx', 'doc', 'txt', 'jpg', 'jpeg', 'png', 'webp', 'mp4'}
 MAX_FILE_SIZE = 40 * 1024 * 1024  # 40 MB per file
 
 REQUIRED_FIELDS = ['title', 'description', 'phase', 'topic', 'learning_objectives']
@@ -110,6 +110,12 @@ def _matches_signature(file, ext):
         return False
     if ext == 'pdf':
         return head.startswith(b'%PDF')
+    if ext in ('docx', 'doc'):
+        # OOXML/ZIP container magic (doc, docx) or legacy OLE (doc)
+        return head.startswith(b'PK\x03\x04') or head.startswith(b'\xd0\xcf\x11\xe0')
+    if ext == 'txt':
+        # allow any printable-ish text; reject binary nulls
+        return b'\x00' not in head[:16]
     if ext == 'png':
         return head.startswith(b'\x89PNG\r\n\x1a\n')
     if ext in ('jpg', 'jpeg'):
@@ -967,7 +973,7 @@ def upload_material_file(material_id):
         return jsonify({'error': 'File tidak ditemukan'}), 400
 
     if not _allowed_file(file.filename):
-        return jsonify({'error': 'Tipe file tidak diizinkan (pdf, jpg, jpeg, png, webp, mp4)'}), 400
+        return jsonify({'error': 'Tipe file tidak diizinkan (pdf, docx, doc, txt, jpg, jpeg, png, webp, mp4)'}), 400
 
     saved, err = _save_uploaded_file(file)
     if err:

@@ -23,10 +23,17 @@ from src.services.ai_explanation_service import (
     PROMPT_VERSION,
     option_letters,
     correct_letter as _correct_letter_fn,
-    build_material_context,
     validate_explanation,
 )
 from src.services.learning_analytics_service import log_activity
+from src.services.ai_knowledge_service import (
+    material_context_parts,
+    build_course_context,
+    build_knowledge_context,
+    store_topic_knowledge,
+    find_similar_approved,
+    approved_reuse_context,
+)
 
 BATCH_LIMIT = 50
 STUDENT_VIEWABLE = ('APPROVED', 'TEACHER_APPROVED')
@@ -154,8 +161,38 @@ def _reuse_from_bank(question, existing):
 # ------------------------------------------------------------------
 # Generation
 # ------------------------------------------------------------------
-def _build_payload(question_text, qtype, difficulty, topic, options, student_answer, material, material_title):
+def _resolve_course_id(quiz, material):
+    if quiz and getattr(quiz, 'course_id', None):
+        return quiz.course_id
+    if material and getattr(material, 'course_id', None):
+        return material.course_id
+    if material and material.course_links:
+        return material.course_links[0].id
+    return None
+
+
+def _build_payload(question_text, qtype, difficulty, topic, options, student_answer, material, material_title,
+                   course_id=None, teacher_id=None):
     correct = _correct_letter_fn(options)
+    context_parts = []
+    if material:
+        own = material_context_parts(material, question_text)
+        if own:
+            context_parts.append('\n'.join(own))
+    realm = build_course_context(question_text, course_id, teacher_id=teacher_id,
+                                 own_material_id=material.id if material else None)
+    if realm:
+        context_parts.append('Konteks dari materi guru lain dalam course yang sama:\n' + realm)
+    if topic:
+        kctx = build_knowledge_context(topic, course_id)
+        if kctx:
+            context_parts.append('Pengetahuan topik yang tersimpan:\n' + kctx)
+    similar = find_similar_approved(question_text, course_id) if course_id else None
+    if similar:
+        rctx = approved_reuse_context(similar)
+        if rctx:
+            context_parts.append(rctx)
+    merged = '\n\n'.join(context_parts)
     return {
         'question_text': question_text,
         'question_type': qtype,
@@ -165,7 +202,8 @@ def _build_payload(question_text, qtype, difficulty, topic, options, student_ans
         'correct_answer': correct,
         'student_answer': student_answer,
         'material_title': material_title,
-        'material_context': build_material_context(material, question_text),
+        'course_id': course_id,
+        'material_context': merged or None,
     }
 
 
@@ -210,6 +248,16 @@ def _generate_into(exp, payload, source_material, actor_id=None):
     db.session.commit()
     _try_log(actor_id, source_material.id if source_material else None, 'AI_EXPLANATION_GENERATED',
              {'explanation_id': exp.id, 'generated_by': generated_by})
+    try:
+        store_topic_knowledge(
+            payload.get('topic') or 'umum',
+            payload.get('course_id'),
+            source_material.id if source_material else None,
+            data,
+            approved=False,
+        )
+    except Exception:
+        db.session.rollback()
     return True, None
 
 
@@ -305,7 +353,7 @@ def generate_question_explanation(question_id):
 
     body = request.get_json(silent=True) or {}
     force = bool(body.get('force'))
-    _, material = _resolve_material_for_question(question)
+    quiz, material = _resolve_material_for_question(question)
     exp = _get_or_create_global(question_id=question.id)
     exp = _reuse_from_bank(question, exp)
     db.session.commit()
@@ -321,6 +369,7 @@ def generate_question_explanation(question_id):
         question.text, question.question_type, question.difficulty,
         material.topic if material else None, _question_options(question),
         None, material, material.title if material else None,
+        course_id=_resolve_course_id(quiz, material), teacher_id=user.id,
     )
     ok, err = _generate_into(exp, payload, material, actor_id=user.id)
     if not ok:
@@ -358,6 +407,7 @@ def generate_bank_explanation(bank_id):
     payload = _build_payload(
         bq.question_text, bq.question_type, bq.difficulty,
         bq.topic, _bank_options(bq), None, material, material.title if material else None,
+        course_id=_resolve_course_id(None, material), teacher_id=user.id,
     )
     ok, err = _generate_into(exp, payload, material, actor_id=user.id)
     if not ok:
@@ -395,10 +445,14 @@ def batch_generate_explanations():
                     results.append({'id': tid, 'status': 'Approved'})
                     continue
                 material = None
+                if body.get('material_id'):
+                    material = Material.query.get(int(body['material_id']))
                 payload = _build_payload(
                     bq.question_text, bq.question_type, bq.difficulty,
-                    bq.topic, _bank_options(bq), None, None, None)
-                ok, err = _generate_into(exp, payload, None, actor_id=user.id)
+                    bq.topic, _bank_options(bq), None, material,
+                    material.title if material else None,
+                    course_id=_resolve_course_id(None, material), teacher_id=user.id)
+                ok, err = _generate_into(exp, payload, material, actor_id=user.id)
             else:
                 question = Question.query.get(tid)
                 if not question:
@@ -414,11 +468,12 @@ def batch_generate_explanations():
                 if exp.status in ('APPROVED', 'TEACHER_APPROVED'):
                     results.append({'id': tid, 'status': 'Approved'})
                     continue
-                _, material = _resolve_material_for_question(question)
+                quiz, material = _resolve_material_for_question(question)
                 payload = _build_payload(
                     question.text, question.question_type, question.difficulty,
                     material.topic if material else None, _question_options(question),
-                    None, material, material.title if material else None)
+                    None, material, material.title if material else None,
+                    course_id=_resolve_course_id(quiz, material), teacher_id=user.id)
                 ok, err = _generate_into(exp, payload, material, actor_id=user.id)
             if ok:
                 ok_count += 1
@@ -675,6 +730,26 @@ def _set_explanation_status(explanation_id, status, action):
     exp.updated_at = datetime.utcnow()
     db.session.add(exp)
     db.session.commit()
+    if action == 'approve':
+        try:
+            mat = None
+            course_id = None
+            topic = None
+            if exp.question_id:
+                q = Question.query.get(exp.question_id)
+                quiz, mat = _resolve_material_for_question(q) if q else (None, None)
+                course_id = _resolve_course_id(quiz, mat)
+                topic = mat.topic if mat else None
+            elif exp.bank_question_id:
+                bq = QuestionBank.query.get(exp.bank_question_id)
+                topic = bq.topic if bq else None
+                mat = Material.query.get(exp.recommended_material_id) if exp.recommended_material_id else None
+                course_id = _resolve_course_id(None, mat)
+            store_topic_knowledge(topic or 'umum', course_id,
+                                  exp.recommended_material_id or (mat.id if mat else None),
+                                  exp, approved=True)
+        except Exception:
+            db.session.rollback()
     if exp.question_id:
         q = Question.query.get(exp.question_id)
         if q:
@@ -704,7 +779,8 @@ def regenerate_explanation(explanation_id):
         payload = _build_payload(
             question.text, question.question_type, question.difficulty,
             material.topic if material else None, _question_options(question),
-            None, material, material.title if material else None)
+            None, material, material.title if material else None,
+            course_id=_resolve_course_id(quiz, material), teacher_id=user.id)
         source_mat = material
     else:
         bq = QuestionBank.query.get(exp.bank_question_id)
@@ -714,7 +790,8 @@ def regenerate_explanation(explanation_id):
             return jsonify({'error': 'Bukan milik Anda'}), 403
         payload = _build_payload(
             bq.question_text, bq.question_type, bq.difficulty,
-            bq.topic, _bank_options(bq), None, None, None)
+            bq.topic, _bank_options(bq), None, None, None,
+            course_id=None, teacher_id=user.id)
         source_mat = None
     ok, err = _generate_into(exp, payload, source_mat, actor_id=user.id)
     if not ok:
