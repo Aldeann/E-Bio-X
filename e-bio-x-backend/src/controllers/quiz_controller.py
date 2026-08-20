@@ -314,6 +314,10 @@ def delete_quiz(quiz_id):
 
 @jwt_required()
 def submit_quiz(quiz_id):
+    try:
+        quiz_id = int(quiz_id)
+    except (TypeError, ValueError):
+        quiz_id = None
     user = _legacy_user()
     if not user:
         return jsonify({"error": "User not found"}), 404
