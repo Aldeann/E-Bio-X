@@ -318,13 +318,23 @@ definePageMeta({
         </p>
       </div>
 
-      <button
-        @click="sidebarOpen = !sidebarOpen"
-        class="lg:hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200"
-      >
-        <Icon name="material-symbols:menu-book" class="w-4 h-4" />
-        Daftar Bagian
-      </button>
+      <div class="flex flex-wrap items-center gap-2">
+        <NuxtLink
+          :to="`/student/forum/new?material_id=${material.id}&course_id=${material.course_id || ''}&topic=${encodeURIComponent(material.title)}&category=${encodeURIComponent(material.topic || '')}`"
+          class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-green-300 dark:border-green-700 text-sm font-semibold text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/30 transition"
+        >
+          <Icon name="mdi:forum-outline" class="w-4 h-4" />
+          Diskusi di Forum
+        </NuxtLink>
+
+        <button
+          @click="sidebarOpen = !sidebarOpen"
+          class="lg:hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200"
+        >
+          <Icon name="material-symbols:menu-book" class="w-4 h-4" />
+          Daftar Bagian
+        </button>
+      </div>
     </div>
 
     <div v-if="material.learning_objectives" class="mb-6 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 p-4">

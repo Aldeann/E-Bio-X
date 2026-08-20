@@ -65,6 +65,14 @@ definePageMeta({
           Preview sebagai Siswa
         </span>
       </span>
+      <NuxtLink
+        v-if="material.course_id"
+        :to="`/teacher/forum/new?material_id=${material.id}&course_id=${material.course_id}&topic=${encodeURIComponent(material.title)}&category=${encodeURIComponent(material.topic || '')}`"
+        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-green-300 dark:border-green-700 text-sm font-semibold text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/30 transition"
+      >
+        <Icon name="mdi:forum-outline" class="w-4 h-4" />
+        Buat Forum dari Materi
+      </NuxtLink>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 items-start">

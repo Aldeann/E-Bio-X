@@ -54,7 +54,7 @@
       <MaterialList v-if="activeTab === 'materi'" :courseId="courseId"/>
       <QuizList v-if="activeTab === 'kuis'" :courseId="Number(courseId)"/>
       <StudentList v-if="activeTab === 'siswa'" :students="course.students" :courseId="Number(courseId)"/>
-      <DiscussionList v-if="activeTab === 'forum'" :courseId="courseId"/>
+      <ForumList v-if="activeTab === 'forum'" :courseId="courseId"/>
     </div>
   </div>
 </template>

@@ -72,6 +72,17 @@ ALLOWED_EVENT_TYPES = {
     'note_created',
     'bookmark_created',
     'recommendation_clicked',
+    # forum learning events (Prompt 11)
+    'FORUM_CREATED',
+    'FORUM_VIEWED',
+    'POST_CREATED',
+    'REPLY_CREATED',
+    'QUESTION_CREATED',
+    'QUESTION_ANSWERED',
+    'REACTION_ADDED',
+    'BEST_ANSWER_SELECTED',
+    'TEACHER_FEEDBACK_CREATED',
+    'FORUM_COMPLETED',
 }
 
 

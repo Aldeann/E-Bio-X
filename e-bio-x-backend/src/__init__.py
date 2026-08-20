@@ -51,7 +51,21 @@ def create_app():
         save_student_answer, submit_student_attempt, get_student_attempt_result, get_student_quiz_result,
     )
     from src.controllers.analysis_controller import analyze_quiz, get_analyze
-    from src.controllers.discussion_controller import get_threads_by_course, create_thread, get_thread_by_id, create_reply, delete_thread, delete_reply, toggle_pin_thread
+    from src.controllers.forum_controller import (
+        list_forums, create_forum, get_forum_detail, update_forum, delete_forum,
+        create_post, create_reply, update_post, delete_post, upload_forum_attachment,
+        toggle_reaction, remove_reaction,
+        create_question, answer_question,
+        create_feedback, mark_best_answer,
+        lock_forum, unlock_forum,
+        report_post,
+        teacher_moderation_queue, moderation_action,
+        get_forum_settings, update_forum_settings,
+        suggest_mentions,
+        teacher_forum_analytics, student_forum_analytics,
+        get_notifications, mark_notification_read, mark_all_notifications_read,
+        presenter_dashboard,
+    )
     from src.controllers.learning_tracking_controller import (
         ping_session, log_material_event, post_video_progress,
         get_video_progress, get_content_track,
@@ -198,14 +212,38 @@ def create_app():
     app.add_url_rule('/api/ml/train', view_func=train_ml, methods=['POST'])
     app.add_url_rule('/api/ml/retrain', view_func=retrain_ml, methods=['POST'])
     app.add_url_rule('/api/ml/predict/<student_id>', view_func=predict_student, methods=['POST'])
-    
-    app.add_url_rule('/api/discussions/<course_id>', view_func=get_threads_by_course, methods=['GET'])
-    app.add_url_rule('/api/discussions/<course_id>', view_func=create_thread, methods=['POST'])
-    app.add_url_rule('/api/discussions/thread/<thread_id>', view_func=get_thread_by_id, methods=['GET'])
-    app.add_url_rule('/api/discussions/thread/<thread_id>', view_func=delete_thread, methods=['DELETE'])
-    app.add_url_rule('/api/discussions/thread/<thread_id>/pin', view_func=toggle_pin_thread, methods=['PUT'])
-    app.add_url_rule('/api/discussions/thread/<thread_id>/reply', view_func=create_reply, methods=['POST'])
-    app.add_url_rule('/api/discussions/reply/<reply_id>', view_func=delete_reply, methods=['DELETE'])
+
+    # ===== Interactive Discussion Forum (Prompt 11) =====
+    app.add_url_rule('/api/forums', view_func=list_forums, methods=['GET'])
+    app.add_url_rule('/api/forums', view_func=create_forum, methods=['POST'])
+    app.add_url_rule('/api/forums/<forum_id>', view_func=get_forum_detail, methods=['GET'])
+    app.add_url_rule('/api/forums/<forum_id>', view_func=update_forum, methods=['PUT'])
+    app.add_url_rule('/api/forums/<forum_id>', view_func=delete_forum, methods=['DELETE'])
+    app.add_url_rule('/api/forums/<forum_id>/posts', view_func=create_post, methods=['POST'])
+    app.add_url_rule('/api/forums/<forum_id>/attachments', view_func=upload_forum_attachment, methods=['POST'])
+    app.add_url_rule('/api/forums/<forum_id>/questions', view_func=create_question, methods=['POST'])
+    app.add_url_rule('/api/forums/<forum_id>/lock', view_func=lock_forum, methods=['POST'])
+    app.add_url_rule('/api/forums/<forum_id>/unlock', view_func=unlock_forum, methods=['POST'])
+    app.add_url_rule('/api/forums/<forum_id>/presenter-dashboard', view_func=presenter_dashboard, methods=['GET'])
+    app.add_url_rule('/api/posts/<post_id>', view_func=update_post, methods=['PUT'])
+    app.add_url_rule('/api/posts/<post_id>', view_func=delete_post, methods=['DELETE'])
+    app.add_url_rule('/api/posts/<post_id>/replies', view_func=create_reply, methods=['POST'])
+    app.add_url_rule('/api/posts/<post_id>/reactions', view_func=toggle_reaction, methods=['POST'])
+    app.add_url_rule('/api/posts/<post_id>/reactions', view_func=remove_reaction, methods=['DELETE'])
+    app.add_url_rule('/api/posts/<post_id>/feedback', view_func=create_feedback, methods=['POST'])
+    app.add_url_rule('/api/posts/<post_id>/best-answer', view_func=mark_best_answer, methods=['POST'])
+    app.add_url_rule('/api/posts/<post_id>/report', view_func=report_post, methods=['POST'])
+    app.add_url_rule('/api/posts/<post_id>/moderation/<action>', view_func=moderation_action, methods=['POST'])
+    app.add_url_rule('/api/questions/<question_id>/answer', view_func=answer_question, methods=['POST'])
+    app.add_url_rule('/api/teacher/forum/moderation', view_func=teacher_moderation_queue, methods=['GET'])
+    app.add_url_rule('/api/teacher/forum/analytics', view_func=teacher_forum_analytics, methods=['GET'])
+    app.add_url_rule('/api/student/forum/analytics', view_func=student_forum_analytics, methods=['GET'])
+    app.add_url_rule('/api/forum/settings', view_func=get_forum_settings, methods=['GET'])
+    app.add_url_rule('/api/forum/settings', view_func=update_forum_settings, methods=['PUT'])
+    app.add_url_rule('/api/forum/mentions/suggest', view_func=suggest_mentions, methods=['GET'])
+    app.add_url_rule('/api/notifications', view_func=get_notifications, methods=['GET'])
+    app.add_url_rule('/api/notifications/<notification_id>/read', view_func=mark_notification_read, methods=['PUT'])
+    app.add_url_rule('/api/notifications/read-all', view_func=mark_all_notifications_read, methods=['PUT'])
     
     return app
 

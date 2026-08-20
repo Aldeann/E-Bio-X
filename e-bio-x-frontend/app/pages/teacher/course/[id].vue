@@ -84,7 +84,7 @@
       />
       <QuizCreate v-if="activeTab === 'buat-kuis'" class="mb-3" :courseId="Number(courseId)" />
       <QuizList v-if="activeTab === 'kuis'" class="mb-3" :courseId="Number(courseId)" />
-      <DiscussionList v-if="activeTab === 'forum'" class="mb-3" :courseId="courseId" />
+      <ForumList v-if="activeTab === 'forum'" class="mb-3" :courseId="courseId" />
     </div>
   </div>
 </template>

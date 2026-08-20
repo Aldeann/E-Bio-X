@@ -17,7 +17,12 @@ from .submission import Submission
 from .answer import Answer
 from .question_bank import QuestionBank
 from .question_bank_option import QuestionBankOption
-from .discussion import DiscussionThread, DiscussionReply
+from .forum import (
+    Forum, ForumMember, ForumPost, ForumReaction, ForumMention,
+    ForumAttachment, ForumQuestion, ForumAnswer, ForumFeedback,
+    ForumReport, ForumModerationLog, Notification, UserXp, XpLog,
+    Achievement, UserAchievement, ForumSetting,
+)
 from .learning_session import LearningSession
 from .learning_activity import LearningActivity
 from .video_progress import VideoProgress

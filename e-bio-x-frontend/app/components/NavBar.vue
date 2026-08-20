@@ -52,10 +52,18 @@
             <Icon name="material-symbols:quiz" class="w-4 h-4" />
             Kuis
           </NuxtLink>
+          <NuxtLink
+            :to="forumLink"
+            class="px-3 py-1.5 rounded-lg hover:bg-white/15 transition flex items-center gap-1"
+          >
+            <Icon name="mdi:forum-outline" class="w-4 h-4" />
+            Forum
+          </NuxtLink>
         </nav>
       </div>
 
       <div v-if="username" class="relative flex items-center space-x-2">
+          <NotificationBell v-if="role" />
           <span class="font-medium text-white dark:text-gray-100">{{ username }}</span>
           <button @click.stop="toggleDropdown" class="focus:outline-none">
             <div
@@ -116,6 +124,13 @@ const materialsLink = computed(() => {
 const quizzesLink = computed(() => {
   if (role.value === "teacher") return "/teacher/quizzes";
   if (role.value === "student") return "/student/quizzes";
+  return "/";
+});
+
+const forumLink = computed(() => {
+  if (role.value === "teacher") return "/teacher/forum";
+  if (role.value === "student") return "/student/forum";
+  if (role.value === "admin") return "/teacher/forum";
   return "/";
 });
 
