@@ -198,7 +198,8 @@ class AIExplanationService:
         if payload.get('topic'):
             lines.append(f"Topic: {payload['topic']}")
         lines.append("Options (letter: text):")
-        for letter, text in payload.get('options', []):
+        for opt in payload.get('options', []):
+            letter, text = opt[0], opt[1]
             lines.append(f"{letter}: {text}")
         lines.append(f"Correct answer (authoritative, from answer key): {payload.get('correct_answer')}")
         if payload.get('student_answer') is not None:

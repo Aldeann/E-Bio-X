@@ -77,6 +77,10 @@ migrations/
 # File upload
 src/config/credentials.json
 
+# Uploaded material files (kept out of the repo)
+uploads/*
+!uploads/.gitkeep
+
 # ML artifacts
 /models/
 src/models/*.joblib
