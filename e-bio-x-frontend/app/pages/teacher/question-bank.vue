@@ -97,7 +97,7 @@
       </div>
     </div>
 
-    <QuestionBankForm
+    <QuizQuestionBankForm
       :open="formOpen"
       :question="editing"
       @close="formOpen = false; editing = null"
