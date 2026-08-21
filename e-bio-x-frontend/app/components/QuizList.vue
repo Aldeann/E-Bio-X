@@ -65,14 +65,14 @@
               <div class="flex flex-wrap md:flex-nowrap items-center gap-3">
                 <div v-if="role === 'teacher'" class="flex flex-col md:flex-row gap-2">
                   <NuxtLink
-                    :to="`/teacher/quiz/${quiz.quiz_id}/analysis`"
+                    :to="`/teacher/quizzes/${quiz.quiz_id}/analytics`"
                     class="bg-green-600 text-white px-3 py-1.5 text-sm rounded hover:bg-green-700 flex items-center gap-1">
                     <Icon name="material-symbols:bar-chart-4-bars" />
                     Analisis
                   </NuxtLink>
 
                   <NuxtLink
-                    :to="`/teacher/quiz/${quiz.quiz_id}`"
+                    :to="`/teacher/quizzes/${quiz.quiz_id}`"
                     class="bg-yellow-400 text-white px-3 py-1.5 text-sm rounded hover:bg-yellow-500 flex items-center gap-1">
                     <Icon name="material-symbols:edit-square" />
                     Edit
@@ -86,33 +86,49 @@
                   </button>
                 </div>
 
-                <button
-                  v-else-if="role === 'student' && !quiz.is_closed && !quiz.is_submited"
-                  @click="startQuiz(quiz.quiz_id)"
-                  class="bg-green-600 text-white px-3 py-1.5 text-sm rounded hover:bg-green-700 flex items-center gap-1">
-                  <Icon name="mdi:play-circle-outline" />
-                  Kerjakan
-                </button>
-
-                <div
-                  v-else-if="role === 'student' && quiz.is_submited"
-                  class="flex flex-col md:flex-row gap-2 py-2 rounded-lg bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 border border-green-200 dark:border-green-700 transition-colors">
-                  <div class="flex items-center gap-2 px-4">
-                    <Icon name="mdi:star-outline" class="w-5 h-5" />
-                    <div>
-                      <p class="text-xs text-gray-500 dark:text-gray-400">Nilai</p>
-                      <p class="font-semibold text-base">
-                        {{ quiz.score !== undefined && quiz.score !== null ? quiz.score : "-" }}
-                      </p>
+                <template v-else-if="role === 'student' && !quiz.is_closed">
+                  <div
+                    v-if="quiz.student_status === 'completed'"
+                    class="flex flex-col md:flex-row gap-2 py-2 rounded-lg bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 border border-green-200 dark:border-green-700 transition-colors">
+                    <div class="flex items-center gap-2 px-4">
+                      <Icon name="mdi:star-outline" class="w-5 h-5" />
+                      <div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Nilai terbaik</p>
+                        <p class="font-semibold text-base">
+                          {{ quiz.best_percentage !== null && quiz.best_percentage !== undefined ? `${quiz.best_percentage}%` : "-" }}
+                        </p>
+                      </div>
                     </div>
+                    <div class="flex items-center gap-2 px-4">
+                      <span
+                        class="px-2 py-0.5 rounded-full text-xs font-medium"
+                        :class="quiz.passed ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300' : 'bg-orange-100 dark:bg-orange-800 text-orange-700 dark:text-orange-300'">
+                        {{ quiz.passed ? "Lulus" : "Belum Lulus" }}
+                      </span>
+                    </div>
+                    <NuxtLink
+                      :to="`/student/quizzes/${quiz.quiz_id}/result`"
+                      class="bg-green-600 text-white px-3 py-1.5 text-sm rounded hover:bg-green-700 flex items-center gap-1 self-center">
+                      <Icon name="material-symbols:visibility-outline" />
+                      Lihat Hasil
+                    </NuxtLink>
+                    <button
+                      v-if="quiz.attempts_used < quiz.max_attempts"
+                      @click="startQuiz(quiz.quiz_id)"
+                      class="border border-green-600 text-green-700 dark:text-green-400 px-3 py-1.5 text-sm rounded hover:bg-green-100 dark:hover:bg-gray-800 flex items-center gap-1 self-center">
+                      <Icon name="mdi:refresh" />
+                      Ulangi
+                    </button>
                   </div>
-                  <div class="flex items-center gap-2 px-4">
-                    <Icon name="mdi:timer-outline" class="w-5 h-5" />
-                    <p class="font-semibold text-base">
-                      {{ quiz.work_time ? quiz.work_time : "-" }}
-                    </p>
-                  </div>
-                </div>
+
+                  <button
+                    v-else
+                    @click="startQuiz(quiz.quiz_id)"
+                    class="bg-green-600 text-white px-3 py-1.5 text-sm rounded hover:bg-green-700 flex items-center gap-1">
+                    <Icon name="mdi:play-circle-outline" />
+                    {{ quiz.student_status === 'in_progress' ? 'Lanjutkan' : 'Kerjakan' }}
+                  </button>
+                </template>
 
                 <div
                   v-else-if="role === 'student' && quiz.is_closed"
@@ -235,8 +251,7 @@ function startQuiz(quizId) {
     })
     .then((result) => {
       if (result.isConfirmed) {
-        localStorage.setItem("course_id", props.courseId);
-        router.push(`/student/quiz/${quizId}`);
+        router.push(`/student/quizzes/${quizId}`);
       }
     });
 }

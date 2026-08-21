@@ -256,36 +256,49 @@ def get_quizzes_by_course(course_id):
         return jsonify({"error": "Anda tidak berhak mengakses kelas ini"}), 403
 
     quizzes = Quiz.query.filter_by(course_id=course_id).all()
-    
+
+    student_id = user.id
+    result = []
     for quiz in quizzes:
-        quiz.is_submited = False
-        quiz.score = 0
-        quiz.work_time = None
-        
-        student_id = user.id
+        entry = {
+            "quiz_id": quiz.id,
+            "title": quiz.title,
+            "is_closed": quiz.is_closed,
+            "questions": len(quiz.questions),
+            "created_at": quiz.created_at,
+        }
         if user.role == 'student':
-            submission = Submission.query.filter_by(student_id=student_id, quiz_id=quiz.id).first()
-            if submission:
-                quiz.is_submited = True
-                quiz.score = submission.score
-                quiz.work_time = submission.work_time.strftime('%H:%M:%S')
-                
+            done = Submission.query.filter(
+                Submission.student_id == student_id,
+                Submission.quiz_id == quiz.id,
+                Submission.status.in_(['submitted', 'timeout']),
+            ).all()
+            inprog = Submission.query.filter_by(
+                student_id=student_id, quiz_id=quiz.id, status='in_progress'
+            ).first()
+            best = max([
+                s.percentage if s.percentage is not None else s.score
+                for s in done
+            ], default=None)
+            passing_grade = quiz.passing_grade or 75
+            max_attempts = quiz.max_attempts or 1
+            entry.update({
+                "is_submited": bool(done),
+                "score": best if best is not None else 0,
+                "work_time": None,
+                "student_status": 'in_progress' if inprog else ('completed' if done else 'not_started'),
+                "attempts_used": len(done),
+                "max_attempts": max_attempts,
+                "best_percentage": best,
+                "passed": best is not None and best >= passing_grade,
+                "passing_grade": passing_grade,
+            })
+        result.append(entry)
+
     return (
         jsonify(
             {
-                "quizzes": [
-                    {
-                        "quiz_id": quiz.id,
-                        "title": quiz.title,
-                        "is_closed": quiz.is_closed,
-                        "is_submited": quiz.is_submited,
-                        "score": quiz.score,
-                        "questions": len(quiz.questions),
-                        "created_at": quiz.created_at,
-                        "work_time": quiz.work_time if quiz.work_time else None,
-                    }
-                    for quiz in quizzes
-                ]
+                "quizzes": result,
             }
         ),
         200,

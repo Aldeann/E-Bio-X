@@ -80,7 +80,21 @@
         :courseId="courseId"
         @studentRemoved="handleStudentRemoved"
       />
-      <QuizCreate v-if="activeTab === 'buat-kuis'" class="mb-3" :courseId="Number(courseId)" />
+      <div
+        v-if="activeTab === 'buat-kuis'"
+        class="mb-3 bg-white dark:bg-gray-900 border border-green-200 dark:border-gray-700 rounded-xl shadow-md p-8 text-center">
+        <Icon name="fluent:quiz-new-24-filled" class="w-12 h-12 text-green-500 mx-auto mb-3" />
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-1">Buat Kuis Baru</h3>
+        <p class="text-sm text-gray-500 mb-4">
+          Buat kuis dengan pengaturan lengkap: materi, durasi, nilai lulus, dan jumlah percobaan.
+        </p>
+        <NuxtLink
+          to="/teacher/quizzes/create"
+          class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold">
+          <Icon name="material-symbols:add" class="w-5 h-5" />
+          Buat Kuis
+        </NuxtLink>
+      </div>
       <QuizList v-if="activeTab === 'kuis'" class="mb-3" :courseId="Number(courseId)" />
       <ForumList v-if="activeTab === 'forum'" class="mb-3" :courseId="courseId" />
     </div>
