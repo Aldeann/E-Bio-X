@@ -26,9 +26,13 @@
       @submitted="onSubmitted"
     />
 
-    <div v-else-if="result" class="max-w-3xl mx-auto">
+    <div v-else-if="result" class="max-w-3xl mx-auto space-y-6">
       <QuizResultView :result="result" />
-      <div class="mt-6 flex flex-wrap gap-3 justify-center">
+      <QuizReviewSection
+        v-if="result.attempt_id"
+        :attempt-id="result.attempt_id"
+      />
+      <div class="flex flex-wrap gap-3 justify-center">
         <NuxtLink
           :to="`/student/quizzes/${quizId}/result`"
           class="border border-green-600 text-green-700 dark:text-green-400 px-5 py-2 rounded-lg hover:bg-green-50 dark:hover:bg-gray-800 transition"
