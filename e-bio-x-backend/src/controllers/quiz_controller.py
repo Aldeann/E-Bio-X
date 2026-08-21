@@ -256,6 +256,8 @@ def get_quizzes_by_course(course_id):
         return jsonify({"error": "Anda tidak berhak mengakses kelas ini"}), 403
 
     quizzes = Quiz.query.filter_by(course_id=course_id).all()
+    if user.role == 'student':
+        quizzes = [q for q in quizzes if q.status == 'published']
 
     student_id = user.id
     result = []

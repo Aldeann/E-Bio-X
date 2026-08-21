@@ -77,7 +77,7 @@
 </template>
 
 <script setup>
-defineProps({
+const props = defineProps({
   quiz: { type: Object, required: true },
 });
 defineEmits(["start"]);
