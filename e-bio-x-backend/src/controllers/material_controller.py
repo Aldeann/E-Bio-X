@@ -582,6 +582,7 @@ def get_material_by_course(course_id):
     }), 200
 
 
+# DEPRECATED (audit 14.8): gunakan /api/teacher/analytics/materials/<id>
 @jwt_required()
 def get_material_analytics(material_id):
     user = _get_current_user()

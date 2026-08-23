@@ -42,19 +42,6 @@ def _teacher():
     return user, None
 
 
-def _teacher_owns_student(teacher, student_id):
-    target = User.query.get(student_id)
-    if not target or target.role != 'student':
-        return None
-    if teacher.role == 'admin':
-        return target
-    course_ids = set(analytics.teacher_course_ids(teacher.id))
-    enrolled = Enrollment.query.filter_by(student_id=target.id).all()
-    if any(e.course_id in course_ids for e in enrolled):
-        return target
-    return PermissionError('Siswa bukan anggota kelas Anda')
-
-
 # ============================================================
 # STUDENT: learning profile & recommendations
 # ============================================================
@@ -241,27 +228,6 @@ def get_teacher_ml_analytics():
     return jsonify(result), 200
 
 
-@jwt_required()
-def get_teacher_ml_mastery():
-    teacher, err = _teacher()
-    if err:
-        return err
-    insights = _ml_insights(teacher)
-    return jsonify({
-        'mastery_distribution': insights['mastery_distribution'],
-        'analyzed': insights['analyzed'],
-        'insufficient_data': insights['insufficient_data'],
-    }), 200
-
-
-@jwt_required()
-def get_teacher_ml_clusters():
-    teacher, err = _teacher()
-    if err:
-        return err
-    return jsonify(_clusters_info() or {'status': cfg.STATUS_MODEL_UNAVAILABLE}), 200
-
-
 # ============================================================
 # TRAINING / PREDICTION (protected, teacher/admin)
 # ============================================================
@@ -309,29 +275,3 @@ def train_ml():
     if err:
         return err
     return jsonify(_train_pipeline()), 200
-
-
-@jwt_required()
-def retrain_ml():
-    teacher, err = _teacher()
-    if err:
-        return err
-    return jsonify(_train_pipeline()), 200
-
-
-@jwt_required()
-def predict_student(student_id):
-    teacher, err = _teacher()
-    if err:
-        return err
-    try:
-        target = _teacher_owns_student(teacher, student_id)
-        if isinstance(target, PermissionError):
-            return jsonify({'error': str(target)}), 403
-    except Exception as exc:
-        return jsonify({'error': str(exc)}), 403
-    if target is None:
-        return jsonify({'error': 'Siswa tidak ditemukan'}), 404
-    dt_artifact = model_manager.load_artifact('decision_tree')
-    km_artifact = model_manager.load_artifact('kmeans')
-    return jsonify(profile_mod.generate_profile(target, dt_artifact, km_artifact)), 200

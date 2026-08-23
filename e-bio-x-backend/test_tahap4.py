@@ -177,7 +177,6 @@ quizzes = requests.get(f"{BASE}/api/student/quizzes", headers=auth(T["murid1@ebi
 check("student quizzes 200", quizzes.status_code == 200)
 
 # Full interactive quiz attempt cycle for material 28 (creates a new quiz as test data)
-import json as _json, time as _time
 quiz_id = None
 try:
     r = requests.post(f"{BASE}/api/teacher/quizzes", headers=auth(T["guru1@ebiox.com"]),

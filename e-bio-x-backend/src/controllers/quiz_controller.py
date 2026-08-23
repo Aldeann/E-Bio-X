@@ -82,6 +82,7 @@ def create_quiz():
         return jsonify({"error": f"Error creating quiz: {str(e)}"}), 500
 
 
+# DEPRECATED (audit 14.8): gunakan API kanonik /api/teacher/quizzes*
 @jwt_required()
 def toggle_open_quiz(quiz_id):
     user = _legacy_user()
@@ -187,6 +188,7 @@ def edit_option(option_id):
     
     return jsonify({"message": "Option edited successfully"}), 200
 
+# DEPRECATED (audit 14.8): gunakan API kanonik /api/teacher/quizzes*
 @jwt_required()
 def get_quiz_by_id(quiz_id):
     user_id = get_jwt_identity()
@@ -238,6 +240,7 @@ def get_quiz_by_id(quiz_id):
         ],
     }), 200
 
+# DEPRECATED (audit 14.8): gunakan API kanonik /api/teacher/quizzes*
 @jwt_required()
 def get_quizzes_by_course(course_id):
     user = _legacy_user()
@@ -306,6 +309,7 @@ def get_quizzes_by_course(course_id):
         200,
     )
 
+# DEPRECATED (audit 14.8): gunakan API kanonik /api/teacher/quizzes*
 @jwt_required()
 def delete_quiz(quiz_id):
     user = _legacy_user()

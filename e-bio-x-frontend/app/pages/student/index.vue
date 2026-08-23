@@ -95,7 +95,7 @@ const fetchCoursesData = async () => {
 const joinClass = async () => {
   try {
     await $fetch(`${config.public.backend}/api/courses/enroll/${classCode.value}`, {
-      method: "GET",
+      method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -124,7 +124,7 @@ const outClass = async (code) => {
   }
   try {
     await $fetch(`${config.public.backend}/api/courses/out/${code}`, {
-      method: "GET",
+      method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",

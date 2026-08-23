@@ -1,6 +1,6 @@
 import pymysql
 pymysql.install_as_MySQLdb()
-from flask import Flask, request
+from flask import Flask
 from flask_migrate import Migrate
 from src.config.database import init_db, db
 from flask_cors import CORS
@@ -50,7 +50,6 @@ def create_app():
         get_student_quizzes, get_student_quiz, start_student_attempt, get_student_attempt,
         save_student_answer, submit_student_attempt, get_student_attempt_result, get_student_quiz_result,
     )
-    from src.controllers.analysis_controller import analyze_quiz, get_analyze
     from src.controllers.forum_controller import (
         list_forums, create_forum, get_forum_detail, update_forum, delete_forum,
         create_post, create_reply, update_post, delete_post, upload_forum_attachment,
@@ -81,8 +80,8 @@ def create_app():
     )
     from src.controllers.ml_controller import (
         get_student_learning_profile, get_student_recommendations, post_recommendation_click,
-        get_teacher_ml_analytics, get_teacher_ml_mastery, get_teacher_ml_clusters,
-        train_ml, retrain_ml, predict_student,
+        get_teacher_ml_analytics,
+        train_ml,
     )
     from src.controllers.ai_explanation_controller import (
         generate_question_explanation, generate_bank_explanation, batch_generate_explanations,
@@ -108,8 +107,8 @@ def create_app():
     app.add_url_rule('/api/courses/<course_id>', view_func=delete_course, methods=['DELETE'])
     app.add_url_rule('/api/courses/teacher', view_func=get_teacher_courses, methods=['GET'])
     app.add_url_rule('/api/courses/student', view_func=get_student_courses, methods=['GET'])
-    app.add_url_rule('/api/courses/enroll/<course_id>', view_func=enroll, methods=['GET'])
-    app.add_url_rule('/api/courses/out/<course_id>', view_func=out, methods=['GET'])
+    app.add_url_rule('/api/courses/enroll/<course_id>', view_func=enroll, methods=['GET', 'POST'])
+    app.add_url_rule('/api/courses/out/<course_id>', view_func=out, methods=['GET', 'POST'])
     app.add_url_rule('/api/courses/<course_id>/students/<student_id>', view_func=kick, methods=['DELETE'])
     app.add_url_rule('/api/courses/materials/<course_id>', view_func=get_material_by_course, methods=['GET'])
     app.add_url_rule('/api/course/quiz/<course_id>', view_func=get_quizzes_by_course, methods=['GET'])
@@ -159,9 +158,6 @@ def create_app():
     app.add_url_rule('/api/quiz/<quiz_id>/edit_title', view_func=edit_quiz_title, methods=['PATCH'])
     app.add_url_rule('/api/quiz/<question_id>/edit_question', view_func=edit_question, methods=['PATCH'])
     app.add_url_rule('/api/quiz/<option_id>/edit_option', view_func=edit_option, methods=['PATCH'])
-    
-    app.add_url_rule('/api/analysis/<quiz_id>', view_func=get_analyze, methods=['GET'])
-    app.add_url_rule('/api/analysis/<quiz_id>', view_func=analyze_quiz, methods=['POST'])
 
     # ===== Interactive quiz system (materials-linked) =====
     app.add_url_rule('/api/teacher/quizzes', view_func=get_teacher_quizzes, methods=['GET'])
@@ -232,11 +228,7 @@ def create_app():
     app.add_url_rule('/api/student/recommendations', view_func=get_student_recommendations, methods=['GET'])
     app.add_url_rule('/api/student/recommendations/click', view_func=post_recommendation_click, methods=['POST'])
     app.add_url_rule('/api/teacher/analytics/ml', view_func=get_teacher_ml_analytics, methods=['GET'])
-    app.add_url_rule('/api/teacher/analytics/ml/mastery', view_func=get_teacher_ml_mastery, methods=['GET'])
-    app.add_url_rule('/api/teacher/analytics/ml/clusters', view_func=get_teacher_ml_clusters, methods=['GET'])
     app.add_url_rule('/api/ml/train', view_func=train_ml, methods=['POST'])
-    app.add_url_rule('/api/ml/retrain', view_func=retrain_ml, methods=['POST'])
-    app.add_url_rule('/api/ml/predict/<student_id>', view_func=predict_student, methods=['POST'])
 
     # ===== Interactive Discussion Forum (Prompt 11) =====
     app.add_url_rule('/api/forums', view_func=list_forums, methods=['GET'])
