@@ -32,16 +32,89 @@ def login(email, password):
     return d['access_token']
 
 
-QUESTION_ID = 66
-QUESTION_ID2 = 67
-ATTEMPT_ID = 30
-BANK_ID = 1
-MATERIAL_ID = 28
+QUESTION_ID = None
+QUESTION_ID2 = None
+ATTEMPT_ID = None
+QUIZ_ID = None
+
+
+def _raw(method, url, token=None, body=None):
+    headers = {'Authorization': f'Bearer {token}'} if token else {}
+    rv = client.open(url, method=method, headers=headers, json=body)
+    return rv.status_code, rv.get_json(silent=True)
+
+
+def build_fixture(teacher_token, student_token):
+    """Buat kuis sementara (materi demo milik guru) + 1 attempt murid.
+
+    Semua test explanation dijalankan terhadap fixture ini sehingga
+    kuis/materi milik pengguna tidak pernah tersentuh.
+    """
+    global QUESTION_ID, QUESTION_ID2, ATTEMPT_ID, QUIZ_ID
+    with app.app_context():
+        from src.models.user import User
+        guru = User.query.filter_by(email='guru1@ebiox.com').first()
+        from src.models.material import Material
+        mat = Material.query.filter(Material.title.like('[Demo] %'),
+                                    Material.teacher_id == guru.id).first()
+        assert mat is not None, 'materi demo tidak ditemukan - jalankan scripts/seed_ml_activity.py dulu'
+        material_id = mat.id
+        # bersihkan fixture liar dari run yang terputus
+        from src.models.quiz import Quiz
+        for stray in Quiz.query.filter(Quiz.title == '[Smoke] AI Explanation Fixture').all():
+            db.session.delete(stray)
+        db.session.commit()
+
+    st, d = _raw('POST', '/api/teacher/quizzes', teacher_token,
+                 {'title': '[Smoke] AI Explanation Fixture', 'material_id': material_id,
+                  'duration': 5, 'passing_grade': 50})
+    assert st == 201, f'fixture create quiz: {st} {d}'
+    QUIZ_ID = d['quiz']['id']
+
+    def add_q(text):
+        st, d = _raw('POST', f'/api/teacher/quizzes/{QUIZ_ID}/questions', teacher_token,
+                     {'question_text': text, 'question_type': 'multiple_choice',
+                      'difficulty': 'medium',
+                      'options': [{'option_text': 'Benar', 'is_correct': True},
+                                  {'option_text': 'Salah', 'is_correct': False}]})
+        assert st == 201, f'fixture add question: {st} {d}'
+        q = d['question']
+        correct = next(o['option_id'] for o in q['options'] if o['is_correct'])
+        wrong = next(o['option_id'] for o in q['options'] if not o['is_correct'])
+        return q['question_id'], correct, wrong
+
+    QUESTION_ID, q1_correct, _ = add_q('Smoke Q1: sel adalah unit terkecil kehidupan?')
+    QUESTION_ID2, q2_correct, q2_wrong = add_q('Smoke Q2: virus memiliki sel tubuh sendiri?')
+
+    st, _d = _raw('POST', f'/api/teacher/quizzes/{QUIZ_ID}/publish', teacher_token,
+                  {'status': 'published'})
+    assert st == 200, f'fixture publish: {st}'
+
+    st, d = _raw('POST', f'/api/student/quizzes/{QUIZ_ID}/start', student_token, {})
+    assert st == 201, f'fixture start attempt: {st} {d}'
+    ATTEMPT_ID = d['attempt_id']
+    # Q1 dijawab benar, Q2 dijawab salah agar analisis personal punya variasi
+    for qid, opt in ((QUESTION_ID, q1_correct), (QUESTION_ID2, q2_wrong)):
+        st, _d = _raw('POST', f'/api/student/attempts/{ATTEMPT_ID}/answer',
+                      student_token, {'question_id': qid, 'selected_option_id': opt})
+        assert st == 200, f'fixture answer: {st}'
+    st, _d = _raw('POST', f'/api/student/attempts/{ATTEMPT_ID}/submit', student_token, {})
+    assert st == 200, f'fixture submit: {st}'
+    print(f'fixture ok: quiz={QUIZ_ID} questions=({QUESTION_ID},{QUESTION_ID2}) attempt={ATTEMPT_ID}')
+
+
+def cleanup_fixture(teacher_token):
+    if QUIZ_ID:
+        _raw('DELETE', f'/api/teacher/quizzes/{QUIZ_ID}', teacher_token)
+
 
 print('== LOGIN ==')
 T = login('guru1@ebiox.com', '123123123')
 S = login('murid1@ebiox.com', '123123123')
 print('tokens ok')
+build_fixture(T, S)
+import atexit
+atexit.register(cleanup_fixture, T)
 
 print('== TEST 1: teacher generate explanation for question (rule-based fallback) ==')
 st, d = call('gen-q1', 'POST', f'/api/questions/{QUESTION_ID}/explanation/generate', token=T, body={}, expect=201)
