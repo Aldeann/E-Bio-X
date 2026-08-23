@@ -2,8 +2,8 @@
   <div class="container mx-auto px-4 py-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
       <div>
-        <h2 class="text-2xl font-semibold">Pembahasan AI</h2>
-        <p class="text-sm text-gray-500">Kelola pembahasan soal yang dihasilkan AI. Siswa hanya bisa melihat pembahasan berstatus disetujui.</p>
+        <h2 class="text-2xl font-semibold">Pembahasan Kuis</h2>
+        <p class="text-sm text-gray-500">Kelola pembahasan kuis yang dihasilkan sistem. Siswa hanya bisa melihat pembahasan berstatus disetujui.</p>
       </div>
       <div class="flex items-center gap-2">
         <input
