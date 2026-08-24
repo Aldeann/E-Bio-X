@@ -13,7 +13,7 @@
             {{ userData.name || "User" }}
           </h1>
           <button
-          class="w-6 h-6 text-yellow-400 hover:text-yellow-500 transition duration-300"
+          class="w-9 h-9 p-1.5 text-yellow-400 hover:text-yellow-500 transition duration-300"
           @click="updateName"
           aria-label="Edit Name">
           <Icon name="material-symbols:edit" />

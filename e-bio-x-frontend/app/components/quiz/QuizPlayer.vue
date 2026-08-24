@@ -55,19 +55,19 @@
           Kuis ini belum memiliki soal.
         </div>
 
-        <div class="flex items-center justify-between mt-4">
+        <div class="flex items-center justify-between gap-2 mt-4">
           <button
-            class="border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-lg text-sm disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+            class="flex-1 sm:flex-none border border-gray-300 dark:border-gray-600 px-4 py-2.5 rounded-lg text-sm disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
             :disabled="currentIndex === 0"
             @click="currentIndex--"
           >
             <Icon name="material-symbols:arrow-back" class="w-4 h-4 inline" /> Sebelumnya
           </button>
-          <span class="text-sm text-gray-500">
-            Soal {{ currentIndex + 1 }} dari {{ attempt.questions.length }}
+          <span class="text-sm text-gray-500 text-center whitespace-nowrap">
+            {{ currentIndex + 1 }} / {{ attempt.questions.length }}
           </span>
           <button
-            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition"
+            class="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg text-sm transition"
             :disabled="currentIndex === attempt.questions.length - 1"
             @click="currentIndex++"
           >

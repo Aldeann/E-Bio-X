@@ -152,7 +152,7 @@ const handleSubmit = async (key, selected, questionIndex = null) => {
         v-if="data.url"
         :src="data.url"
         :alt="data.caption || ''"
-        class="max-h-96 w-auto mx-auto rounded-xl shadow-md border border-gray-200 dark:border-gray-700"
+        class="max-h-96 w-auto max-w-full h-auto mx-auto rounded-xl shadow-md border border-gray-200 dark:border-gray-700"
       />
       <figcaption
         v-if="data.caption"

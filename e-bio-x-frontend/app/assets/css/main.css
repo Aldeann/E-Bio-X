@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
+/* Guard horizontal overflow di mobile tanpa merusak position:sticky */
+html, body {
+  overflow-x: clip;
+}
+
 html.dark .swal2-popup {
   background-color: #1f2937 !important; /* bg-gray-800 */
   color: #fff !important;

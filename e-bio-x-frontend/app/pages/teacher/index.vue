@@ -33,7 +33,8 @@
         class="bg-white dark:bg-gray-900 border rounded-lg p-4 shadow-md shadow-green-300 hover:shadow-lg hover:shadow-green-300 relative">
         <button
           @click="deleteClass(kelas.id)"
-          class="absolute top-0 right-0 text-red-600 w-6 h-6 flex items-center justify-center hover:text-red-700">
+          class="absolute top-1 right-1 text-red-600 w-9 h-9 flex items-center justify-center rounded-lg hover:text-red-700 hover:bg-red-50 dark:hover:bg-gray-800 transition"
+          aria-label="Hapus kelas">
           <Icon name="material-symbols:delete-rounded" class="w-5 h-5" />
         </button>
         <div class="flex justify-between items-start mb-2">
@@ -49,7 +50,8 @@
             <span class="text-sm text-gray-600 dark:text-gray-200">Kode: {{ kelas.code }}</span>
             <button
               @click="copyToClipboard(kelas.code)"
-              class="text-green-500 hover:text-green-800 transition duration-200">
+              class="text-green-500 hover:text-green-800 p-1.5 -m-1.5 rounded transition duration-200"
+              aria-label="Salin kode kelas">
               <Icon name="material-symbols:content-copy" class="w-5 h-5" />
             </button>
           </div>

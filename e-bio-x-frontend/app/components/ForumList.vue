@@ -120,8 +120,8 @@
           :key="forum.id"
           class="rounded-xl p-4 shadow-md dark:shadow-green-200 bg-white dark:bg-gray-900 border dark:border-gray-700 hover:shadow-lg transition cursor-pointer"
           @click="openForum(forum)">
-          <div class="flex items-start justify-between gap-3">
-            <div class="flex-1 min-w-0">
+          <div class="flex flex-col sm:flex-row items-start justify-between gap-2 sm:gap-3">
+            <div class="flex-1 min-w-0 w-full sm:w-auto">
               <div class="flex items-center gap-2 mb-1 flex-wrap">
                 <Icon v-if="forum.is_pinned" name="mdi:pin" class="text-red-500 shrink-0" title="Disematkan" />
                 <span class="text-[11px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide"
@@ -142,26 +142,25 @@
               <p v-if="forum.description" class="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">{{ forum.description }}</p>
             </div>
 
-            <div class="flex items-center gap-3 shrink-0">
-              <div class="flex items-center gap-3 text-xs text-gray-500">
-                <span class="flex items-center gap-1" title="Postingan">
-                  <Icon name="mdi:message-text-outline" class="text-green-500" /> {{ forum.posts_count }}
-                </span>
-                <span class="flex items-center gap-1" title="Balasan">
-                  <Icon name="mdi:comment-outline" class="text-green-500" /> {{ forum.replies_count }}
-                </span>
-                <span class="flex items-center gap-1" title="Reaksi">
-                  <Icon name="mdi:heart-outline" class="text-green-500" /> {{ forum.reactions_count }}
-                </span>
-                <span class="flex items-center gap-1" title="Peserta" v-if="forum.participants_count">
-                  <Icon name="mdi:account-group-outline" class="text-green-500" /> {{ forum.participants_count }}
-                </span>
-              </div>
+            <div class="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-4 shrink-0 text-xs text-gray-500">
+              <span class="flex items-center gap-1" title="Postingan">
+                <Icon name="mdi:message-text-outline" class="text-green-500" /> {{ forum.posts_count }}
+              </span>
+              <span class="flex items-center gap-1" title="Balasan">
+                <Icon name="mdi:comment-outline" class="text-green-500" /> {{ forum.replies_count }}
+              </span>
+              <span class="flex items-center gap-1" title="Reaksi">
+                <Icon name="mdi:heart-outline" class="text-green-500" /> {{ forum.reactions_count }}
+              </span>
+              <span class="hidden md:flex items-center gap-1" title="Peserta" v-if="forum.participants_count">
+                <Icon name="mdi:account-group-outline" class="text-green-500" /> {{ forum.participants_count }}
+              </span>
               <button
                 v-if="forum.can_manage"
                 @click.stop="deleteForum(forum)"
-                class="p-1 rounded hover:bg-red-100 dark:hover:bg-gray-700"
-                title="Hapus forum">
+                class="p-2 -m-1 rounded-lg hover:bg-red-100 dark:hover:bg-gray-700"
+                title="Hapus forum"
+                aria-label="Hapus forum">
                 <Icon name="material-symbols:delete-rounded" class="w-5 h-5 text-red-500" />
               </button>
             </div>

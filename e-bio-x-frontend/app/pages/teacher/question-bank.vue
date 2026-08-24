@@ -107,10 +107,11 @@
               <li v-if="b.explanation" class="pt-1 text-gray-500 italic">Pembahasan: {{ b.explanation }}</li>
             </ul>
           </div>
-          <div class="flex gap-1 shrink-0">
+          <div class="flex gap-0.5 shrink-0">
             <button
-              class="text-amber-500 hover:text-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="p-2 rounded-lg text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
               title="Generate Pembahasan AI"
+              aria-label="Generate pembahasan AI"
               :disabled="generatingId === b.id"
               @click="generateExplanation(b)"
             >
@@ -120,10 +121,20 @@
                 :class="generatingId === b.id ? 'animate-spin' : ''"
               />
             </button>
-            <button class="text-blue-500 hover:text-blue-600" title="Edit" @click="openForm(b)">
+            <button
+              class="p-2 rounded-lg text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-gray-800 transition"
+              title="Edit"
+              aria-label="Edit soal"
+              @click="openForm(b)"
+            >
               <Icon name="material-symbols:edit" class="w-5 h-5" />
             </button>
-            <button class="text-red-500 hover:text-red-600" title="Hapus" @click="remove(b)">
+            <button
+              class="p-2 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-gray-800 transition"
+              title="Hapus"
+              aria-label="Hapus soal"
+              @click="remove(b)"
+            >
               <Icon name="material-symbols:delete" class="w-5 h-5" />
             </button>
           </div>

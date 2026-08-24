@@ -49,14 +49,14 @@
                 {{ q.correct_rate }}% benar
               </span>
             </div>
-            <div class="mt-3 flex items-center gap-2">
+            <div class="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
               <div class="flex-1 h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
                 <div
                   class="h-full bg-green-500"
                   :style="{ width: q.correct_rate + '%' }"
                 ></div>
               </div>
-              <span class="text-xs text-gray-500 whitespace-nowrap">
+              <span class="text-xs text-gray-500">
                 {{ q.correct_count }}/{{ q.correct_count + q.wrong_count }} menjawab benar ·
                 {{ q.unanswered }} tidak terjawab
               </span>

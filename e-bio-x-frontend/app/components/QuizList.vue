@@ -32,9 +32,9 @@
             v-for="quiz in quizzes"
             :key="quiz.quiz_id"
             class="rounded-xl p-4 shadow-md dark:shadow-green-200 bg-white dark:bg-gray-900 hover:shadow-lg transition">
-            <div class="flex items-center justify-between">
-              <div>
-                <h3 class="text-xl font-semibold text-gray-800 dark:text-white">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div class="min-w-0">
+                <h3 class="text-xl font-semibold text-gray-800 dark:text-white break-words">
                   {{ quiz.title }}
                 </h3>
                 <p class="text-sm text-gray-500">
