@@ -144,7 +144,7 @@ const deleteMateri = async (materialId) => {
     swal.fire({
       icon: "error",
       title: "Gagal",
-      text: "Terjadi kesalahan saat menghapus materi",
+      text: err?.data?.error || "Terjadi kesalahan saat menghapus materi",
     });
   } finally {
     fetchData();

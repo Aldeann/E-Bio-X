@@ -170,7 +170,10 @@ r = requests.get(f"{BASE}/api/teacher/analytics", headers=auth(T["murid1@ebiox.c
 check("student blocked from teacher analytics 403", r.status_code == 403)
 
 r = requests.get(f"{BASE}/api/teacher/analytics/materials/1", headers=auth(T["guru1@ebiox.com"]), timeout=15)
-check("teacher blocked from unowned legacy material analytics 403", r.status_code == 403)
+check("course teacher can manage legacy material after backfill 200", r.status_code == 200)
+
+r = requests.get(f"{BASE}/api/teacher/analytics/materials/28", headers=auth(T["guru2test@ebiox.com"]), timeout=15)
+check("other teacher blocked from class material analytics 403", r.status_code == 403)
 
 print("===== QUIZ FLOWS STILL WORK (regression) =====")
 quizzes = requests.get(f"{BASE}/api/student/quizzes", headers=auth(T["murid1@ebiox.com"]), timeout=15)

@@ -40,8 +40,21 @@ def _is_owner(material, user):
     return material.teacher_id == user.id
 
 
+def _is_course_teacher(material, user):
+    linked_ids = {c.id for c in (material.course_links or [])}
+    if material.course_id:
+        linked_ids.add(material.course_id)
+    if not linked_ids:
+        return False
+    return Course.query.filter(
+        Course.id.in_(linked_ids), Course.teacher_id == user.id
+    ).first() is not None
+
+
 def _can_manage(material, user):
-    return user.role == 'admin' or _is_owner(material, user)
+    if user.role == 'admin' or _is_owner(material, user):
+        return True
+    return user.role == 'teacher' and _is_course_teacher(material, user)
 
 
 def _can_view_detail(material, user):

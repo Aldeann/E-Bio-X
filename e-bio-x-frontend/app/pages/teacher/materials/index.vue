@@ -93,7 +93,7 @@ const deleteMaterial = async (m) => {
     toast.add({ title: "Materi dihapus.", color: "green" });
     fetchData();
   } catch (e) {
-    toast.add({ title: "Gagal menghapus materi.", color: "red" });
+    toast.add({ title: e?.data?.error || "Gagal menghapus materi.", color: "red" });
   }
 };
 
