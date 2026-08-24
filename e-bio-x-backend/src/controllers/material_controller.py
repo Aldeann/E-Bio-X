@@ -1,6 +1,6 @@
 from flask import request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from sqlalchemy import or_
+from sqlalchemy import or_, text
 from werkzeug.utils import secure_filename
 from src.models.material import Material, material_courses
 from src.models.material_section import MaterialSection
@@ -684,8 +684,42 @@ def delete_material(material_id):
     for f in material.files:
         disk_files.append(f.file_name)
 
-    db.session.delete(material)
-    db.session.commit()
+    try:
+        # The real MySQL schema keeps every FK to materials/material_sections
+        # as ON DELETE RESTRICT and most child tables have no ORM cascade,
+        # so a bare session.delete() dies with an IntegrityError once any
+        # analytics/state/forum row exists. Clean up explicitly first.
+        params = {'mid': material_id}
+        detach_stmts = [
+            # quizzes survive as standalone assessments instead of being destroyed
+            text("""UPDATE quizzes SET material_id = NULL, section_id = NULL
+                    WHERE material_id = :mid
+                       OR section_id IN (SELECT id FROM material_sections WHERE material_id = :mid)"""),
+            # forum threads stay attached to the course only
+            text("""UPDATE forums SET material_id = NULL, lesson_id = NULL
+                    WHERE material_id = :mid
+                       OR lesson_id IN (SELECT id FROM material_sections WHERE material_id = :mid)"""),
+            text("UPDATE quiz_explanations SET recommended_material_id = NULL, source_material_id = NULL "
+                 "WHERE recommended_material_id = :mid OR source_material_id = :mid"),
+            text("UPDATE topic_knowledge SET source_material_id = NULL WHERE source_material_id = :mid"),
+        ]
+        purge_stmts = [
+            'learning_activities', 'learning_sessions', 'material_bookmarks',
+            'material_file_texts', 'material_progress', 'material_student_state',
+            'recommendations', 'student_answers', 'student_content_track',
+            'student_notes', 'video_progress', 'material_courses',
+        ]
+        for stmt in detach_stmts:
+            db.session.execute(stmt, params)
+        for table in purge_stmts:
+            db.session.execute(text(f"DELETE FROM {table} WHERE material_id = :mid"), params)
+
+        db.session.delete(material)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Failed to delete material {material_id}: {e}")
+        return jsonify({'error': 'Gagal menghapus materi karena masih ada data terkait'}), 500
 
     for filename in disk_files:
         file_path = os.path.join(upload_folder, filename)
