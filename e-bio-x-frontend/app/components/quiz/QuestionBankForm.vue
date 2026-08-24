@@ -1,68 +1,24 @@
 <template>
   <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-black/50" @click="close"></div>
+    <div class="absolute inset-0 bg-black/50" @click="requestClose"></div>
     <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-semibold text-green-700 dark:text-green-500 flex items-center gap-2">
           <Icon name="material-symbols:database" class="w-5 h-5" />
           {{ isEdit ? "Edit Soal Bank" : "Tambah Soal Bank" }}
         </h3>
-        <button class="text-gray-500 hover:text-gray-700" @click="close">
+        <button class="text-gray-500 hover:text-gray-700" @click="requestClose">
           <Icon name="material-symbols:close" class="w-6 h-6" />
         </button>
       </div>
 
       <form @submit.prevent="save" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium mb-1">Topik (opsional)</label>
-          <input
-            v-model="form.topic"
-            type="text"
-            placeholder="Contoh: Virus"
-            class="w-full dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
-          />
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label class="block text-sm font-medium mb-1">Tipe Soal</label>
-            <select
-              v-model="form.question_type"
-              class="w-full dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
-              @change="onTypeChange"
-            >
-              <option value="multiple_choice">Pilihan Ganda</option>
-              <option value="true_false">Benar / Salah</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">Kesulitan</label>
-            <select
-              v-model="form.difficulty"
-              class="w-full dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
-            >
-              <option value="easy">Mudah</option>
-              <option value="medium">Sedang</option>
-              <option value="hard">Sulit</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">Bobot Poin *</label>
-            <input
-              v-model.number="form.points"
-              type="number"
-              min="0"
-              class="w-full dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
-              required
-            />
-          </div>
-        </div>
-
-        <div>
           <label class="block text-sm font-medium mb-1">Pertanyaan *</label>
           <textarea
+            ref="questionInput"
             v-model="form.question_text"
-            rows="2"
+            rows="4"
             placeholder="Tulis pertanyaan..."
             class="w-full dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
             required
@@ -81,6 +37,7 @@
               <Icon name="material-symbols:add-circle" class="w-4 h-4" /> Tambah Pilihan
             </button>
           </div>
+          <p class="text-xs text-gray-500 mb-2">Klik lingkaran di kiri untuk menandai jawaban yang benar.</p>
           <div v-for="(o, i) in form.options" :key="i" class="flex items-center gap-2 mb-2">
             <button
               type="button"
@@ -119,17 +76,65 @@
           ></textarea>
         </div>
 
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">Tipe Soal</label>
+            <select
+              v-model="form.question_type"
+              class="w-full dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
+              @change="onTypeChange"
+            >
+              <option value="multiple_choice">Pilihan Ganda</option>
+              <option value="true_false">Benar / Salah</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Kesulitan</label>
+            <select
+              v-model="form.difficulty"
+              class="w-full dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
+            >
+              <option value="easy">Mudah</option>
+              <option value="medium">Sedang</option>
+              <option value="hard">Sulit</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Bobot Poin *</label>
+            <input
+              v-model.number="form.points"
+              type="number"
+              min="0"
+              class="w-full dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Topik (opsional)</label>
+          <input
+            v-model="form.topic"
+            type="text"
+            placeholder="Contoh: Virus"
+            class="w-full dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
+          />
+        </div>
+
         <div class="flex gap-2 pt-2">
           <button
             type="submit"
-            class="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg transition"
+            :disabled="saving"
+            class="bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg transition flex items-center gap-2"
           >
+            <Icon v-if="saving" name="mdi:loading" class="w-4 h-4 animate-spin" />
             {{ isEdit ? "Simpan Perubahan" : "Tambahkan ke Bank" }}
           </button>
           <button
             type="button"
-            class="border border-gray-300 dark:border-gray-600 px-5 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
-            @click="close"
+            :disabled="saving"
+            class="border border-gray-300 dark:border-gray-600 px-5 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition disabled:opacity-60"
+            @click="requestClose"
           >
             Batal
           </button>
@@ -140,6 +145,8 @@
 </template>
 
 <script setup>
+import { useSwal } from "~/utils/swal";
+
 const props = defineProps({
   open: { type: Boolean, default: false },
   question: { type: Object, default: null },
@@ -149,9 +156,15 @@ const emit = defineEmits(["close", "saved"]);
 const config = useRuntimeConfig();
 const token = useCookie("access_token").value;
 const toast = useToast();
+const swal = useSwal();
 
 const form = ref(defaultForm());
 const isEdit = computed(() => !!props.question);
+const saving = ref(false);
+const questionInput = ref(null);
+let initialSnapshot = "";
+
+const isDirty = computed(() => JSON.stringify(form.value) !== initialSnapshot);
 
 function defaultForm() {
   return {
@@ -169,8 +182,23 @@ function defaultForm() {
   };
 }
 
-const onTypeChange = () => {
+const onTypeChange = async () => {
   if (form.value.question_type === "true_false") {
+    const hasContent = form.value.options.some((o) => o.option_text.trim());
+    if (hasContent) {
+      const r = await swal.fire({
+        title: "Ganti ke Benar/Salah?",
+        text: "Pilihan jawaban yang sudah ditulis akan diganti.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Ganti",
+        cancelButtonText: "Batal",
+      });
+      if (!r.isConfirmed) {
+        form.value.question_type = "multiple_choice";
+        return;
+      }
+    }
     form.value.options = [
       { option_text: "Benar", is_correct: false },
       { option_text: "Salah", is_correct: false },
@@ -199,10 +227,29 @@ const applyInitial = () => {
       }));
     }
   }
+  initialSnapshot = JSON.stringify(form.value);
+  nextTick(() => questionInput.value?.focus());
 };
 
 const close = () => {
   emit("close");
+};
+
+const requestClose = async () => {
+  if (!isDirty.value) return close();
+  const r = await swal.fire({
+    title: "Buang perubahan?",
+    text: "Perubahan yang belum disimpan akan hilang.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Buang",
+    cancelButtonText: "Lanjut Edit",
+  });
+  if (r.isConfirmed) close();
+};
+
+const onKeydown = (e) => {
+  if (e.key === "Escape") requestClose();
 };
 
 const save = async () => {
@@ -235,6 +282,7 @@ const save = async () => {
   };
 
   try {
+    saving.value = true;
     if (isEdit.value) {
       await $fetch(`${config.public.backend}/api/teacher/question-bank/${props.question.id}`, {
         method: "PUT",
@@ -252,13 +300,22 @@ const save = async () => {
     emit("saved");
   } catch (err) {
     toast.add({ title: err?.data?.error || "Gagal menyimpan soal bank", color: "red" });
+  } finally {
+    saving.value = false;
   }
 };
 
 watch(
   () => props.open,
   (val) => {
-    if (val) applyInitial();
+    if (val) {
+      applyInitial();
+      document.addEventListener("keydown", onKeydown);
+    } else {
+      document.removeEventListener("keydown", onKeydown);
+    }
   }
 );
+
+onBeforeUnmount(() => document.removeEventListener("keydown", onKeydown));
 </script>

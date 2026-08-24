@@ -1,5 +1,6 @@
 from flask import request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from sqlalchemy import func
 from src.models.user import User
 from src.models.quiz import Quiz
 from src.models.question import Question
@@ -1063,7 +1064,7 @@ def reorder_quiz_questions(quiz_id):
 
 # ---------------- TEACHER: question bank ----------------
 
-def _serialize_bank(bq):
+def _serialize_bank(bq, times_used=None):
     return {
         'id': bq.id,
         'question_text': bq.question_text,
@@ -1072,6 +1073,7 @@ def _serialize_bank(bq):
         'difficulty': bq.difficulty,
         'explanation': bq.explanation,
         'points': bq.points,
+        'times_used': times_used if times_used is not None else len(bq.quiz_questions),
         'created_at': bq.created_at.isoformat() if bq.created_at else None,
         'updated_at': bq.updated_at.isoformat() if bq.updated_at else None,
         'options': [{
@@ -1105,8 +1107,20 @@ def get_question_bank():
     if qtype:
         query = query.filter(QuestionBank.question_type == qtype)
     items = query.order_by(QuestionBank.created_at.desc()).all()
+    usage_counts = {}
+    if items:
+        rows = (
+            db.session.query(Question.bank_question_id, func.count(Question.id))
+            .filter(Question.bank_question_id.in_([b.id for b in items]))
+            .group_by(Question.bank_question_id)
+            .all()
+        )
+        usage_counts = {bid: cnt for bid, cnt in rows}
     topics = sorted({b.topic for b in QuestionBank.query.filter_by(teacher_id=user.id).all() if b.topic})
-    return jsonify({'data': [_serialize_bank(b) for b in items], 'topics': topics}), 200
+    return jsonify({
+        'data': [_serialize_bank(b, usage_counts.get(b.id, 0)) for b in items],
+        'topics': topics,
+    }), 200
 
 
 @jwt_required()
