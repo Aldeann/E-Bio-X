@@ -1,28 +1,45 @@
 # ============================================================
-# Storage service - Cloudflare R2 (S3-compatible) with a local
-# dev fallback. The ONLY module that talks to object storage.
+# Storage service - the ONLY module that talks to object storage.
 #
-# Providers:
-#   r2    -> permanent storage in a PRIVATE Cloudflare R2 bucket
-#   local -> legacy uploads/ folder, development only
+# Providers (selected by STORAGE_PROVIDER):
+#   supabase -> PRIVATE Supabase Storage bucket (production target)
+#               REST API via requests; no supabase-py dependency.
+#   r2       -> Cloudflare R2 (S3 API via boto3). KEPT for rollback
+#               until Supabase is confirmed live; remove afterwards.
+#   local    -> legacy uploads/ folder, development only. Never a
+#               permanent storage target.
 #
-# Credentials live exclusively in environment variables:
-#   STORAGE_PROVIDER=r2
-#   R2_ACCOUNT_ID=...
-#   R2_BUCKET=...
-#   R2_ACCESS_KEY_ID=...
-#   R2_SECRET_ACCESS_KEY=...
-#   R2_PRESIGN_EXPIRES=7200   (optional, seconds)
+# MySQL stores portable /api/files/<key> urls only - never provider
+# urls - so switching providers never invalidates the URL shape.
+#
+# Supabase env (see src/config/supabase_config.py):
+#   SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / SUPABASE_STORAGE_BUCKET
+# R2 env:
+#   STORAGE_PROVIDER=r2 + R2_ACCOUNT_ID/R2_BUCKET/R2_ACCESS_KEY_ID/
+#   R2_SECRET_ACCESS_KEY (+ optional R2_PRESIGN_EXPIRES)
 # ============================================================
 import os
 import uuid
 
+import requests as http_client
 from flask import current_app
 from werkzeug.utils import secure_filename
+
+from src.config import supabase_config as sb_cfg
 
 
 class StorageError(Exception):
     """Raised when the storage backend cannot complete an operation."""
+
+
+def _scrub(msg):
+    """Never let provider credentials travel inside error strings."""
+    msg = str(msg or '')
+    for secret in (sb_cfg.service_role_key(), _env('R2_SECRET_ACCESS_KEY'),
+                   _env('R2_ACCESS_KEY_ID')):
+        if secret:
+            msg = msg.replace(secret, '[redacted]')
+    return msg
 
 
 URL_PREFIX = '/api/files/'
@@ -50,11 +67,14 @@ def _env(name, default=None):
 
 
 def active_provider():
-    """'r2' when selected AND fully configured, otherwise 'local'."""
-    if (_env('STORAGE_PROVIDER', '').lower() == 'r2'
-            and _env('R2_ACCOUNT_ID') and _env('R2_BUCKET')
-            and _env('R2_ACCESS_KEY_ID') and _env('R2_SECRET_ACCESS_KEY')):
-        return 'r2'
+    """Selected AND fully configured provider; falls back to 'local'."""
+    chosen = (_env('STORAGE_PROVIDER') or '').lower()
+    if chosen == 'supabase' and sb_cfg.is_configured():
+        return 'supabase'
+    if chosen == 'r2':
+        if _env('R2_ACCOUNT_ID') and _env('R2_BUCKET') \
+                and _env('R2_ACCESS_KEY_ID') and _env('R2_SECRET_ACCESS_KEY'):
+            return 'r2'
     return 'local'
 
 
@@ -64,14 +84,104 @@ def content_type_for(filename):
 
 
 def object_key(category, teacher_id, filename):
-    """e-bio-x/materials/teacher/71/ab12..._materi.pdf
-    (teacher segment omitted when teacher_id is unknown)"""
+    """Unique, teacher-scoped key. Original name is kept only after a
+    uuid prefix so collisions are impossible.
+
+      supabase:  materials/teacher/15/<uuid>_materi.pdf   (bucket = root)
+      r2/local:  e-bio-x/materials/teacher/71/<uuid>_materi.pdf
+    """
     original = secure_filename(filename or '') or 'file'
     unique = f"{uuid.uuid4().hex}_{original}"
+    prefix = '' if active_provider() == 'supabase' else 'e-bio-x/'
     if teacher_id is not None:
-        return f"e-bio-x/{category}/teacher/{teacher_id}/{unique}"
-    return f"e-bio-x/{category}/{unique}"
+        return f"{prefix}{category}/teacher/{teacher_id}/{unique}"
+    return f"{prefix}{category}/{unique}"
 
+
+# ------------------------------------------------------------------
+# Supabase Storage (REST)
+# ------------------------------------------------------------------
+
+def _sb_headers(extra=None):
+    h = {
+        'Authorization': f'Bearer {sb_cfg.service_role_key()}',
+        **(extra or {}),
+    }
+    return h
+
+
+def _sb_object_url(key):
+    return f"{sb_cfg.supabase_url()}/storage/v1/object/{sb_cfg.bucket()}/{key}"
+
+
+def _sb_upload(key, data, content_type):
+    resp = http_client.post(
+        _sb_object_url(key), data=data,
+        headers=_sb_headers({'Content-Type': content_type or content_type_for(key)}),
+        timeout=120,
+    )
+    if resp.status_code not in (200, 201):
+        raise StorageError(f'Supabase upload gagal (HTTP {resp.status_code})')
+
+
+def _sb_get(key):
+    resp = http_client.get(_sb_object_url(key), headers=_sb_headers(), timeout=60)
+    if resp.status_code == 200:
+        return resp.content
+    if resp.status_code == 404:
+        return None
+    raise StorageError(f'Supabase read gagal (HTTP {resp.status_code})')
+
+
+def _sb_delete(key):
+    resp = http_client.delete(
+        _sb_object_url(key),
+        headers=_sb_headers({'Content-Type': 'application/json'}),
+        timeout=60,
+    )
+    # 200 deleted, 404 already gone - both count as clean
+    if resp.status_code in (200, 204, 404):
+        return True
+    raise StorageError(f'Supabase delete gagal (HTTP {resp.status_code})')
+
+
+def _sb_exists(key):
+    parent, _, name = key.rpartition('/')
+    resp = http_client.post(
+        f"{sb_cfg.supabase_url()}/storage/v1/object/list/{sb_cfg.bucket()}",
+        json={'prefix': f'{parent}/' if parent else '', 'search': name, 'limit': 1},
+        headers=_sb_headers({'Content-Type': 'application/json'}),
+        timeout=30,
+    )
+    if resp.status_code != 200:
+        return False
+    try:
+        items = resp.json() or []
+    except ValueError:
+        return False
+    return any(item.get('name') == name for item in items)
+
+
+def _sb_signed_url(key, expires):
+    resp = http_client.post(
+        f"{sb_cfg.supabase_url()}/storage/v1/object/sign/{sb_cfg.bucket()}/{key}",
+        json={'expiresIn': int(expires)},
+        headers=_sb_headers({'Content-Type': 'application/json'}),
+        timeout=30,
+    )
+    if resp.status_code != 200:
+        return URL_PREFIX + key  # graceful fallback to authenticated proxy
+    path = (resp.json() or {}).get('signedURL') or ''
+    if path.startswith('/'):
+        return f"{sb_cfg.supabase_url()}/storage/v1{path}"
+    if path.startswith('http'):
+        return path
+    return URL_PREFIX + key
+
+
+# ------------------------------------------------------------------
+# R2 / S3 (rollback provider)
+# ------------------------------------------------------------------
 
 def _client():
     if active_provider() != 'r2':
@@ -103,13 +213,15 @@ def _local_path(key):
 
 
 # ------------------------------------------------------------------
-# Core operations
+# Core operations (provider-agnostic)
 # ------------------------------------------------------------------
 
 def put_bytes(key, data, content_type=None):
     provider = active_provider()
     try:
-        if provider == 'r2':
+        if provider == 'supabase':
+            _sb_upload(key, data, content_type or content_type_for(key))
+        elif provider == 'r2':
             _client().put_object(
                 Bucket=_bucket(), Key=key, Body=data,
                 ContentType=content_type or content_type_for(key),
@@ -121,13 +233,16 @@ def put_bytes(key, data, content_type=None):
     except StorageError:
         raise
     except Exception as e:
-        raise StorageError(f'Gagal mengunggah ke storage: {e}') from e
+        raise StorageError(f'Gagal mengunggah ke storage: {_scrub(e)}') from e
     return key
 
 
 def get_bytes(key):
+    provider = active_provider()
     try:
-        if active_provider() == 'r2':
+        if provider == 'supabase':
+            return _sb_get(key)
+        if provider == 'r2':
             resp = _client().get_object(Bucket=_bucket(), Key=key)
             return resp['Body'].read()
         path = _local_path(key)
@@ -142,8 +257,11 @@ def get_bytes(key):
 
 
 def exists(key):
+    provider = active_provider()
     try:
-        if active_provider() == 'r2':
+        if provider == 'supabase':
+            return _sb_exists(key)
+        if provider == 'r2':
             _client().head_object(Bucket=_bucket(), Key=key)
             return True
         return os.path.exists(_local_path(key))
@@ -155,12 +273,17 @@ def delete_key(key):
     if not key:
         return False
     deleted = False
+    provider = active_provider()
     try:
-        if active_provider() == 'r2':
+        if provider == 'supabase':
+            deleted = _sb_delete(key)
+        elif provider == 'r2':
             _client().delete_object(Bucket=_bucket(), Key=key)
             deleted = True
-    except Exception:
-        deleted = False
+    except StorageError as e:
+        print('Storage delete failed:', _scrub(e))
+    except Exception as e:
+        print('Storage delete failed:', _scrub(e))
     # legacy local copy cleanup (old uploads / local provider)
     try:
         path = _local_path(key)
@@ -173,20 +296,20 @@ def delete_key(key):
 
 
 def presigned_get(key, expires=None):
-    """Short-lived authenticated URL for <img>/<video>/download tags."""
+    """Short-lived signed URL for <img>/<video>/download tags."""
     if not key:
         return None
     if expires is None:
-        try:
-            expires = int(_env('R2_PRESIGN_EXPIRES', '7200'))
-        except ValueError:
-            expires = 7200
+        expires = sb_cfg.presign_expires() \
+            if active_provider() == 'supabase' else 7200
+    if active_provider() == 'supabase':
+        return _sb_signed_url(key, expires)
     if active_provider() == 'r2':
         try:
             return _client().generate_presigned_url(
                 'get_object',
                 Params={'Bucket': _bucket(), 'Key': key},
-                ExpiresIn=expires,
+                ExpiresIn=int(_env('R2_PRESIGN_EXPIRES', str(expires))),
             )
         except Exception:
             return URL_PREFIX + key
@@ -222,7 +345,7 @@ def resolve_key(url):
 
 def out_url(url):
     """Serialize stored url for API responses: swap /api/files/<key>
-    with a presigned GET so browser media tags work without headers.
+    with a signed GET so browser media tags work without headers.
     Legacy /uploads urls are returned unchanged."""
     key = resolve_key(url)
     if key and str(url).lstrip().startswith((URL_PREFIX, 'http')) \
@@ -237,3 +360,4 @@ def delete_url(url):
     if key:
         return delete_key(key)
     return False
+

@@ -740,14 +740,23 @@ def delete_material(material_id):
         current_app.logger.error(f"Failed to delete material {material_id}: {e}")
         return jsonify({'error': 'Gagal menghapus materi karena masih ada data terkait'}), 500
 
-    # metadata committed -> now remove the stored objects (best effort)
+    # metadata committed -> now remove the stored objects; failures are
+    # reported back instead of being silently swallowed
+    warnings = []
     for url in stored_urls:
         try:
-            storage_service.delete_url(url)
+            if not storage_service.delete_url(url):
+                key = storage_service.resolve_key(url)
+                if key and storage_service.active_provider() != 'local':
+                    warnings.append(key)
         except Exception as e:
             print('Failed to delete stored object:', e)
+            warnings.append(storage_service.resolve_key(url) or str(url))
 
-    return jsonify({'message': 'Material deleted successfully'}), 200
+    resp = {'message': 'Material deleted successfully'}
+    if warnings:
+        resp['storage_warning'] = 'Sebagian file tidak dapat dihapus dari storage: ' + ', '.join(warnings)
+    return jsonify(resp), 200
 
 
 # ============================================================
