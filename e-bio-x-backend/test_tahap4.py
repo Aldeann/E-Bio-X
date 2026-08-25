@@ -25,10 +25,38 @@ T = {k: login(k) for k in [
     "wahyuniami@example.org",  # 4, course 1&2, NOT course 6
 ]}
 
-MATERIAL = 28  # VIRUS, owned by guru1 (71), course 6, section 19, contents 35(text)36(pdf)38(video)39(question)
-SECTION = 19
-VIDEO_CONTENT = 38
-QUESTION_CONTENT = 39
+# ------------------------------------------------------------------
+# Fixture: self-provisioned per run so the suite never depends on
+# manually created demo rows that may be deleted from the UI.
+# Material owned by guru1, linked to course 6 (so students outside
+# the course are blocked), with a section containing video+question.
+# ------------------------------------------------------------------
+def _ensure_fixture():
+    h = auth(T["guru1@ebiox.com"])
+    r = requests.post(f"{BASE}/api/materials", headers=h, timeout=15, json={
+        "title": "Tahap4 Fixture Materi", "description": "auto fixture",
+        "phase": "F", "topic": "fixture", "learning_objectives": "x",
+        "course_ids": [6], "status": "published",
+    })
+    assert r.status_code in (200, 201), f"fixture material: {r.status_code} {r.text[:200]}"
+    mid = r.json()["material"]["id"]
+    r = requests.post(f"{BASE}/api/materials/{mid}/sections", headers=h,
+                      json={"title": "Fixture Section"}, timeout=10)
+    sid = (r.json().get("section") or r.json()).get("id") if r.status_code in (200, 201) else None
+    assert sid, f"fixture section: {r.status_code} {r.text[:200]}"
+
+    def _content(ctype, data):
+        rr = requests.post(f"{BASE}/api/sections/{sid}/contents",
+                           headers=h, json={"type": ctype, **data}, timeout=10)
+        assert rr.status_code in (200, 201), f"fixture {ctype}: {rr.status_code} {rr.text[:200]}"
+        return rr.json()["content"]["id"]
+
+    vid = _content("video", {"data": {"title": "Fixture Video", "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}})
+    qid = _content("text", {"data": {"content": "Fixture pertanyaan?"}})
+    return mid, sid, vid, qid
+
+
+MATERIAL, SECTION, VIDEO_CONTENT, QUESTION_CONTENT = _ensure_fixture()
 
 print("===== TRACKING (murid1) =====")
 r = requests.post(f"{BASE}/api/materials/{MATERIAL}/session/ping", headers=auth(T["murid1@ebiox.com"]), json={}, timeout=10)
@@ -90,7 +118,7 @@ print("===== STUDENT SECURITY =====")
 r = requests.get(f"{BASE}/api/student/dashboard", headers=auth(T["guru1@ebiox.com"]), timeout=10)
 check("teacher blocked from student dashboard 403", r.status_code == 403)
 
-# student not in course 6 cannot read material 28 detail
+# student not in course 6 cannot read the fixture material detail
 r = requests.get(f"{BASE}/api/student/progress/{MATERIAL}", headers=auth(T["wahyuniami@example.org"]), timeout=10)
 check("student outside course blocked from material detail 403", r.status_code == 403)
 
@@ -169,17 +197,17 @@ check("other teacher blocked from student detail 403", r.status_code == 403)
 r = requests.get(f"{BASE}/api/teacher/analytics", headers=auth(T["murid1@ebiox.com"]), timeout=15)
 check("student blocked from teacher analytics 403", r.status_code == 403)
 
-r = requests.get(f"{BASE}/api/teacher/analytics/materials/1", headers=auth(T["guru1@ebiox.com"]), timeout=15)
-check("course teacher can manage legacy material after backfill 200", r.status_code == 200)
+r = requests.get(f"{BASE}/api/teacher/analytics/materials/{MATERIAL}", headers=auth(T["guru1@ebiox.com"]), timeout=15)
+check("owner can read own material analytics 200", r.status_code == 200)
 
-r = requests.get(f"{BASE}/api/teacher/analytics/materials/28", headers=auth(T["guru2test@ebiox.com"]), timeout=15)
+r = requests.get(f"{BASE}/api/teacher/analytics/materials/{MATERIAL}", headers=auth(T["guru2test@ebiox.com"]), timeout=15)
 check("other teacher blocked from class material analytics 403", r.status_code == 403)
 
 print("===== QUIZ FLOWS STILL WORK (regression) =====")
 quizzes = requests.get(f"{BASE}/api/student/quizzes", headers=auth(T["murid1@ebiox.com"]), timeout=15)
 check("student quizzes 200", quizzes.status_code == 200)
 
-# Full interactive quiz attempt cycle for material 28 (creates a new quiz as test data)
+# Full interactive quiz attempt cycle for the fixture material (creates a new quiz as test data)
 quiz_id = None
 try:
     r = requests.post(f"{BASE}/api/teacher/quizzes", headers=auth(T["guru1@ebiox.com"]),

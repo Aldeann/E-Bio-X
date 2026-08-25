@@ -16,6 +16,7 @@ from src.models.course import Course
 from src.models.enrollment import Enrollment
 from src.config.database import db
 from src.services.learning_analytics_service import log_activity, mark_content_viewed
+from src.services import storage_service
 from datetime import datetime
 from dotenv import load_dotenv
 import traceback
@@ -148,26 +149,48 @@ def _upload_folder():
     return folder
 
 
-def _save_uploaded_file(file):
+def _read_capped(file, max_size):
+    """Stream the upload into memory enforcing the size limit BEFORE
+    anything is stored permanently."""
+    head = file.read(16)
+    buf = bytearray(head)
+    while True:
+        chunk = file.read(1024 * 1024)
+        if not chunk:
+            break
+        buf.extend(chunk)
+        if len(buf) > max_size:
+            return None
+    return bytes(buf)
+
+
+def _save_uploaded_file(file, teacher_id):
     ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
     if not _matches_signature(file, ext):
         return None, 'Konten file tidak sesuai dengan tipe yang diizinkan'
-    original_name = secure_filename(file.filename)
-    if not original_name:
-        original_name = 'file'
-    ext = original_name.rsplit('.', 1)[-1].lower() if '.' in original_name else ''
-    unique_name = f"{uuid.uuid4().hex}_{original_name}" if ext else uuid.uuid4().hex
-    upload_folder = _upload_folder()
-    os.makedirs(upload_folder, exist_ok=True)
-    save_path = os.path.join(upload_folder, unique_name)
-    file.save(save_path)
+    try:
+        file.seek(0)
+    except Exception:
+        pass
+    data = _read_capped(file, MAX_FILE_SIZE)
+    if data is None:
+        return None, 'Ukuran file melebihi batas maksimal 40MB'
 
-    if os.path.getsize(save_path) > MAX_FILE_SIZE:
-        os.remove(save_path)
-        return None, f'Ukuran file melebihi batas maksimal 40MB'
+    original_name = secure_filename(file.filename) or 'file'
+    key = storage_service.object_key('materials', teacher_id, original_name)
+    try:
+        storage_service.put_bytes(key, data, storage_service.content_type_for(original_name))
+    except storage_service.StorageError as e:
+        print('Storage upload failed:', e)
+        return None, 'Gagal mengunggah file ke storage'
 
-    file_url = f"{request.host_url}uploads/{unique_name}"
-    return {'name': unique_name, 'path': save_path, 'url': file_url}, None
+    unique_name = key.rsplit('/', 1)[-1]
+    return {
+        'name': unique_name,
+        'key': key,
+        'size': len(data),
+        'url': storage_service.public_url(key),
+    }, None
 
 
 def _student_progress_map(user, material_ids):
@@ -201,7 +224,7 @@ def _serialize_material_list(material, include_analytics=False, student_progress
         'id': material.id,
         'title': material.title,
         'description': description,
-        'file_url': material.file_url,
+        'file_url': storage_service.out_url(material.file_url),
         'course': material.course.name if material.course else None,
         'course_id': material.course_id,
         'courses': [c.name for c in material.course_links],
@@ -212,7 +235,7 @@ def _serialize_material_list(material, include_analytics=False, student_progress
         'topic': material.topic,
         'difficulty': material.difficulty,
         'estimated_time': material.estimated_time,
-        'thumbnail_url': material.thumbnail_url,
+        'thumbnail_url': storage_service.out_url(material.thumbnail_url),
         'status': material.status,
         'teacher_id': material.teacher_id,
         'uploaded_at': material.uploaded_at.isoformat() if material.uploaded_at else None,
@@ -260,7 +283,7 @@ def _serialize_material_detail(material, include_answers=True, include_analytics
         'title': material.title,
         'description': material.description or material.content,
         'content': material.content,
-        'file_url': material.file_url,
+        'file_url': storage_service.out_url(material.file_url),
         'subject': material.subject,
         'phase': material.phase,
         'class_level': material.class_level,
@@ -268,7 +291,7 @@ def _serialize_material_detail(material, include_answers=True, include_analytics
         'learning_objectives': material.learning_objectives,
         'estimated_time': material.estimated_time,
         'difficulty': material.difficulty,
-        'thumbnail_url': material.thumbnail_url,
+        'thumbnail_url': storage_service.out_url(material.thumbnail_url),
         'status': material.status,
         'course_id': material.course_id,
         'courses': [c.name for c in material.course_links],
@@ -286,7 +309,7 @@ def _serialize_material_detail(material, include_answers=True, include_analytics
                 'file_name': f.file_name,
                 'file_size': f.file_size,
                 'file_type': f.file_type,
-                'file_url': f.file_url,
+                'file_url': storage_service.out_url(f.file_url),
             }
             for f in material.files
         ],
@@ -442,7 +465,7 @@ def _create_material_form():
     if not _allowed_file(file.filename):
         return jsonify({'error': 'Tipe file tidak diizinkan'}), 400
 
-    saved, err = _save_uploaded_file(file)
+    saved, err = _save_uploaded_file(file, user.id)
     if err:
         return jsonify({'error': err}), 400
 
@@ -463,15 +486,14 @@ def _create_material_form():
             material_id=new_material.id,
             original_name=file.filename,
             file_name=saved['name'],
-            file_size=os.path.getsize(saved['path']),
+            file_size=saved['size'],
             file_type=file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else '',
             file_url=saved['url'],
         ))
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        if os.path.exists(saved['path']):
-            os.remove(saved['path'])
+        storage_service.delete_key(saved['key'])
         traceback.print_exc()
         return jsonify({"error": "Gagal menyimpan file"}), 500
 
@@ -480,7 +502,7 @@ def _create_material_form():
         'material': {
             'id': new_material.id,
             'title': new_material.title,
-            'file_url': new_material.file_url
+            'file_url': storage_service.out_url(new_material.file_url)
         }
     }), 201
 
@@ -580,7 +602,7 @@ def get_material_by_course(course_id):
             'id': material.id,
             'title': material.title,
             'description': material.description or material.content,
-            'file_url': material.file_url,
+            'file_url': storage_service.out_url(material.file_url),
             'course_id': material.course_id,
             'category': 'interactive' if is_interactive else 'file',
             'status': material.status,
@@ -676,13 +698,10 @@ def delete_material(material_id):
     if not _can_manage(material, user):
         return jsonify({'error': 'Anda hanya dapat menghapus materi milik sendiri'}), 403
 
-    upload_folder = _upload_folder()
-
-    disk_files = []
-    if material.file_url:
-        disk_files.append(os.path.basename(material.file_url))
-    for f in material.files:
-        disk_files.append(f.file_name)
+    stored_urls = [material.file_url]
+    if material.thumbnail_url:
+        stored_urls.append(material.thumbnail_url)
+    stored_urls += [f.file_url for f in material.files]
 
     try:
         # The real MySQL schema keeps every FK to materials/material_sections
@@ -721,13 +740,12 @@ def delete_material(material_id):
         current_app.logger.error(f"Failed to delete material {material_id}: {e}")
         return jsonify({'error': 'Gagal menghapus materi karena masih ada data terkait'}), 500
 
-    for filename in disk_files:
-        file_path = os.path.join(upload_folder, filename)
-        if os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except Exception as e:
-                print("Failed to delete file from disk:", e)
+    # metadata committed -> now remove the stored objects (best effort)
+    for url in stored_urls:
+        try:
+            storage_service.delete_url(url)
+        except Exception as e:
+            print('Failed to delete stored object:', e)
 
     return jsonify({'message': 'Material deleted successfully'}), 200
 
@@ -1023,7 +1041,7 @@ def upload_material_file(material_id):
     if not _allowed_file(file.filename):
         return jsonify({'error': 'Tipe file tidak diizinkan (pdf, docx, doc, txt, jpg, jpeg, png, webp, mp4)'}), 400
 
-    saved, err = _save_uploaded_file(file)
+    saved, err = _save_uploaded_file(file, user.id)
     if err:
         return jsonify({'error': err}), 400
 
@@ -1032,15 +1050,14 @@ def upload_material_file(material_id):
             material_id=material.id,
             original_name=file.filename,
             file_name=saved['name'],
-            file_size=os.path.getsize(saved['path']),
+            file_size=saved['size'],
             file_type=file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else '',
             file_url=saved['url'],
         )
         db.session.add(new_file)
         db.session.commit()
     except Exception as e:
-        if os.path.exists(saved['path']):
-            os.remove(saved['path'])
+        storage_service.delete_key(saved['key'])
         db.session.rollback()
         traceback.print_exc()
         return jsonify({'error': 'Gagal menyimpan file'}), 500
@@ -1053,7 +1070,7 @@ def upload_material_file(material_id):
             'file_name': new_file.file_name,
             'file_size': new_file.file_size,
             'file_type': new_file.file_type,
-            'file_url': new_file.file_url,
+            'file_url': storage_service.out_url(new_file.file_url),
         },
     }), 201
 
@@ -1075,16 +1092,15 @@ def delete_material_file(material_id, file_id):
     if not material_file:
         return jsonify({'error': 'File not found'}), 404
 
-    file_path = os.path.join(_upload_folder(), material_file.file_name)
+    stored_url = material_file.file_url
 
     db.session.delete(material_file)
     db.session.commit()
 
-    if os.path.exists(file_path):
-        try:
-            os.remove(file_path)
-        except Exception as e:
-            print("Failed to delete file from disk:", e)
+    try:
+        storage_service.delete_url(stored_url)
+    except Exception as e:
+        print('Failed to delete stored object:', e)
 
     return jsonify({'message': 'File berhasil dihapus'}), 200
 

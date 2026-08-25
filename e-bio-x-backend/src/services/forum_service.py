@@ -11,6 +11,7 @@ from src.models.forum import (
 )
 from src.models.enrollment import Enrollment
 from src.models.course import Course
+from src.services import storage_service
 
 # ============================================================
 # SANITIZATION
@@ -445,9 +446,9 @@ def forum_payload(forum, user):
         'presentation_group_name': forum.presentation_group_name,
         'presenter_id': forum.presenter_id,
         'presenter_name': forum.presenter.name if forum.presenter else None,
-        'presentation_file_url': forum.presentation_file_url,
+        'presentation_file_url': storage_service.out_url(forum.presentation_file_url),
         'presentation_file_name': forum.presentation_file_name,
-        'presentation_video_url': forum.presentation_video_url,
+        'presentation_video_url': storage_service.out_url(forum.presentation_video_url),
         'presentation_video_name': forum.presentation_video_name,
         'presenter_question_enabled': forum.presenter_question_enabled,
         'presenters': [{'id': m.user_id, 'name': m.user.name} for m in presenters],
@@ -499,7 +500,8 @@ def post_payload(post, user, include_replies=False, depth=0):
         'mentions': [m.mentioned_user_id for m in post.mentions],
         'attachments': [{
             'id': a.id, 'original_name': a.original_name, 'file_name': a.file_name,
-            'file_size': a.file_size, 'file_type': a.file_type, 'file_url': a.file_url,
+            'file_size': a.file_size, 'file_type': a.file_type,
+            'file_url': storage_service.out_url(a.file_url),
         } for a in post.attachments],
         'feedback': {
             'teacher_id': feedback.teacher_id,

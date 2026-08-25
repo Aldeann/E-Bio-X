@@ -16,6 +16,7 @@ from src.models.forum import (
     ForumReport, ForumModerationLog, Notification, ForumSetting,
 )
 from src.services import forum_service as fs
+from src.services import storage_service
 
 FORUM_TYPES = ('GENERAL_DISCUSSION', 'PRESENTATION', 'QUESTION_ANSWER', 'CASE_STUDY')
 FORUM_VISIBILITY = ('PRIVATE', 'CLASS', 'COURSE')
@@ -77,20 +78,34 @@ def _save_attachment(file):
     if not _matches_signature(file, ext):
         return None, 'Konten file tidak sesuai dengan tipe yang diizinkan'
     try:
+        from src.services import storage_service
+        from src.controllers.material_controller import MAX_FILE_SIZE
         file.seek(0)
-        folder = _attachment_folder()
-        os.makedirs(folder, exist_ok=True)
-        name = f"{uuid.uuid4().hex}_{original}"
-        path = os.path.join(folder, name)
-        file.save(path)
-        size = os.path.getsize(path)
+        head = b''
+        chunks = []
+        total = 0
+        while True:
+            chunk = file.read(1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > MAX_FILE_SIZE:
+                return None, 'Ukuran file melebihi batas maksimal 40MB'
+        data = b''.join(chunks)
+        key = storage_service.object_key('forum', user.id if user else None, original)
+        storage_service.put_bytes(key, data, storage_service.content_type_for(original))
+    except storage_service.StorageError as e:
+        print('Storage upload failed:', e)
+        return None, 'Gagal mengunggah file ke storage'
     except Exception:
         return None, 'Gagal menyimpan file'
+    name = key.rsplit('/', 1)[-1]
     return {
         'name': name,
-        'path': path,
-        'url': f'/uploads/{name}',
-        'size': size,
+        'key': key,
+        'url': storage_service.public_url(key),
+        'size': len(data),
         'type': ext,
         'original': original,
     }, None
@@ -555,17 +570,12 @@ def delete_forum(forum_id):
     _purge_forum_dependents(forum)
     db.session.delete(forum)
     db.session.commit()
-    folder = _attachment_folder()
+    from src.services import storage_service
     for url in disk:
-        if not url:
-            continue
-        name = os.path.basename(url)
-        path = os.path.join(folder, name)
-        if os.path.exists(path):
-            try:
-                os.remove(path)
-            except Exception:
-                pass
+        try:
+            storage_service.delete_url(url)
+        except Exception:
+            pass
     return jsonify({'message': 'Forum berhasil dihapus'}), 200
 
 
@@ -815,7 +825,7 @@ def upload_forum_attachment(forum_id):
     purpose = request.form.get('purpose') or 'post'
     if purpose == 'presentation':
         if not fs.can_manage_forum(forum, user):
-            os.remove(saved['path'])
+            storage_service.delete_key(saved['key'])
             return jsonify({'error': 'Anda tidak berhak mengubah materi presentasi'}), 403
         forum.presentation_file_url = saved['url']
         forum.presentation_file_name = saved['original']
@@ -837,7 +847,8 @@ def upload_forum_attachment(forum_id):
     db.session.commit()
     return jsonify({'message': 'Lampiran diunggah', 'attachment': {
         'id': att.id, 'original_name': att.original_name, 'file_name': att.file_name,
-        'file_size': att.file_size, 'file_type': att.file_type, 'file_url': att.file_url,
+        'file_size': att.file_size, 'file_type': att.file_type,
+        'file_url': storage_service.out_url(att.file_url),
     }}), 201
 
 

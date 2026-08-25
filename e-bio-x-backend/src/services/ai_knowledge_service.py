@@ -33,6 +33,25 @@ def _upload_folder():
     return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'uploads')
 
 
+def _material_file_bytes(material_file):
+    """Fetch uploaded bytes through the storage service (R2 or local);
+    falls back to the legacy on-disk uploads folder for old rows."""
+    from src.services import storage_service
+    key = storage_service.resolve_key(getattr(material_file, 'file_url', None))
+    if key:
+        data = storage_service.get_bytes(key)
+        if data is not None:
+            return data
+    try:
+        path = os.path.join(_upload_folder(), material_file.file_name)
+        if os.path.exists(path):
+            with open(path, 'rb') as f:
+                return f.read()
+    except Exception:
+        pass
+    return None
+
+
 def file_text_cached(material_file):
     """Extract text from an uploaded MaterialFile once, cache in DB."""
     if not material_file:
@@ -47,8 +66,16 @@ def file_text_cached(material_file):
                 material_id=material_file.material_id,
             )
             db.session.add(row)
-        path = os.path.join(_upload_folder(), material_file.file_name)
-        content = extract_file_text(path, material_file.file_type)
+        content = ''
+        data = _material_file_bytes(material_file)
+        if data:
+            import tempfile
+            with tempfile.TemporaryDirectory() as tmpdir:
+                ext = (material_file.file_type or '').lstrip('.').lower() or 'bin'
+                tmppath = os.path.join(tmpdir, f'extract.{ext}')
+                with open(tmppath, 'wb') as tf:
+                    tf.write(data)
+                content = extract_file_text(tmppath, material_file.file_type)
         row.content = content
         row.chars = len(content) if content else 0
         row.updated_at = datetime.utcnow()

@@ -9,6 +9,13 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 
+
+@app.errorhandler(413)
+def too_large(_e):
+    from flask import jsonify
+    return jsonify({'error': 'Ukuran file melebihi batas maksimal 40MB'}), 413
+
+
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)

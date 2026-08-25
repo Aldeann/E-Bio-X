@@ -40,6 +40,7 @@ def create_app():
         get_material_bookmarks, create_material_bookmark, delete_material_bookmark,
         get_material_notes, create_material_note, update_student_note, delete_student_note,
     )
+    from src.controllers.file_proxy_controller import download_file
     from src.controllers.quiz_controller import create_quiz, get_quiz_by_id, delete_quiz, get_quizzes_by_course, submit_quiz, remove_sumbission, get_submission_by_quiz, toggle_open_quiz, edit_quiz_title, edit_question, edit_option
     from src.controllers.quiz_controller import (
         get_teacher_quizzes, create_quiz_teacher, get_teacher_quiz, update_quiz_teacher,
@@ -129,6 +130,7 @@ def create_app():
     app.add_url_rule('/api/contents/<content_id>', view_func=update_content, methods=['PUT'])
     app.add_url_rule('/api/contents/<content_id>', view_func=delete_content, methods=['DELETE'])
     app.add_url_rule('/api/materials/<material_id>/files', view_func=upload_material_file, methods=['POST'])
+    app.add_url_rule('/api/files/<path:key>', view_func=download_file, methods=['GET'])
     app.add_url_rule('/api/materials/<material_id>/files/<file_id>', view_func=delete_material_file, methods=['DELETE'])
     app.add_url_rule('/api/materials/<material_id>/progress', view_func=record_progress, methods=['POST'])
     app.add_url_rule('/api/materials/<material_id>/state', view_func=get_material_student_state, methods=['GET'])
