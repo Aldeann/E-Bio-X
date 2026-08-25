@@ -702,6 +702,13 @@ def delete_material(material_id):
     if material.thumbnail_url:
         stored_urls.append(material.thumbnail_url)
     stored_urls += [f.file_url for f in material.files]
+    # deduplicate — initial file_url may also appear as a MaterialFile row
+    deduped, seen = [], set()
+    for u in stored_urls:
+        if u and u not in seen:
+            deduped.append(u)
+            seen.add(u)
+    stored_urls = deduped
 
     try:
         # The real MySQL schema keeps every FK to materials/material_sections

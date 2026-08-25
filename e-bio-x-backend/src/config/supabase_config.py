@@ -23,7 +23,13 @@ def _get(name):
 
 
 def supabase_url():
-    return (_get('SUPABASE_URL') or '').rstrip('/')
+    """Bare project URL - users often paste the copy button value that
+    includes /rest/v1; strip any known API path suffix."""
+    u = (_get('SUPABASE_URL') or '').rstrip('/')
+    for suffix in ('/rest/v1', '/storage/v1', '/auth/v1', '/realtime/v1'):
+        if u.endswith(suffix):
+            u = u[: -len(suffix)]
+    return u.rstrip('/')
 
 
 def service_role_key():

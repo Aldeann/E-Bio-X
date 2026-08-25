@@ -82,7 +82,10 @@ def _resolve_access(key, user):
     if m_direct is not None:
         return _material_readable(m_direct, user), m_direct
     # forum attachments / presentation files: any authenticated member-level access
-    return True, None
+    if forum_hit is not None:
+        return True, None
+    # nothing matched — deny to prevent bucket enumeration
+    return False, None
 
 
 @jwt_required()

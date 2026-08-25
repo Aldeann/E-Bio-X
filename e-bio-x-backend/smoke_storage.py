@@ -56,10 +56,15 @@ with app.app_context():
     }, headers=guru, content_type='multipart/form-data')
     check('T1 upload PDF -> 201', r.status_code == 201, f'{r.status_code} {r.get_data(as_text=True)[:200]}')
     mat = r.get_json()['material']
-    mid, stored_url = mat['id'], mat['file_url']
+    mid = mat['id']
+    # canonical value lives in MySQL; API responses carry presigned/signed urls
+    stored_url = db.session.execute(
+        db.text(f'SELECT file_url FROM materials WHERE id = {mid}')).scalar()
     key = storage_service.resolve_key(stored_url)
     check('T1 url portabel /api/files/', '/api/files/' in stored_url and not stored_url.startswith('http'), stored_url[:80])
-    check('T1 objek ada di storage', storage_service.exists(key), key)
+    if provider == 'supabase':
+        check('T1 respons FE berisi signed URL', '/object/sign/' in mat['file_url'] and 'token=' in mat['file_url'], mat['file_url'][:80])
+    check('T1 objek ada di storage', storage_service.exists(key), str(key))
 
     # ---- Test 2: serializer tetap menyajikan file (presigned/proxy) ----
     r = client.get(f'/api/materials/{mid}', headers=murid)
@@ -75,7 +80,7 @@ with app.app_context():
     rp = client.get('/api/files/' + key, headers=murid)
     check('Proxy: murid terdaftar bisa unduh', rp.status_code == 200 and rp.data == pdf, str(rp.status_code))
     rn = client.get('/api/files/e-bio-x/materials/teacher/71/tidak-ada-xyz.pdf', headers=murid)
-    check('Proxy: key tak dikenal -> 404 (anti-enumerasi)', rn.status_code == 404, str(rn.status_code))
+    check('Proxy: key tak dikenal -> 403 ditolak (anti-enumerasi)', rn.status_code == 403, str(rn.status_code))
     ra = client.get('/api/files/' + key)  # tanpa JWT
     check('Proxy: tanpa JWT ditolak', ra.status_code in (401, 422), str(ra.status_code))
 
@@ -102,7 +107,9 @@ with app.app_context():
                     headers=guru, content_type='multipart/form-data')
     check('T7 upload pengganti -> 201', r.status_code == 201, str(r.status_code))
     new_file = r.get_json()['file']
-    old_key, new_key = key, storage_service.resolve_key(new_file['file_url'])
+    new_stored = db.session.execute(
+        db.text(f"SELECT file_url FROM material_files WHERE id = {new_file['id']}")).scalar()
+    old_key, new_key = key, storage_service.resolve_key(new_stored)
     check('T7 objek baru ada', storage_service.exists(new_key))
 
     # ---- Test 8: guru lain / siswa tak bisa hapus-hapus milik orang ----

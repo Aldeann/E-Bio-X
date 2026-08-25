@@ -103,8 +103,12 @@ def object_key(category, teacher_id, filename):
 # ------------------------------------------------------------------
 
 def _sb_headers(extra=None):
+    key = sb_cfg.service_role_key()
     h = {
-        'Authorization': f'Bearer {sb_cfg.service_role_key()}',
+        # new-style keys (sb_secret_...) require the apikey header;
+        # legacy JWTs accept both, so always send it
+        'apikey': key,
+        'Authorization': f'Bearer {key}',
         **(extra or {}),
     }
     return h
@@ -128,17 +132,18 @@ def _sb_get(key):
     resp = http_client.get(_sb_object_url(key), headers=_sb_headers(), timeout=60)
     if resp.status_code == 200:
         return resp.content
-    if resp.status_code == 404:
+    # storage quirk: a missing object arrives as HTTP 400 whose BODY
+    # carries statusCode 404 / NoSuchKey
+    if resp.status_code in (400, 404) and (
+            'NoSuchKey' in resp.text or '"404"' in resp.text or 'not_found' in resp.text):
         return None
     raise StorageError(f'Supabase read gagal (HTTP {resp.status_code})')
 
 
 def _sb_delete(key):
-    resp = http_client.delete(
-        _sb_object_url(key),
-        headers=_sb_headers({'Content-Type': 'application/json'}),
-        timeout=60,
-    )
+    # NOTE: no Content-Type json header here - a JSON content-type with an
+    # empty body is rejected by the storage API (400 InvalidRequest)
+    resp = http_client.delete(_sb_object_url(key), headers=_sb_headers(), timeout=60)
     # 200 deleted, 404 already gone - both count as clean
     if resp.status_code in (200, 204, 404):
         return True
