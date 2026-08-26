@@ -334,7 +334,8 @@ def resolve_key(url):
     """Extract the storage key from any url shape we have ever stored.
 
     Handles: /api/files/<key>, {host}/api/files/<key>,
-             /uploads/<name>, {host}/uploads/<name>.
+             /uploads/<name>, {host}/uploads/<name>,
+             Supabase signed/public URLs.
     Returns None for foreign urls.
     """
     if not url:
@@ -345,16 +346,29 @@ def resolve_key(url):
         if idx != -1:
             tail = u[idx + len(marker):].lstrip('/')
             return tail or None
+    # Supabase signed URL: .../object/sign/<bucket>/<key>
+    # Supabase public URL: .../object/public/<bucket>/<key>
+    if 'supabase' in u and '/object/' in u:
+        for marker in ('/object/sign/', '/object/public/'):
+            idx = u.find(marker)
+            if idx != -1:
+                # Skip bucket name, extract key
+                rest = u[idx + len(marker):]
+                parts = rest.split('/', 1)
+                if len(parts) == 2:
+                    return parts[1] or None
     return None
 
 
 def out_url(url):
-    """Serialize stored url for API responses: swap /api/files/<key>
-    with a signed GET so browser media tags work without headers.
+    """Serialize stored url for API responses: re-sign via signed GET
+    so browser media tags work without headers.
+    Handles /api/files/, /uploads/, and Supabase signed/public URLs.
     Legacy /uploads urls are returned unchanged."""
     key = resolve_key(url)
-    if key and str(url).lstrip().startswith((URL_PREFIX, 'http')) \
-            and '/api/files/' in str(url):
+    if key:
+        if str(url).strip().startswith('/uploads/'):
+            return url
         return presigned_get(key)
     return url
 

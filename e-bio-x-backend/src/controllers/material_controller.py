@@ -260,6 +260,10 @@ def _serialize_content(content, include_answers=True):
             for q in data['questions']:
                 if isinstance(q, dict):
                     q.pop('correct_answer', None)
+    # Re-sign storage URLs for browser-consumable blocks so signed URLs
+    # never expire in the client (image, video, pdf, link).
+    if content.type in ('image', 'video', 'pdf', 'link') and data.get('url'):
+        data['url'] = storage_service.out_url(data['url']) or data['url']
     return {
         'id': content.id,
         'type': content.type,
