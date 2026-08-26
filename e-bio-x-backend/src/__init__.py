@@ -82,7 +82,8 @@ def create_app():
     from src.controllers.ml_controller import (
         get_student_learning_profile, get_student_recommendations, post_recommendation_click,
         get_teacher_ml_analytics,
-        train_ml,
+        train_ml, retrain_ml, predict_student,
+        get_teacher_ml_mastery, get_teacher_ml_clusters,
     )
     from src.controllers.ai_explanation_controller import (
         generate_question_explanation, generate_bank_explanation, batch_generate_explanations,
@@ -230,7 +231,11 @@ def create_app():
     app.add_url_rule('/api/student/recommendations', view_func=get_student_recommendations, methods=['GET'])
     app.add_url_rule('/api/student/recommendations/click', view_func=post_recommendation_click, methods=['POST'])
     app.add_url_rule('/api/teacher/analytics/ml', view_func=get_teacher_ml_analytics, methods=['GET'])
+    app.add_url_rule('/api/teacher/analytics/ml/mastery', view_func=get_teacher_ml_mastery, methods=['GET'])
+    app.add_url_rule('/api/teacher/analytics/ml/clusters', view_func=get_teacher_ml_clusters, methods=['GET'])
     app.add_url_rule('/api/ml/train', view_func=train_ml, methods=['POST'])
+    app.add_url_rule('/api/ml/retrain', view_func=retrain_ml, methods=['POST'])
+    app.add_url_rule('/api/ml/predict/<student_id>', view_func=predict_student, methods=['POST'])
 
     # ===== Interactive Discussion Forum (Prompt 11) =====
     app.add_url_rule('/api/forums', view_func=list_forums, methods=['GET'])

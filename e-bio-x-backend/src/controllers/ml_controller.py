@@ -275,3 +275,65 @@ def train_ml():
     if err:
         return err
     return jsonify(_train_pipeline()), 200
+
+
+# ============================================================
+# RETRAIN (alias of train — semantic re-use)
+# ============================================================
+@jwt_required()
+def retrain_ml():
+    teacher, err = _teacher()
+    if err:
+        return err
+    return jsonify(_train_pipeline()), 200
+
+
+# ============================================================
+# PREDICT single student (teacher/admin, must share a course)
+# ============================================================
+@jwt_required()
+def predict_student(student_id):
+    teacher, err = _teacher()
+    if err:
+        return err
+    student = User.query.get(int(student_id)) if str(student_id).isdigit() else None
+    if not student or student.role != 'student':
+        return jsonify({'error': 'Siswa tidak ditemukan'}), 404
+    # ownership check: student must be among teacher's own students
+    my_student_ids = set(analytics.teacher_student_ids(teacher.id))
+    if student.id not in my_student_ids:
+        return jsonify({'error': 'Anda tidak memiliki akses ke data siswa ini'}), 403
+    dt_artifact = model_manager.load_artifact('decision_tree')
+    km_artifact = model_manager.load_artifact('kmeans')
+    result = profile_mod.generate_profile(student, dt_artifact, km_artifact)
+    return jsonify(result), 200
+
+
+# ============================================================
+# TEACHER ML ANALYTICS — mastery breakdown
+# ============================================================
+@jwt_required()
+def get_teacher_ml_mastery():
+    teacher, err = _teacher()
+    if err:
+        return err
+    insights = _ml_insights(teacher)
+    return jsonify({
+        'mastery_distribution': insights['mastery_distribution'],
+        'analyzed': insights['analyzed'],
+        'insufficient_data': insights['insufficient_data'],
+    }), 200
+
+
+# ============================================================
+# TEACHER ML ANALYTICS — cluster breakdown
+# ============================================================
+@jwt_required()
+def get_teacher_ml_clusters():
+    teacher, err = _teacher()
+    if err:
+        return err
+    clusters = _clusters_info()
+    if not clusters:
+        return jsonify({'status': cfg.STATUS_MODEL_UNAVAILABLE, 'message': 'Model belum tersedia'}), 200
+    return jsonify(clusters), 200
