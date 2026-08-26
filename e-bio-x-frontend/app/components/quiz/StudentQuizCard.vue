@@ -55,7 +55,7 @@
           v-else
           class="border border-gray-300 dark:border-gray-600 text-gray-400 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center"
         >
-          Kesempatan habis
+          Tidak ada sisa percobaan
         </span>
       </div>
       <NuxtLink

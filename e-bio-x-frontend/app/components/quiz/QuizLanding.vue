@@ -71,7 +71,7 @@
     </div>
 
     <p v-if="quiz.student_status === 'completed' && quiz.attempts_used >= quiz.max_attempts" class="text-center mt-4 text-sm text-gray-500">
-      Kesempatan mengerjakan sudah habis.
+      Tidak ada sisa percobaan yang tersedia.
     </p>
   </div>
 </template>

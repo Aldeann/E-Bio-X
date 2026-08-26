@@ -165,7 +165,7 @@
                     v-else
                     class="border border-gray-300 dark:border-gray-600 text-gray-400 text-[10px] sm:text-xs px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center"
                   >
-                    Habis
+                    Selesai
                   </span>
                 </div>
                 <button
