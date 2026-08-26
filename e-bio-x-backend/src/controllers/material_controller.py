@@ -220,6 +220,7 @@ def _student_progress_info(material, done_section_ids):
 
 def _serialize_material_list(material, include_analytics=False, student_progress=None):
     description = material.description or material.content
+    is_interactive = material.file_url is None
     item = {
         'id': material.id,
         'title': material.title,
@@ -237,6 +238,7 @@ def _serialize_material_list(material, include_analytics=False, student_progress
         'estimated_time': material.estimated_time,
         'thumbnail_url': storage_service.out_url(material.thumbnail_url),
         'status': material.status,
+        'category': 'interactive' if is_interactive else 'file',
         'teacher_id': material.teacher_id,
         'uploaded_at': material.uploaded_at.isoformat() if material.uploaded_at else None,
         'created_at': material.uploaded_at.isoformat() if material.uploaded_at else None,
@@ -599,21 +601,16 @@ def get_material_by_course(course_id):
     if user.role == 'student':
         materials = [m for m in materials if m.status == 'published']
 
+    progress_map = {}
+    if user.role == 'student':
+        progress_map = _student_progress_map(user, [m.id for m in materials])
+
     result = []
     for material in materials:
-        is_interactive = material.file_url is None
-        result.append({
-            'id': material.id,
-            'title': material.title,
-            'description': material.description or material.content,
-            'file_url': storage_service.out_url(material.file_url),
-            'course_id': material.course_id,
-            'category': 'interactive' if is_interactive else 'file',
-            'status': material.status,
-            'section_count': len(material.sections),
-            'content_count': sum(len(s.contents) for s in material.sections),
-            'uploaded_at': material.uploaded_at,
-        })
+        result.append(_serialize_material_list(
+            material,
+            student_progress=_student_progress_info(material, progress_map.get(material.id, set())),
+        ))
 
     return jsonify({
         'message': 'Materials retrieved successfully',
