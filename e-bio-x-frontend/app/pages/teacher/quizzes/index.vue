@@ -1,99 +1,99 @@
 <template>
-  <div class="container mx-auto px-4 py-6">
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+  <div class="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4 sm:mb-6">
       <div>
-        <h2 class="text-2xl font-semibold">Manajemen Kuis</h2>
-        <p class="text-sm text-gray-500">Buat, publikasikan, dan pantau kuis interaktif materi.</p>
+        <h2 class="text-xl sm:text-2xl font-semibold">Manajemen Kuis</h2>
+        <p class="text-xs sm:text-sm text-gray-500">Buat, publikasikan, dan pantau kuis interaktif materi.</p>
       </div>
       <div class="flex gap-2">
         <NuxtLink
           to="/teacher/question-bank"
-          class="border border-green-600 text-green-700 dark:text-green-400 px-4 py-2 rounded-lg hover:bg-green-50 dark:hover:bg-gray-800 transition flex items-center gap-1"
+          class="border border-green-600 text-green-700 dark:text-green-400 px-3 sm:px-4 py-2 rounded-lg hover:bg-green-50 dark:hover:bg-gray-800 transition flex items-center gap-1 text-xs sm:text-sm"
         >
-          <Icon name="material-symbols:database" class="w-5 h-5" /> Bank Soal
+          <Icon name="material-symbols:database" class="w-4 h-4 sm:w-5 sm:h-5" /> Bank Soal
         </NuxtLink>
         <NuxtLink
           to="/teacher/quizzes/create"
-          class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center gap-1 shadow-md shadow-green-300/50"
+          class="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-lg transition flex items-center gap-1 shadow-md shadow-green-300/50 text-xs sm:text-sm"
         >
-          <Icon name="material-symbols:add" class="w-5 h-5" /> Buat Kuis
+          <Icon name="material-symbols:add" class="w-4 h-4 sm:w-5 sm:h-5" /> Buat Kuis
         </NuxtLink>
       </div>
     </div>
 
     <div v-if="loading" class="text-gray-500 text-center py-10">Memuat kuis...</div>
 
-    <div v-else-if="quizzes.length === 0" class="text-center py-16 bg-white dark:bg-gray-900 border border-dashed border-gray-300 dark:border-gray-600 rounded-xl">
-      <Icon name="material-symbols:quiz" class="w-14 h-14 text-gray-300 mx-auto mb-3" />
-      <p class="text-gray-500">Belum ada kuis. Klik "Buat Kuis" untuk membuat kuis pertama.</p>
+    <div v-else-if="quizzes.length === 0" class="text-center py-12 sm:py-16 bg-white dark:bg-gray-900 border border-dashed border-gray-300 dark:border-gray-600 rounded-xl">
+      <Icon name="material-symbols:quiz" class="w-12 h-12 sm:w-14 sm:h-14 text-gray-300 mx-auto mb-3" />
+      <p class="text-sm text-gray-500">Belum ada kuis. Klik "Buat Kuis" untuk membuat kuis pertama.</p>
     </div>
 
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
       <div
         v-for="q in quizzes"
         :key="q.id"
-        class="bg-white dark:bg-gray-900 border border-green-200 dark:border-gray-700 rounded-xl shadow-md hover:shadow-lg hover:shadow-green-300/40 transition p-5 flex flex-col"
+        class="bg-white dark:bg-gray-900 border border-green-200 dark:border-gray-700 rounded-xl shadow-md hover:shadow-lg hover:shadow-green-300/40 transition p-3 sm:p-5 flex flex-col"
       >
         <div class="flex items-start justify-between gap-2">
-          <div class="flex items-center gap-2 text-sm">
+          <div class="flex items-center gap-2 text-xs sm:text-sm">
             <span
-              class="px-2 py-0.5 rounded-full text-xs"
+              class="px-2 py-0.5 rounded-full text-[10px] sm:text-xs"
               :class="statusClass(q.status)"
             >{{ statusLabel(q.status) }}</span>
-            <span class="text-xs text-gray-500">{{ q.question_count }} soal · {{ q.total_points }} poin</span>
+            <span class="text-[10px] sm:text-xs text-gray-500">{{ q.question_count }} soal · {{ q.total_points }} poin</span>
           </div>
           <button
             class="text-red-500 hover:text-red-700"
             title="Hapus kuis"
             @click="removeQuiz(q)"
           >
-            <Icon name="material-symbols:delete" class="w-5 h-5" />
+            <Icon name="material-symbols:delete" class="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
-        <h3 class="mt-2 font-semibold text-lg">{{ q.title }}</h3>
-        <p v-if="q.description" class="text-sm text-gray-500 line-clamp-2 mt-1">{{ q.description }}</p>
+        <h3 class="mt-2 font-semibold text-sm sm:text-lg">{{ q.title }}</h3>
+        <p v-if="q.description" class="text-xs sm:text-sm text-gray-500 line-clamp-2 mt-1">{{ q.description }}</p>
 
-        <div class="mt-3 flex flex-wrap gap-1.5 text-xs">
+        <div class="mt-3 flex flex-wrap gap-1 sm:gap-1.5 text-[10px] sm:text-xs">
           <span
             v-if="q.material_title"
-            class="px-2 py-1 rounded-full bg-green-50 dark:bg-green-900/40 text-green-700 dark:text-green-400"
+            class="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-green-50 dark:bg-green-900/40 text-green-700 dark:text-green-400"
           >
             {{ q.material_title }}
           </span>
-          <span class="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+          <span class="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
             Durasi {{ q.duration || "-" }} mnt
           </span>
-          <span class="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+          <span class="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
             Lulus {{ q.passing_grade }}%
           </span>
         </div>
 
-        <div v-if="q.stats" class="mt-3 grid grid-cols-3 gap-2 text-center text-xs border-t border-gray-100 dark:border-gray-800 pt-3">
+        <div v-if="q.stats" class="mt-3 grid grid-cols-3 gap-1.5 sm:gap-2 text-center text-[10px] sm:text-xs border-t border-gray-100 dark:border-gray-800 pt-3">
           <div>
-            <p class="font-semibold text-green-700 dark:text-green-500 text-base">{{ q.stats.participants }}</p>
+            <p class="font-semibold text-green-700 dark:text-green-500 text-sm sm:text-base">{{ q.stats.participants }}</p>
             <p class="text-gray-500">Peserta</p>
           </div>
           <div>
-            <p class="font-semibold text-green-700 dark:text-green-500 text-base">{{ q.stats.attempts }}</p>
+            <p class="font-semibold text-green-700 dark:text-green-500 text-sm sm:text-base">{{ q.stats.attempts }}</p>
             <p class="text-gray-500">Percobaan</p>
           </div>
           <div>
-            <p class="font-semibold text-green-700 dark:text-green-500 text-base">{{ q.stats.avg_percentage }}%</p>
+            <p class="font-semibold text-green-700 dark:text-green-500 text-sm sm:text-base">{{ q.stats.avg_percentage }}%</p>
             <p class="text-gray-500">Rata-rata</p>
           </div>
         </div>
 
-        <div class="mt-4 grid grid-cols-2 gap-2 mt-auto pt-4">
+        <div class="mt-3 sm:mt-4 grid grid-cols-2 gap-1.5 sm:gap-2 mt-auto pt-3 sm:pt-4">
           <NuxtLink
             :to="`/teacher/quizzes/${q.id}`"
-            class="bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-2 rounded-lg text-center transition"
+            class="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center transition"
           >
             Kelola
           </NuxtLink>
           <NuxtLink
             :to="`/teacher/quizzes/${q.id}/analytics`"
-            class="border border-green-600 text-green-700 dark:text-green-400 text-sm px-3 py-2 rounded-lg text-center hover:bg-green-50 dark:hover:bg-gray-800 transition"
+            class="border border-green-600 text-green-700 dark:text-green-400 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center hover:bg-green-50 dark:hover:bg-gray-800 transition"
           >
             Analitik
           </NuxtLink>

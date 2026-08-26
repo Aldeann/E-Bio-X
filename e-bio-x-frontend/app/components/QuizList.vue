@@ -1,141 +1,190 @@
 <template>
-  <div
-    class="p-6 bg-white dark:bg-gray-900 rounded-xl dark:shadow-green-400 dark:border-none border shadow-lg border-green-200">
-    <h2 class="text-xl font-semibold text-green-700 dark:text-green-500 flex items-center gap-2">
+  <div class="p-3 sm:p-6 bg-white dark:bg-gray-900 rounded-xl dark:shadow-green-400 dark:border-none border shadow-lg border-green-200">
+    <h2 class="text-lg sm:text-xl font-semibold text-green-700 dark:text-green-500 flex items-center gap-2 mb-3 sm:mb-4">
       <Icon name="hugeicons:quiz-04" class="text-green-500" /> Kuis
     </h2>
 
-    <div class="my-3">
-      <div v-if="loading" class="space-y-4">
-        <div class="border rounded-xl p-4 shadow bg-white dark:bg-gray-900 animate-pulse">
+    <div>
+      <!-- Skeleton -->
+      <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div v-for="i in 3" :key="i" class="border rounded-xl p-3 sm:p-4 shadow bg-white dark:bg-gray-900 animate-pulse">
           <div class="flex items-center justify-between mb-3">
-            <div class="space-y-2">
-              <div class="h-5 bg-green-200 rounded w-48"></div>
-              <div class="h-3 bg-green-200 rounded w-32"></div>
-              <div class="h-3 bg-green-200 rounded w-40"></div>
+            <div class="space-y-2 flex-1">
+              <div class="h-4 bg-green-200 rounded w-3/4"></div>
+              <div class="h-3 bg-green-200 rounded w-1/2"></div>
             </div>
-            <div class="flex flex-col md:flex-row gap-2">
-              <div class="h-8 w-20 bg-green-200 rounded"></div>
-              <div class="h-8 w-20 bg-green-200 rounded"></div>
-              <div class="h-8 w-20 bg-green-200 rounded"></div>
-            </div>
+            <div class="h-6 w-16 bg-green-200 rounded-full"></div>
+          </div>
+          <div class="flex flex-wrap gap-1.5 mt-3">
+            <div class="h-5 w-16 bg-green-100 rounded-full"></div>
+            <div class="h-5 w-20 bg-green-100 rounded-full"></div>
           </div>
         </div>
       </div>
 
-      <div v-else-if="error" class="text-red-500">{{ error }}</div>
-      <div v-else>
-        <div v-if="quizzes.length === 0" class="text-gray-500">Belum ada kuis untuk kelas ini.</div>
+      <!-- Error -->
+      <div v-else-if="error" class="text-red-500 text-sm">{{ error }}</div>
 
-        <div v-else class="space-y-4">
+      <!-- Empty -->
+      <div v-else-if="quizzes.length === 0" class="text-center py-8">
+        <Icon name="material-symbols:quiz" class="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+        <p class="text-sm text-gray-500 dark:text-gray-400">Belum ada kuis untuk kelas ini.</p>
+      </div>
+
+      <!-- Card Grid -->
+      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div
+          v-for="quiz in quizzes"
+          :key="quiz.quiz_id"
+          class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden flex flex-col shadow-sm hover:shadow-md transition"
+        >
+          <!-- Header stripe -->
           <div
-            v-for="quiz in quizzes"
-            :key="quiz.quiz_id"
-            class="rounded-xl p-4 shadow-md dark:shadow-green-200 bg-white dark:bg-gray-900 hover:shadow-lg transition">
-            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div class="min-w-0">
-                <h3 class="text-xl font-semibold text-gray-800 dark:text-white break-words">
-                  {{ quiz.title }}
-                </h3>
-                <p class="text-sm text-gray-500">
-                  {{ formatDate(quiz.created_at) }}
-                </p>
-                <p class="text-sm text-gray-500">{{ quiz.questions }} soal</p>
-                <button
-                  v-if="role == 'teacher'"
-                  @click="toggleActivateQuizz(quiz.quiz_id, quiz.is_closed)"
-                  class="text-sm mt-1 px-3 py-1 rounded font-semibold transition border focus:outline-none"
-                  :class="
-                    quiz.is_closed
-                      ? 'bg-red-100 text-red-600 border-red-300 hover:bg-red-200'
-                      : 'bg-green-100 text-green-600 border-green-300 hover:bg-green-200'
-                  ">
-                  {{ quiz.is_closed ? "Status: Ditutup" : "Status: Terbuka" }}
-                </button>
+            class="h-2"
+            :class="quiz.is_closed ? 'bg-red-400' : 'bg-gradient-to-r from-green-500 to-emerald-500'"
+          />
 
-                <p
-                  v-else
-                  class="text-sm mt-1"
-                  :class="quiz.is_closed ? 'text-red-500' : 'text-green-600'">
-                  {{ quiz.is_closed ? "Ditutup" : "Terbuka" }}
-                </p>
+          <!-- Body -->
+          <div class="p-3 sm:p-4 flex flex-col flex-1">
+            <!-- Status + title -->
+            <div class="flex items-start justify-between gap-2">
+              <h3 class="font-semibold text-sm sm:text-base text-gray-800 dark:text-gray-100 line-clamp-2">
+                {{ quiz.title }}
+              </h3>
+              <span
+                class="shrink-0 text-[9px] sm:text-[10px] uppercase font-bold px-1.5 sm:px-2 py-0.5 rounded-full"
+                :class="quiz.is_closed
+                  ? 'bg-red-100 text-red-600'
+                  : 'bg-green-100 text-green-700'"
+              >
+                {{ quiz.is_closed ? "Tutup" : "Buka" }}
+              </span>
+            </div>
+
+            <!-- Meta -->
+            <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] sm:text-xs text-gray-400">
+              <span class="flex items-center gap-1">
+                <Icon name="material-symbols:calendar-today" class="w-3 h-3" />
+                {{ formatDate(quiz.created_at) }}
+              </span>
+              <span class="flex items-center gap-1">
+                <Icon name="material-symbols:help-outline" class="w-3 h-3" />
+                {{ quiz.questions }} soal
+              </span>
+            </div>
+
+            <!-- Teacher: toggle status -->
+            <div v-if="role === 'teacher'" class="mt-2">
+              <button
+                @click="toggleActivateQuizz(quiz.quiz_id, quiz.is_closed)"
+                class="text-[10px] sm:text-xs mt-1 px-2 sm:px-3 py-1 rounded-full font-semibold transition border focus:outline-none"
+                :class="quiz.is_closed
+                  ? 'bg-red-100 text-red-600 border-red-300 hover:bg-red-200'
+                  : 'bg-green-100 text-green-600 border-green-300 hover:bg-green-200'"
+              >
+                {{ quiz.is_closed ? "Status: Ditutup" : "Status: Terbuka" }}
+              </button>
+            </div>
+
+            <!-- Student: status -->
+            <div v-else class="mt-2">
+              <span
+                class="text-[10px] sm:text-xs font-medium"
+                :class="quiz.is_closed ? 'text-red-500' : 'text-green-600'"
+              >
+                {{ quiz.is_closed ? "Ditutup" : "Terbuka" }}
+              </span>
+            </div>
+
+            <!-- Student: score -->
+            <div
+              v-if="role === 'student' && quiz.student_status === 'completed'"
+              class="mt-2 flex flex-wrap items-center gap-2"
+            >
+              <span class="text-[10px] sm:text-xs text-gray-500">Skor terbaik:</span>
+              <span class="text-xs sm:text-sm font-bold text-green-700 dark:text-green-500">
+                {{ quiz.best_percentage !== null && quiz.best_percentage !== undefined ? quiz.best_percentage + "%" : "-" }}
+              </span>
+              <span
+                class="px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-medium"
+                :class="quiz.passed
+                  ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                  : 'bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300'"
+              >
+                {{ quiz.passed ? "Lulus" : "Belum Lulus" }}
+              </span>
+            </div>
+
+            <!-- Spacer -->
+            <div class="flex-1" />
+
+            <!-- Actions -->
+            <div class="mt-3 pt-2.5 sm:pt-3 border-t border-gray-100 dark:border-gray-800">
+              <!-- Teacher actions -->
+              <div v-if="role === 'teacher'" class="grid grid-cols-3 gap-1.5 sm:gap-2">
+                <NuxtLink
+                  :to="`/teacher/quizzes/${quiz.quiz_id}/analytics`"
+                  class="bg-green-600 hover:bg-green-700 text-white text-[10px] sm:text-xs px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center transition flex items-center justify-center gap-1"
+                >
+                  <Icon name="material-symbols:bar-chart-4-bars" class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                  Analisis
+                </NuxtLink>
+                <NuxtLink
+                  :to="`/teacher/quizzes/${quiz.quiz_id}`"
+                  class="bg-amber-400 hover:bg-amber-500 text-white text-[10px] sm:text-xs px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center transition flex items-center justify-center gap-1"
+                >
+                  <Icon name="material-symbols:edit-square" class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                  Edit
+                </NuxtLink>
+                <button
+                  @click="deleteQuiz(quiz.quiz_id)"
+                  class="bg-red-600 hover:bg-red-700 text-white text-[10px] sm:text-xs px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center transition flex items-center justify-center gap-1"
+                >
+                  <Icon name="material-symbols:delete-rounded" class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                  Hapus
+                </button>
               </div>
 
-              <!-- Action menu -->
-              <div class="flex flex-wrap md:flex-nowrap items-center gap-3">
-                <div v-if="role === 'teacher'" class="flex flex-col md:flex-row gap-2">
+              <!-- Student: open quiz -->
+              <div v-else-if="role === 'student' && !quiz.is_closed">
+                <div v-if="quiz.student_status === 'completed'" class="grid grid-cols-2 gap-1.5 sm:gap-2">
                   <NuxtLink
-                    :to="`/teacher/quizzes/${quiz.quiz_id}/analytics`"
-                    class="bg-green-600 text-white px-3 py-1.5 text-sm rounded hover:bg-green-700 flex items-center gap-1">
-                    <Icon name="material-symbols:bar-chart-4-bars" />
-                    Analisis
+                    :to="`/student/quizzes/${quiz.quiz_id}/result`"
+                    class="bg-green-600 hover:bg-green-700 text-white text-[10px] sm:text-xs px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center transition"
+                  >
+                    Lihat Hasil
                   </NuxtLink>
-
-                  <NuxtLink
-                    :to="`/teacher/quizzes/${quiz.quiz_id}`"
-                    class="bg-yellow-400 text-white px-3 py-1.5 text-sm rounded hover:bg-yellow-500 flex items-center gap-1">
-                    <Icon name="material-symbols:edit-square" />
-                    Edit
-                  </NuxtLink>
-
                   <button
-                    @click="deleteQuiz(quiz.quiz_id)"
-                    class="bg-red-600 text-white px-3 py-1.5 text-sm rounded hover:bg-red-700 flex items-center gap-1">
-                    <Icon name="material-symbols:delete-rounded" />
-                    Hapus
-                  </button>
-                </div>
-
-                <template v-else-if="role === 'student' && !quiz.is_closed">
-                  <div
-                    v-if="quiz.student_status === 'completed'"
-                    class="flex flex-col md:flex-row gap-2 py-2 rounded-lg bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 border border-green-200 dark:border-green-700 transition-colors">
-                    <div class="flex items-center gap-2 px-4">
-                      <Icon name="mdi:star-outline" class="w-5 h-5" />
-                      <div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Nilai terbaik</p>
-                        <p class="font-semibold text-base">
-                          {{ quiz.best_percentage !== null && quiz.best_percentage !== undefined ? `${quiz.best_percentage}%` : "-" }}
-                        </p>
-                      </div>
-                    </div>
-                    <div class="flex items-center gap-2 px-4">
-                      <span
-                        class="px-2 py-0.5 rounded-full text-xs font-medium"
-                        :class="quiz.passed ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300' : 'bg-orange-100 dark:bg-orange-800 text-orange-700 dark:text-orange-300'">
-                        {{ quiz.passed ? "Lulus" : "Belum Lulus" }}
-                      </span>
-                    </div>
-                    <NuxtLink
-                      :to="`/student/quizzes/${quiz.quiz_id}/result`"
-                      class="bg-green-600 text-white px-3 py-1.5 text-sm rounded hover:bg-green-700 flex items-center gap-1 self-center">
-                      <Icon name="material-symbols:visibility-outline" />
-                      Lihat Hasil
-                    </NuxtLink>
-                    <button
-                      v-if="quiz.attempts_used < quiz.max_attempts"
-                      @click="startQuiz(quiz.quiz_id)"
-                      class="border border-green-600 text-green-700 dark:text-green-400 px-3 py-1.5 text-sm rounded hover:bg-green-100 dark:hover:bg-gray-800 flex items-center gap-1 self-center">
-                      <Icon name="mdi:refresh" />
-                      Ulangi
-                    </button>
-                  </div>
-
-                  <button
-                    v-else
+                    v-if="quiz.attempts_used < quiz.max_attempts"
                     @click="startQuiz(quiz.quiz_id)"
-                    class="bg-green-600 text-white px-3 py-1.5 text-sm rounded hover:bg-green-700 flex items-center gap-1">
-                    <Icon name="mdi:play-circle-outline" />
-                    {{ quiz.student_status === 'in_progress' ? 'Lanjutkan' : 'Kerjakan' }}
+                    class="border border-green-600 text-green-700 dark:text-green-400 text-[10px] sm:text-xs px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center hover:bg-green-50 dark:hover:bg-gray-800 transition"
+                  >
+                    Ulangi
                   </button>
-                </template>
-
-                <div
-                  v-else-if="role === 'student' && quiz.is_closed"
-                  class="bg-gray-200 px-3 py-1.5 text-sm rounded flex items-center gap-1">
-                  <Icon name="material-symbols:cancel-rounded" />
-                  Kuis ditutup
+                  <span
+                    v-else
+                    class="border border-gray-300 dark:border-gray-600 text-gray-400 text-[10px] sm:text-xs px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center"
+                  >
+                    Habis
+                  </span>
                 </div>
+                <button
+                  v-else
+                  @click="startQuiz(quiz.quiz_id)"
+                  class="w-full bg-green-600 hover:bg-green-700 text-white text-[10px] sm:text-xs px-3 py-1.5 sm:py-2 rounded-lg text-center transition flex items-center justify-center gap-1"
+                >
+                  <Icon name="mdi:play-circle-outline" class="w-3.5 h-3.5" />
+                  {{ quiz.student_status === 'in_progress' ? 'Lanjutkan' : 'Kerjakan' }}
+                </button>
+              </div>
+
+              <!-- Student: closed -->
+              <div
+                v-else-if="role === 'student' && quiz.is_closed"
+                class="bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-[10px] sm:text-xs text-gray-500 rounded-lg flex items-center justify-center gap-1"
+              >
+                <Icon name="material-symbols:cancel-rounded" class="w-3.5 h-3.5" />
+                Kuis ditutup
               </div>
             </div>
           </div>
@@ -173,17 +222,14 @@ const fetchQuizzes = async () => {
       `${useRuntimeConfig().public.backend}/api/course/quiz/${props.courseId}`,
       {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       }
     );
     quizzes.value = res.quizzes;
   } catch (err) {
     console.error(err);
     error.value = "Gagal memuat data kuis.";
-  
-    toast.add({title: 'Gagal memuat data kuis.', color: 'red'})
+    toast.add({ title: "Gagal memuat data kuis.", color: "red" });
   } finally {
     loading.value = false;
   }
@@ -203,14 +249,12 @@ const toggleActivateQuizz = async (quizId, isClosed) => {
     try {
       await $fetch(`${useRuntimeConfig().public.backend}/api/quiz/${quizId}`, {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
-      toast.add({title: `Kuis telah ${isClosed ? "dibuka" : "ditutup"}.`, color: 'green'})
+      toast.add({ title: `Kuis telah ${isClosed ? "dibuka" : "ditutup"}.`, color: "green" });
       fetchQuizzes();
     } catch (err) {
-      toast.add({title: `Kuis gagal ${isClosed ? "dibuka" : "ditutup"}.`, color: 'red'})
+      toast.add({ title: `Kuis gagal ${isClosed ? "dibuka" : "ditutup"}.`, color: "red" });
     }
   }
 };
@@ -229,9 +273,7 @@ const deleteQuiz = async (quizId) => {
     try {
       await $fetch(`${useRuntimeConfig().public.backend}/api/quiz/${quizId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       swal.fire("Terhapus!", "Kuis telah dihapus.", "success");
       fetchQuizzes();
