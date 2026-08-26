@@ -1656,6 +1656,9 @@ def submit_student_attempt(attempt_id):
         log_activity(user.id, quiz.material_id, 'quiz_submitted',
                      section_id=quiz.section_id, data={'quiz_id': quiz.id, 'status': status,
                                                         'percentage': sub.percentage}, silent=True)
+    import threading
+    from src.controllers.ai_explanation_controller import auto_generate_for_quiz
+    threading.Thread(target=auto_generate_for_quiz, args=(quiz.id,), daemon=True).start()
     return jsonify({'message': 'Kuis berhasil dikumpulkan', 'result': _result_payload(quiz, sub, include_detail=True)}), 200
 
 

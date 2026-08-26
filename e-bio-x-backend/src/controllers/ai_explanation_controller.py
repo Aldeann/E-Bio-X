@@ -262,6 +262,49 @@ def _generate_into(exp, payload, source_material, actor_id=None):
 
 
 # ------------------------------------------------------------------
+# Auto-generate for quiz submission
+# ------------------------------------------------------------------
+def auto_generate_for_quiz(quiz_id):
+    """Generate + auto-approve AI explanations for every question in a quiz
+    that doesn't already have an approved one.  Designed to run in a
+    background thread with its own app context."""
+    try:
+        from src import app
+        with app.app_context():
+            quiz = Quiz.query.get(quiz_id)
+            if not quiz:
+                return
+            for question in sorted(quiz.questions, key=lambda x: x.order_index):
+                existing = QuizExplanation.query.filter_by(
+                    question_id=question.id, student_id=None).first()
+                if existing and existing.status in STUDENT_VIEWABLE:
+                    continue
+                exp = _get_or_create_global(question_id=question.id)
+                exp = _reuse_from_bank(question, exp)
+                db.session.commit()
+                if exp.status in STUDENT_VIEWABLE:
+                    continue
+                q_material = None
+                if quiz.material_id:
+                    q_material = Material.query.get(quiz.material_id)
+                payload = _build_payload(
+                    question.text, question.question_type, question.difficulty,
+                    q_material.topic if q_material else None,
+                    _question_options(question), None,
+                    q_material, q_material.title if q_material else None,
+                    course_id=_resolve_course_id(quiz, q_material),
+                    teacher_id=quiz.created_by)
+                ok, _err = _generate_into(exp, payload, q_material)
+                if ok:
+                    exp.status = 'APPROVED'
+                    exp.approved_at = datetime.utcnow()
+                    db.session.add(exp)
+                    db.session.commit()
+    except Exception:
+        pass
+
+
+# ------------------------------------------------------------------
 # Serialization
 # ------------------------------------------------------------------
 def _serialize(exp, for_student=False, personal=None):
