@@ -70,7 +70,7 @@ const filters = computed(() => [
 
 <template>
   <div class="p-4 pb-2">
-    <h2 class="text-2xl font-semibold text-green-600 dark:text-green-500">Data Materi</h2>
+    <h2 class="text-2xl font-semibold text-green-600 dark:text-green-500">Data Kelas</h2>
   </div>
   <div class="overflow-x-auto max-w-full">
     <AdminTable

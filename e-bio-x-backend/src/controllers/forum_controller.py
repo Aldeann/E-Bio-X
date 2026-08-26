@@ -70,7 +70,7 @@ def _matches_signature(file, ext):
     return False
 
 
-def _save_attachment(file):
+def _save_attachment(file, user=None):
     original = file.filename or 'file'
     ext = original.rsplit('.', 1)[-1].lower() if '.' in original else ''
     if ext not in ALLOWED_ATTACHMENT_EXT:
@@ -403,7 +403,7 @@ def _create_forum_form(user):
 
     file = request.files.get('presentation_file')
     if file and file.filename:
-        saved, err = _save_attachment(file)
+        saved, err = _save_attachment(file, user)
         if err:
             db.session.rollback()
             return jsonify({'error': err}), 400
@@ -411,7 +411,7 @@ def _create_forum_form(user):
         forum.presentation_file_name = saved['original']
     video = request.files.get('presentation_video')
     if video and video.filename:
-        saved, err = _save_attachment(video)
+        saved, err = _save_attachment(video, user)
         if err:
             db.session.rollback()
             return jsonify({'error': err}), 400
@@ -818,7 +818,7 @@ def upload_forum_attachment(forum_id):
     file = request.files.get('file')
     if not file or not file.filename:
         return jsonify({'error': 'File wajib diunggah'}), 400
-    saved, err = _save_attachment(file)
+    saved, err = _save_attachment(file, user)
     if err:
         return jsonify({'error': err}), 400
 

@@ -1,14 +1,14 @@
 <template>
-  <div class="container py-4">
+  <div class="container mx-auto px-4 py-4">
     <!-- Header Dashboard -->
-    <div class="row mb-4">
-      <div class="col-md-8">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+      <div>
         <h2 class="text-2xl font-semibold mb-3">
           Hi, <span class="text-green-600 dark:text-green-500">{{ useCookie("username").value }}</span
           >!
         </h2>
       </div>
-      <div class="col-md-4">
+      <div>
         <!-- Form Kode Kelas -->
         <div class="p-4">
           <h5 class="text-xl font-semibold text-green-600 dark:text-green-500 mb-3">Gabung Kelas</h5>
@@ -17,7 +17,7 @@
               <input
                 type="text"
                 v-model="classCode"
-                class="form-input flex-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-400 rounded-l-md ps-3 focus:ring-green-500 focus:border-green-500"
+                class="flex-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-400 rounded-l-md ps-3 focus:ring-green-500 focus:border-green-500"
                 placeholder="Masukkan kode kelas"
                 required />
               <button
@@ -32,8 +32,8 @@
     </div>
 
     <!-- Daftar Kelas -->
-    <div class="row mb-5 p-4">
-      <div class="col-12">
+    <div class="mb-5 p-4">
+      <div>
         <h4 class="text-xl font-semibold text-green-600 dark:text-green-500 mb-3">Kelasku</h4>
         <div v-if="enrolledClasses.length === 0" class="text-gray-500 text-sm mt-4">
           Kamu belum terdaftar di kelas manapun. Dapatkan kode kelas dari gurumu!
@@ -53,7 +53,7 @@
               <p class="text-sm text-green-600 mb-4">Bareng {{ kelas.teacher }}</p>
               <NuxtLink
                 :to="'/student/course/' + kelas.id"
-                class="btn bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 inline-flex items-center">
                 <Icon name="ic:outline-log-in" class="w-4 h-4 me-2" />
                 Masuk Kelas
               </NuxtLink>

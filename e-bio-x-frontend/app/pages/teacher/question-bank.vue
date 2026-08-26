@@ -239,17 +239,17 @@ const remove = async (b) => {
       headers: { Authorization: `Bearer ${token}` },
     });
     toast.add({ title: "Soal bank dihapus", color: "green" });
+    load();
+  } catch (e) {
+    toast.add({ title: e?.data?.error || "Gagal menghapus soal", color: "red" });
+  }
+};
+
 let debounceTimer = null;
 watch(filters, () => {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(load, 300);
 });
-
-load();
-  } catch (e) {
-    toast.add({ title: e?.data?.error || "Gagal menghapus soal", color: "red" });
-  }
-};
 
 load();
 
