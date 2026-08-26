@@ -107,71 +107,71 @@ definePageMeta({
 
 <template>
   <div>
-    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-3">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 sm:mb-6 gap-3">
       <div>
-        <h1 class="text-2xl font-bold text-green-700 dark:text-green-400">
+        <h1 class="text-xl sm:text-2xl font-bold text-green-700 dark:text-green-400">
           Materi Pembelajaran
         </h1>
-        <p class="text-sm text-gray-500">Kelola materi interaktif untuk siswa.</p>
+        <p class="text-xs sm:text-sm text-gray-500">Kelola materi interaktif untuk siswa.</p>
       </div>
       <NuxtLink
         to="/teacher/materials/create"
-        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center gap-1"
+        class="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1 self-start sm:self-auto"
       >
-        <Icon name="material-symbols:add" class="w-5 h-5" />
+        <Icon name="material-symbols:add" class="w-4 h-4 sm:w-5 sm:h-5" />
         Buat Materi
       </NuxtLink>
     </div>
 
-    <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div v-for="i in 6" :key="i" class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 animate-pulse bg-white dark:bg-gray-900 h-48"></div>
+    <!-- Skeleton -->
+    <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+      <div v-for="i in 6" :key="i" class="rounded-xl border border-gray-200 dark:border-gray-700 animate-pulse bg-white dark:bg-gray-900">
+        <div class="h-20 sm:h-24 bg-green-200 dark:bg-green-900" />
+        <div class="p-3 sm:p-4 space-y-3">
+          <div class="h-4 bg-green-200 dark:bg-green-800 rounded w-3/4" />
+          <div class="h-3 bg-green-100 dark:bg-green-900 rounded w-full" />
+          <div class="h-3 bg-green-100 dark:bg-green-900 rounded w-1/2" />
+        </div>
+      </div>
     </div>
 
-    <div v-else-if="materials.length === 0" class="text-center py-20 text-gray-400">
-      <Icon name="material-symbols:auto-stories-outline" class="w-16 h-16 mx-auto mb-3" />
-      <p>Belum ada materi. Klik <span class="font-semibold">+ Buat Materi</span> untuk memulai.</p>
+    <!-- Empty -->
+    <div v-else-if="materials.length === 0" class="text-center py-16 sm:py-20 text-gray-400">
+      <Icon name="material-symbols:auto-stories-outline" class="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3" />
+      <p class="text-sm sm:text-base">Belum ada materi. Klik <span class="font-semibold">+ Buat Materi</span> untuk memulai.</p>
     </div>
 
+    <!-- Cards -->
     <div v-else>
-      <div class="flex items-center gap-2 mb-4">
-        <label class="text-sm text-gray-500">Filter kelas:</label>
-        <select v-model="filterCourse" class="border border-gray-300 dark:border-gray-700 rounded px-3 py-1.5 text-sm bg-white dark:bg-gray-900">
+      <!-- Filter -->
+      <div class="flex flex-wrap items-center gap-2 mb-3 sm:mb-4">
+        <label class="text-xs sm:text-sm text-gray-500">Filter kelas:</label>
+        <select v-model="filterCourse" class="border border-gray-300 dark:border-gray-700 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm bg-white dark:bg-gray-900">
           <option value="">Semua kelas</option>
           <option v-for="c in courseList" :key="c" :value="c">{{ c }}</option>
         </select>
-        <span class="text-xs text-gray-400">{{ filteredMaterials.length }} materi</span>
+        <span class="text-[10px] sm:text-xs text-gray-400">{{ filteredMaterials.length }} materi</span>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div
-        v-for="m in filteredMaterials"
-        :key="m.id"
-        class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden flex flex-col shadow-sm hover:shadow-md transition"
-      >
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <div
-          class="h-24 flex items-center justify-center text-white font-bold text-lg"
-          :style="m.thumbnail_url ? '' : undefined"
+          v-for="m in filteredMaterials"
+          :key="m.id"
+          class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden flex flex-col shadow-sm hover:shadow-md transition"
         >
-          <img
-            v-if="m.thumbnail_url"
-            :src="m.thumbnail_url"
-            class="w-full h-full object-cover"
-          />
-          <div v-else class="w-full h-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
-            <Icon name="material-symbols:menu-book" class="w-10 h-10" />
-          </div>
-        </div>
-
-        <div class="p-4 flex flex-col flex-1">
-          <div class="flex items-start justify-between gap-2">
-            <NuxtLink
-              :to="`/teacher/materials/builder/${m.id}`"
-              class="font-semibold text-gray-800 dark:text-gray-100 hover:text-green-600 line-clamp-2"
-            >
-              {{ m.title }}
-            </NuxtLink>
+          <!-- Thumbnail -->
+          <div class="h-20 sm:h-24 relative">
+            <img
+              v-if="m.thumbnail_url"
+              :src="m.thumbnail_url"
+              class="w-full h-full object-cover"
+            />
+            <div v-else class="w-full h-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+              <Icon name="material-symbols:menu-book" class="w-8 h-8 sm:w-10 sm:h-10 text-white" />
+            </div>
             <span
-              class="shrink-0 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full"
+              class="absolute top-2 right-2 text-[9px] sm:text-[10px] uppercase font-bold px-1.5 sm:px-2 py-0.5 rounded-full"
               :class="
                 m.status === 'published'
                   ? 'bg-green-100 text-green-700'
@@ -182,111 +182,125 @@ definePageMeta({
             </span>
           </div>
 
-          <p class="text-xs text-gray-500 mt-1">
-            {{ m.subject }} · Fase {{ m.phase }}{{ m.class_level ? " · " + m.class_level : "" }}
-          </p>
-          <p class="text-xs text-gray-400">Topik: {{ m.topic || "-" }}</p>
-
-          <div class="mt-2 flex flex-wrap gap-1.5">
-            <span
-              v-for="c in m.courses"
-              :key="c"
-              class="px-2 py-0.5 text-[10px] rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 inline-flex items-center gap-1"
-            >
-              <Icon name="material-symbols:groups" class="w-3 h-3" />
-              {{ c }}
-            </span>
-            <span
-              v-if="!m.courses || m.courses.length === 0"
-              class="px-2 py-0.5 text-[10px] rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-            >
-              Umum
-            </span>
-          </div>
-
-          <div class="text-xs text-gray-400 mt-1 flex flex-wrap gap-x-3">
-            <span class="inline-flex items-center gap-1">
-              <Icon name="material-symbols:category" class="w-3.5 h-3.5" />
-              {{ m.section_count }} section
-            </span>
-            <span
-              class="inline-flex items-center gap-1 px-1.5 rounded"
-              :class="difficultyColor(m.difficulty)"
-            >
-              {{ m.difficulty || "sedang" }}
-            </span>
-          </div>
-
-          <div class="mt-3">
-            <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
-              <span class="inline-flex items-center gap-1">
-                <Icon name="mdi:account-multiple" class="w-4 h-4" />
-                {{ m.students || 0 }} siswa
-              </span>
-              <span>{{ m.completion_percentage || 0 }}% selesai</span>
-            </div>
-            <div class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div
-                class="h-full bg-green-500 rounded-full"
-                :style="{ width: (m.completion_percentage || 0) + '%' }"
-              ></div>
-            </div>
-          </div>
-
-          <div class="text-[11px] text-gray-400 mt-3 flex justify-between">
-            <span>Dibuat: {{ formatDate(m.created_at) }}</span>
-            <span>Diubah: {{ formatDate(m.updated_at || m.created_at) }}</span>
-          </div>
-
-          <div class="flex flex-wrap gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+          <!-- Body -->
+          <div class="p-3 sm:p-4 flex flex-col flex-1">
             <NuxtLink
               :to="`/teacher/materials/builder/${m.id}`"
-              class="px-3 py-1.5 text-xs rounded font-semibold bg-green-600 hover:bg-green-700 text-white flex items-center gap-1"
+              class="font-semibold text-sm sm:text-base text-gray-800 dark:text-gray-100 hover:text-green-600 line-clamp-2"
             >
-              <Icon name="material-symbols:edit-square" class="w-3.5 h-3.5" />
-              Edit
+              {{ m.title }}
             </NuxtLink>
-            <NuxtLink
-              :to="`/teacher/materials/preview/${m.id}`"
-              target="_blank"
-              class="px-3 py-1.5 text-xs rounded font-semibold bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-1"
-            >
-              <Icon name="material-symbols:visibility" class="w-3.5 h-3.5" />
-              Preview
-            </NuxtLink>
-            <NuxtLink
-              :to="`/teacher/materials/analytics/${m.id}`"
-              class="px-3 py-1.5 text-xs rounded font-semibold bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-100 flex items-center gap-1"
-            >
-              <Icon name="material-symbols:monitoring" class="w-3.5 h-3.5" />
-              Analitik
-            </NuxtLink>
-            <button
-              @click="publishToggle(m)"
-              class="px-3 py-1.5 text-xs rounded font-semibold flex items-center gap-1"
-              :class="
-                m.status === 'published'
-                  ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                  : 'bg-green-100 text-green-700 hover:bg-green-200'
-              "
-            >
-              <Icon
-                :name="m.status === 'published' ? 'material-symbols:visibility-off' : 'material-symbols:public'"
-                class="w-3.5 h-3.5"
-              />
-              {{ m.status === "published" ? "Unpublish" : "Publish" }}
-            </button>
-            <button
-              @click="deleteMaterial(m)"
-              class="px-3 py-1.5 text-xs rounded font-semibold bg-red-100 text-red-600 hover:bg-red-200 flex items-center gap-1"
-            >
-              <Icon name="material-symbols:delete-rounded" class="w-3.5 h-3.5" />
-              Hapus
-            </button>
+
+            <p class="text-[10px] sm:text-xs text-gray-500 mt-1">
+              {{ m.subject || "-" }} · Fase {{ m.phase || "-" }}{{ m.class_level ? " · " + m.class_level : "" }}
+            </p>
+            <p class="text-[10px] sm:text-xs text-gray-400 mt-0.5 truncate">Topik: {{ m.topic || "-" }}</p>
+
+            <!-- Course tags -->
+            <div class="mt-2 flex flex-wrap gap-1">
+              <span
+                v-for="c in m.courses"
+                :key="c"
+                class="px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 inline-flex items-center gap-0.5"
+              >
+                <Icon name="material-symbols:groups" class="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                {{ c }}
+              </span>
+              <span
+                v-if="!m.courses || m.courses.length === 0"
+                class="px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+              >
+                Umum
+              </span>
+            </div>
+
+            <!-- Section + Difficulty -->
+            <div class="mt-2 text-[10px] sm:text-xs text-gray-400 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span class="inline-flex items-center gap-1">
+                <Icon name="material-symbols:category" class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                {{ m.section_count || 0 }} section
+              </span>
+              <span
+                class="inline-flex items-center gap-1 px-1 sm:px-1.5 rounded"
+                :class="difficultyColor(m.difficulty)"
+              >
+                {{ m.difficulty || "sedang" }}
+              </span>
+            </div>
+
+            <!-- Student progress -->
+            <div class="mt-2 sm:mt-3">
+              <div class="flex items-center justify-between text-[10px] sm:text-xs text-gray-500 mb-1">
+                <span class="inline-flex items-center gap-1">
+                  <Icon name="mdi:account-multiple" class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  {{ m.students || 0 }} siswa
+                </span>
+                <span>{{ m.completion_percentage || 0 }}% selesai</span>
+              </div>
+              <div class="h-1 sm:h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  class="h-full bg-green-500 rounded-full"
+                  :style="{ width: (m.completion_percentage || 0) + '%' }"
+                ></div>
+              </div>
+            </div>
+
+            <!-- Dates -->
+            <div class="text-[9px] sm:text-[11px] text-gray-400 mt-2 sm:mt-3 flex justify-between">
+              <span>Dibuat: {{ formatDate(m.created_at) }}</span>
+              <span>Diubah: {{ formatDate(m.updated_at || m.created_at) }}</span>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex flex-wrap gap-1.5 sm:gap-2 mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-gray-100 dark:border-gray-800">
+              <NuxtLink
+                :to="`/teacher/materials/builder/${m.id}`"
+                class="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs rounded-lg font-semibold bg-green-600 hover:bg-green-700 text-white flex items-center gap-1"
+              >
+                <Icon name="material-symbols:edit-square" class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                Edit
+              </NuxtLink>
+              <NuxtLink
+                :to="`/teacher/materials/preview/${m.id}`"
+                target="_blank"
+                class="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs rounded-lg font-semibold bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-1"
+              >
+                <Icon name="material-symbols:visibility" class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                Preview
+              </NuxtLink>
+              <NuxtLink
+                :to="`/teacher/materials/analytics/${m.id}`"
+                class="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs rounded-lg font-semibold bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-100 flex items-center gap-1"
+              >
+                <Icon name="material-symbols:monitoring" class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                Analitik
+              </NuxtLink>
+              <button
+                @click="publishToggle(m)"
+                class="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs rounded-lg font-semibold flex items-center gap-1"
+                :class="
+                  m.status === 'published'
+                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                    : 'bg-green-100 text-green-700 hover:bg-green-200'
+                "
+              >
+                <Icon
+                  :name="m.status === 'published' ? 'material-symbols:visibility-off' : 'material-symbols:public'"
+                  class="w-3 h-3 sm:w-3.5 sm:h-3.5"
+                />
+                {{ m.status === "published" ? "Unpublish" : "Publish" }}
+              </button>
+              <button
+                @click="deleteMaterial(m)"
+                class="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs rounded-lg font-semibold bg-red-100 text-red-600 hover:bg-red-200 flex items-center gap-1"
+              >
+                <Icon name="material-symbols:delete-rounded" class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                Hapus
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
   </div>
 </template>
