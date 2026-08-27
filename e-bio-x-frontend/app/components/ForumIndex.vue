@@ -89,7 +89,16 @@
           <div class="h-1 sm:h-1.5" :class="statusColor(f.status)" />
 
           <!-- Body -->
-          <div class="p-2 sm:p-4 flex flex-col flex-1">
+          <div class="p-2 sm:p-4 flex flex-col flex-1 relative">
+            <!-- Delete button (teacher only) -->
+            <button
+              v-if="role === 'teacher'"
+              @click.stop="deleteForum($event, f)"
+              class="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-full text-red-500 hover:bg-red-100 dark:hover:bg-gray-700 transition sm:opacity-0 sm:group-hover:opacity-100"
+              title="Hapus forum">
+              <Icon name="material-symbols:delete-rounded" class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+            </button>
+
             <!-- Badges -->
             <div class="flex items-center gap-1 sm:gap-1.5 flex-wrap">
               <Icon v-if="f.is_pinned" name="mdi:pin" class="text-red-500 shrink-0 w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" />
@@ -129,6 +138,8 @@
 </template>
 
 <script setup>
+import { useSwal } from "~/utils/swal";
+
 const props = defineProps({
   role: { type: String, required: true },
 });
@@ -136,6 +147,8 @@ const props = defineProps({
 const config = useRuntimeConfig();
 const token = useCookie("access_token").value;
 const router = useRouter();
+const swal = useSwal();
+const toast = useToast();
 
 const forums = ref([]);
 const recommended = ref([]);
@@ -215,6 +228,31 @@ const fetchSettings = async () => {
 
 const openForum = (f) => {
   router.push(`/${props.role}/forum/${f.id}`);
+};
+
+const deleteForum = async (e, forum) => {
+  e.stopPropagation();
+  const result = await swal.fire({
+    title: "Hapus forum ini?",
+    text: `"${forum.title}" beserta seluruh postingannya akan dihapus permanen.`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Ya, hapus!",
+    cancelButtonText: "Batal",
+  });
+
+  if (!result.isConfirmed) return;
+
+  try {
+    await $fetch(`${config.public.backend}/api/forums/${forum.id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    toast.add({ title: "Forum dihapus.", color: "green" });
+    fetchForums();
+  } catch (err) {
+    toast.add({ title: "Gagal menghapus forum.", color: "red" });
+  }
 };
 
 const formatDate = (dateStr) => {

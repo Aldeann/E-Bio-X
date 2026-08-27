@@ -287,6 +287,17 @@ const fetchData = async () => {
 };
 
 const deleteMateri = async (materialId) => {
+  const result = await swal.fire({
+    title: "Hapus Materi?",
+    text: "Materi beserta semua isinya akan dihapus permanen.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Ya, hapus!",
+    cancelButtonText: "Batal",
+  });
+
+  if (!result.isConfirmed) return;
+
   swal.fire({
     title: "Menghapus...",
     text: "Mohon tunggu",
