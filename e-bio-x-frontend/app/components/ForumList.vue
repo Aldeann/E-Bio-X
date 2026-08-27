@@ -99,89 +99,89 @@
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      <div v-for="i in 3" :key="i" class="border rounded-xl p-3 sm:p-4 animate-pulse">
-        <div class="h-4 bg-green-200 dark:bg-gray-700 rounded w-2/3 mb-2"></div>
-        <div class="h-3 bg-green-200 dark:bg-gray-700 rounded w-1/2 mb-2"></div>
-        <div class="h-3 bg-green-200 dark:bg-gray-700 rounded w-1/3"></div>
+    <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+      <div v-for="i in 3" :key="i" class="border rounded-xl p-2.5 sm:p-4 animate-pulse">
+        <div class="h-3.5 sm:h-4 bg-green-200 dark:bg-gray-700 rounded w-2/3 mb-1.5 sm:mb-2"></div>
+        <div class="h-2.5 sm:h-3 bg-green-200 dark:bg-gray-700 rounded w-1/2 mb-1.5 sm:mb-2"></div>
+        <div class="h-2.5 sm:h-3 bg-green-200 dark:bg-gray-700 rounded w-1/3"></div>
       </div>
     </div>
 
-    <div v-else-if="error" class="text-red-500 text-sm">{{ error }}</div>
+    <div v-else-if="error" class="text-red-500 text-xs sm:text-sm">{{ error }}</div>
 
     <div v-else>
-      <div v-if="filtered.length === 0" class="text-center py-8 sm:py-10">
-        <Icon name="mdi:forum-outline" class="text-3xl sm:text-4xl mx-auto mb-2 text-gray-300 dark:text-gray-600" />
-        <p class="text-sm text-gray-500">Belum ada forum. Mulai diskusi interaktif pertamamu!</p>
+      <div v-if="filtered.length === 0" class="text-center py-6 sm:py-10">
+        <Icon name="mdi:forum-outline" class="text-3xl sm:text-4xl mx-auto mb-1.5 sm:mb-2 text-gray-300 dark:text-gray-600" />
+        <p class="text-xs sm:text-sm text-gray-500">Belum ada forum. Mulai diskusi interaktif pertamamu!</p>
       </div>
 
-      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
         <div
           v-for="forum in filtered"
           :key="forum.id"
           class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden flex flex-col shadow-sm hover:shadow-md hover:border-green-400 transition cursor-pointer group"
           @click="openForum(forum)">
           <!-- Header stripe -->
-          <div class="h-1.5 sm:h-2" :class="statusColor(forum.status)" />
+          <div class="h-1 sm:h-1.5" :class="statusColor(forum.status)" />
 
           <!-- Body -->
-          <div class="p-2.5 sm:p-4 flex flex-col flex-1">
+          <div class="p-2 sm:p-4 flex flex-col flex-1">
             <!-- Badges + title -->
-            <div class="flex items-start justify-between gap-2">
+            <div class="flex items-start justify-between gap-1.5 sm:gap-2">
               <div class="flex flex-wrap items-center gap-1 sm:gap-1.5 min-w-0">
-                <Icon v-if="forum.is_pinned" name="mdi:pin" class="text-red-500 shrink-0 w-3 h-3 sm:w-3.5 sm:h-3.5" title="Disematkan" />
-                <span class="text-[9px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide shrink-0"
+                <Icon v-if="forum.is_pinned" name="mdi:pin" class="text-red-500 shrink-0 w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" title="Disematkan" />
+                <span class="text-[8px] sm:text-[11px] px-1 sm:px-2 py-px sm:py-0.5 rounded-full font-semibold uppercase tracking-wide shrink-0"
                   :class="typeBadge(forum.type).class">{{ typeBadge(forum.type).label }}</span>
-                <span class="text-[9px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide shrink-0"
+                <span class="text-[8px] sm:text-[11px] px-1 sm:px-2 py-px sm:py-0.5 rounded-full font-semibold uppercase tracking-wide shrink-0"
                   :class="statusBadge(forum.status).class">{{ statusBadge(forum.status).label }}</span>
               </div>
               <button
                 v-if="forum.can_manage"
                 @click.stop="deleteForum(forum)"
-                class="w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-full text-red-500 hover:bg-red-100 dark:hover:bg-gray-700 transition shrink-0 sm:opacity-0 sm:group-hover:opacity-100"
+                class="w-5 h-5 sm:w-7 sm:h-7 flex items-center justify-center rounded-full text-red-500 hover:bg-red-100 dark:hover:bg-gray-700 transition shrink-0 sm:opacity-0 sm:group-hover:opacity-100"
                 title="Hapus forum">
-                <Icon name="material-symbols:delete-rounded" class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <Icon name="material-symbols:delete-rounded" class="w-3 h-3 sm:w-4 sm:h-4" />
               </button>
             </div>
 
-            <h3 class="mt-1.5 sm:mt-2 font-semibold text-xs sm:text-base text-gray-800 dark:text-white group-hover:text-green-600 line-clamp-2">
+            <h3 class="mt-1 sm:mt-2 font-semibold text-[11px] sm:text-base text-gray-800 dark:text-white group-hover:text-green-600 line-clamp-2 leading-snug">
               {{ forum.title }}
             </h3>
 
             <!-- Author + date -->
-            <div class="mt-1 flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 flex-wrap">
+            <div class="mt-0.5 sm:mt-1 flex items-center gap-0.5 sm:gap-1 text-[9px] sm:text-xs text-gray-500 flex-wrap">
               <span class="font-medium text-green-600 dark:text-green-400">{{ forum.author_name }}</span>
               <span>·</span>
               <span>{{ formatDate(forum.created_at) }}</span>
-              <template v-if="forum.course_name"><span>·</span><span class="truncate max-w-[80px]">{{ forum.course_name }}</span></template>
+              <template v-if="forum.course_name"><span>·</span><span class="truncate max-w-[70px] sm:max-w-[80px]">{{ forum.course_name }}</span></template>
             </div>
 
             <!-- Presentation group -->
-            <span v-if="forum.presentation_group_name" class="inline-flex items-center gap-1 mt-1 text-[10px] sm:text-xs text-purple-600 dark:text-purple-400">
-              <Icon name="mdi:microphone-outline" class="w-3 h-3" /> {{ forum.presentation_group_name }}
+            <span v-if="forum.presentation_group_name" class="inline-flex items-center gap-0.5 sm:gap-1 mt-0.5 sm:mt-1 text-[9px] sm:text-xs text-purple-600 dark:text-purple-400">
+              <Icon name="mdi:microphone-outline" class="w-2.5 h-2.5 sm:w-3 sm:h-3" /> {{ forum.presentation_group_name }}
             </span>
 
             <!-- Description -->
-            <p v-if="forum.description" class="text-[11px] sm:text-sm text-gray-600 dark:text-gray-300 mt-1 sm:mt-1.5 line-clamp-2 leading-relaxed">{{ forum.description }}</p>
+            <p v-if="forum.description" class="text-[10px] sm:text-sm text-gray-600 dark:text-gray-300 mt-0.5 sm:mt-1.5 line-clamp-2 leading-relaxed">{{ forum.description }}</p>
 
             <!-- Spacer -->
             <div class="flex-1" />
 
             <!-- Stats -->
-            <div class="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-[10px] sm:text-xs text-gray-500">
-              <div class="flex items-center gap-2 sm:gap-3">
+            <div class="mt-1.5 sm:mt-3 pt-1.5 sm:pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-[9px] sm:text-xs text-gray-500">
+              <div class="flex items-center gap-1.5 sm:gap-3">
                 <span class="flex items-center gap-0.5 sm:gap-1" title="Postingan">
-                  <Icon name="mdi:message-text-outline" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-green-500" /> {{ forum.posts_count }}
+                  <Icon name="mdi:message-text-outline" class="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-green-500" /> {{ forum.posts_count }}
                 </span>
                 <span class="flex items-center gap-0.5 sm:gap-1" title="Balasan">
-                  <Icon name="mdi:comment-outline" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-green-500" /> {{ forum.replies_count }}
+                  <Icon name="mdi:comment-outline" class="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-green-500" /> {{ forum.replies_count }}
                 </span>
                 <span class="flex items-center gap-0.5 sm:gap-1" title="Reaksi">
-                  <Icon name="mdi:heart-outline" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-green-500" /> {{ forum.reactions_count }}
+                  <Icon name="mdi:heart-outline" class="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-green-500" /> {{ forum.reactions_count }}
                 </span>
               </div>
               <span v-if="forum.participants_count" class="flex items-center gap-0.5 sm:gap-1" title="Peserta">
-                <Icon name="mdi:account-group-outline" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-green-500" /> {{ forum.participants_count }}
+                <Icon name="mdi:account-group-outline" class="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-green-500" /> {{ forum.participants_count }}
               </span>
             </div>
           </div>

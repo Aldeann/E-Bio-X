@@ -49,77 +49,77 @@
       </div>
 
       <!-- loading -->
-      <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        <div v-for="i in 4" :key="i" class="border rounded-xl p-3 sm:p-4 animate-pulse">
-          <div class="h-4 bg-green-200 dark:bg-gray-700 rounded w-2/3 mb-2"></div>
-          <div class="h-3 bg-green-200 dark:bg-gray-700 rounded w-1/2 mb-2"></div>
-          <div class="h-3 bg-green-200 dark:bg-gray-700 rounded w-1/3"></div>
+      <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+        <div v-for="i in 4" :key="i" class="border rounded-xl p-2.5 sm:p-4 animate-pulse">
+          <div class="h-3.5 sm:h-4 bg-green-200 dark:bg-gray-700 rounded w-2/3 mb-1.5 sm:mb-2"></div>
+          <div class="h-2.5 sm:h-3 bg-green-200 dark:bg-gray-700 rounded w-1/2 mb-1.5 sm:mb-2"></div>
+          <div class="h-2.5 sm:h-3 bg-green-200 dark:bg-gray-700 rounded w-1/3"></div>
         </div>
       </div>
 
-      <div v-else-if="error" class="text-red-500 text-sm">{{ error }}</div>
+      <div v-else-if="error" class="text-red-500 text-xs sm:text-sm">{{ error }}</div>
 
       <!-- recommended -->
-      <div v-if="role === 'student' && recommended.length" class="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-xl p-3 sm:p-4">
-        <h3 class="font-semibold text-green-700 dark:text-green-400 flex items-center gap-2 mb-2 sm:mb-3 text-sm sm:text-base">
+      <div v-if="role === 'student' && recommended.length" class="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-xl p-2.5 sm:p-4">
+        <h3 class="font-semibold text-green-700 dark:text-green-400 flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-3 text-xs sm:text-base">
           <Icon name="mdi:star-outline" /> Direkomendasikan Untukmu
         </h3>
-        <div class="space-y-2">
+        <div class="space-y-1.5 sm:space-y-2">
           <button v-for="f in recommended" :key="f.id" @click="openForum(f)"
-            class="w-full flex items-center justify-between gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-white dark:bg-gray-900 border border-green-200 dark:border-green-800 hover:shadow transition text-left">
+            class="w-full flex items-center justify-between gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-white dark:bg-gray-900 border border-green-200 dark:border-green-800 hover:shadow transition text-left">
             <div class="min-w-0">
-              <p class="font-medium text-gray-800 dark:text-white truncate text-sm">{{ f.title }}</p>
-              <p class="text-[10px] sm:text-xs text-gray-500">{{ f.author_name }} · {{ f.replies_count }} balasan</p>
+              <p class="font-medium text-gray-800 dark:text-white truncate text-xs sm:text-sm">{{ f.title }}</p>
+              <p class="text-[9px] sm:text-xs text-gray-500">{{ f.author_name }} · {{ f.replies_count }} balasan</p>
             </div>
-            <span class="text-green-600 shrink-0"><Icon name="mdi:arrow-right" /></span>
+            <span class="text-green-600 shrink-0"><Icon name="mdi:arrow-right" class="w-4 h-4 sm:w-5 sm:h-5" /></span>
           </button>
         </div>
       </div>
 
       <!-- list -->
-      <div v-else-if="forums.length === 0" class="text-center py-8 sm:py-10">
-        <Icon name="mdi:forum-outline" class="text-4xl sm:text-5xl mx-auto mb-2 sm:mb-3 text-gray-300 dark:text-gray-600" />
-        <p class="text-sm text-gray-500">Tidak ada forum ditemukan.</p>
+      <div v-else-if="forums.length === 0" class="text-center py-6 sm:py-10">
+        <Icon name="mdi:forum-outline" class="text-3xl sm:text-5xl mx-auto mb-1.5 sm:mb-3 text-gray-300 dark:text-gray-600" />
+        <p class="text-xs sm:text-sm text-gray-500">Tidak ada forum ditemukan.</p>
       </div>
 
-      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
         <button v-for="f in forums" :key="f.id" @click="openForum(f)"
           class="w-full text-left rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden flex flex-col shadow-sm hover:shadow-md hover:border-green-400 transition group">
           <!-- Header stripe -->
-          <div class="h-1.5 sm:h-2" :class="statusColor(f.status)" />
+          <div class="h-1 sm:h-1.5" :class="statusColor(f.status)" />
 
           <!-- Body -->
-          <div class="p-2.5 sm:p-4 flex flex-col flex-1">
+          <div class="p-2 sm:p-4 flex flex-col flex-1">
             <!-- Badges -->
             <div class="flex items-center gap-1 sm:gap-1.5 flex-wrap">
-              <Icon v-if="f.is_pinned" name="mdi:pin" class="text-red-500 shrink-0 w-3 h-3 sm:w-3.5 sm:h-3.5" />
-              <span class="text-[9px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full font-semibold uppercase shrink-0" :class="typeBadge(f.type).class">{{ typeBadge(f.type).label }}</span>
-              <span class="text-[9px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full font-semibold uppercase shrink-0" :class="statusBadge(f.status).class">{{ statusBadge(f.status).label }}</span>
+              <Icon v-if="f.is_pinned" name="mdi:pin" class="text-red-500 shrink-0 w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" />
+              <span class="text-[8px] sm:text-[11px] px-1 sm:px-2 py-px sm:py-0.5 rounded-full font-semibold uppercase shrink-0" :class="typeBadge(f.type).class">{{ typeBadge(f.type).label }}</span>
+              <span class="text-[8px] sm:text-[11px] px-1 sm:px-2 py-px sm:py-0.5 rounded-full font-semibold uppercase shrink-0" :class="statusBadge(f.status).class">{{ statusBadge(f.status).label }}</span>
             </div>
 
-            <h3 class="mt-1.5 sm:mt-2 font-semibold text-xs sm:text-base text-gray-800 dark:text-white group-hover:text-green-600 line-clamp-2">
+            <h3 class="mt-1 sm:mt-2 font-semibold text-[11px] sm:text-base text-gray-800 dark:text-white group-hover:text-green-600 line-clamp-2 leading-snug">
               {{ f.title }}
             </h3>
 
             <!-- Author + date -->
-            <div class="mt-1 flex items-center gap-1 text-[10px] sm:text-xs text-gray-500 flex-wrap">
+            <div class="mt-0.5 sm:mt-1 flex items-center gap-0.5 sm:gap-1 text-[9px] sm:text-xs text-gray-500 flex-wrap">
               <span class="font-medium text-green-600 dark:text-green-400">{{ f.author_name }}</span>
               <span>·</span>
               <span>{{ formatDate(f.created_at) }}</span>
-              <template v-if="f.course_name"><span>·</span><span class="truncate max-w-[80px]">{{ f.course_name }}</span></template>
+              <template v-if="f.course_name"><span>·</span><span class="truncate max-w-[70px] sm:max-w-[80px]">{{ f.course_name }}</span></template>
             </div>
 
             <!-- Description -->
-            <p v-if="f.description" class="text-[11px] sm:text-sm text-gray-600 dark:text-gray-300 mt-1 sm:mt-1.5 line-clamp-2 leading-relaxed">{{ f.description }}</p>
+            <p v-if="f.description" class="text-[10px] sm:text-sm text-gray-600 dark:text-gray-300 mt-0.5 sm:mt-1.5 line-clamp-2 leading-relaxed">{{ f.description }}</p>
 
             <!-- Spacer -->
             <div class="flex-1" />
 
             <!-- Stats -->
-            <div class="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs text-gray-500">
-              <span class="flex items-center gap-0.5 sm:gap-1"><Icon name="mdi:message-text-outline" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-green-500" /> {{ f.posts_count }}</span>
-              <span class="flex items-center gap-0.5 sm:gap-1"><Icon name="mdi:comment-outline" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-green-500" /> {{ f.replies_count }}</span>
-              <span class="flex items-center gap-0.5 sm:gap-1"><Icon name="mdi:heart-outline" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-green-500" /> {{ f.reactions_count }}</span>
+            <div class="mt-1.5 sm:mt-3 pt-1.5 sm:pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center gap-1.5 sm:gap-3 text-[9px] sm:text-xs text-gray-500">
+              <span class="flex items-center gap-0.5 sm:gap-1"><Icon name="mdi:message-text-outline" class="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-green-500" /> {{ f.posts_count }}</span>
+              <span class="flex items-center gap-0.5 sm:gap-1"><Icon name="mdi:comment-outline" class="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-green-500" /> {{ f.replies_count }}</span>
+              <span class="flex items-center gap-0.5 sm:gap-1"><Icon name="mdi:heart-outline" class="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-green-500" /> {{ f.reactions_count }}</span>
             </div>
           </div>
         </button>
