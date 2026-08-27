@@ -1,10 +1,57 @@
 <template>
   <div class="container mx-auto px-4 py-6">
-    <div class="mb-6">
-      <h2 class="text-2xl font-semibold">Machine Learning Insights</h2>
-      <p class="text-sm text-gray-500">
-        Analisis penguasaan, profil belajar, dan rekomendasi berbasis data.
-      </p>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <div>
+        <h2 class="text-2xl font-semibold">Machine Learning Insights</h2>
+        <p class="text-sm text-gray-500">
+          Analisis penguasaan, profil belajar, dan rekomendasi berbasis data.
+        </p>
+      </div>
+      <button
+        @click="trainModel"
+        :disabled="training"
+        class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition shrink-0"
+        :class="training
+          ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
+          : 'bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-300/50'"
+      >
+        <Icon :name="training ? 'mdi:loading' : 'mdi:brain'" class="w-4 h-4" :class="training && 'animate-spin'" />
+        {{ training ? "Melatih Model..." : "Latih / Retrain Model" }}
+      </button>
+    </div>
+
+    <div v-if="trainResult" class="mb-6 p-4 rounded-xl border text-sm"
+      :class="trainResult.success
+        ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300'
+        : 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'"
+    >
+      <div class="flex items-start gap-2">
+        <Icon :name="trainResult.success ? 'mdi:check-circle' : 'mdi:alert-circle'" class="w-5 h-5 shrink-0 mt-0.5" />
+        <div>
+          <p class="font-semibold">{{ trainResult.success ? "Training Berhasil" : "Training Gagal" }}</p>
+          <p v-if="trainResult.message" class="mt-1">{{ trainResult.message }}</p>
+          <div v-if="trainResult.details" class="mt-2 space-y-1 text-xs">
+            <p v-if="trainResult.details.decision_tree">
+              Decision Tree: <b>{{ trainResult.details.decision_tree.status }}</b>
+              <template v-if="trainResult.details.decision_tree.training_sample_count">
+                · {{ trainResult.details.decision_tree.training_sample_count }} sampel
+              </template>
+              <template v-if="trainResult.details.decision_tree.metrics?.accuracy">
+                · Accuracy: {{ trainResult.details.decision_tree.metrics.accuracy }}
+              </template>
+            </p>
+            <p v-if="trainResult.details.kmeans">
+              K-Means: <b>{{ trainResult.details.kmeans.status }}</b>
+              <template v-if="trainResult.details.kmeans.training_sample_count">
+                · {{ trainResult.details.kmeans.training_sample_count }} sampel
+              </template>
+              <template v-if="trainResult.details.kmeans.silhouette">
+                · Silhouette: {{ trainResult.details.kmeans.silhouette }}
+              </template>
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div v-if="loading" class="text-center py-16 text-green-600">
@@ -200,6 +247,8 @@ const toast = useToast();
 
 const data = ref(null);
 const loading = ref(true);
+const training = ref(false);
+const trainResult = ref(null);
 
 const modelVersion = computed(() => (data.value?.model?.model_version || "-"));
 
@@ -242,6 +291,26 @@ const load = async () => {
     toast.add({ title: "Gagal memuat insights", color: "red" });
   } finally {
     loading.value = false;
+  }
+};
+
+const trainModel = async () => {
+  training.value = true;
+  trainResult.value = null;
+  try {
+    const res = await $fetch(`${config.public.backend}/api/ml/train`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    trainResult.value = { success: true, ...res };
+    toast.add({ title: "Model berhasil dilatih!", color: "green" });
+    await load();
+  } catch (e) {
+    const msg = e?.data?.error || e?.data?.message || "Training gagal. Pastikan ada data aktivitas siswa yang cukup.";
+    trainResult.value = { success: false, message: msg };
+    toast.add({ title: msg, color: "red" });
+  } finally {
+    training.value = false;
   }
 };
 
