@@ -14,6 +14,13 @@
 #   learning_sessions / state total seconds      -> learning_minutes
 #   submissions count                            -> quiz_attempts
 #   (interactive + quiz) correct / answered      -> correct_rate
+#   forum_posts (no parent)                      -> forum_posts_count
+#   forum_posts (with parent)                    -> forum_replies_count
+#   forum_questions (questioner)                 -> forum_questions_asked
+#   forum_answers (presenter)                    -> forum_answers_given
+#   forum_reactions on student posts             -> forum_reactions_received
+#   quiz_explanations (viewable statuses)        -> ai_explanations_viewed
+#   quiz_explanations (feedback.helpful=true)    -> ai_explanations_helpful
 # ============================================================
 from src.models.material_section import MaterialSection
 from src.models.material_progress import MaterialProgress
@@ -107,6 +114,34 @@ def aggregate_student_features(student):
     answered_correct = ia_correct + quiz_correct
     correct_rate = (answered_correct / answered_total) if answered_total else 0.0
 
+    # ---- forum activity ------------------------------------------
+    from src.models.forum import ForumPost, ForumQuestion, ForumAnswer, ForumReaction
+    forum_posts = ForumPost.query.filter_by(
+        author_id=student.id, deleted_at=None).filter(
+        ForumPost.parent_id.is_(None)).count()
+    forum_replies = ForumPost.query.filter_by(
+        author_id=student.id, deleted_at=None).filter(
+        ForumPost.parent_id.isnot(None)).count()
+    forum_questions = ForumQuestion.query.filter_by(questioner_id=student.id).count()
+    forum_answers = ForumAnswer.query.filter_by(presenter_id=student.id).count()
+
+    # reactions received on student's posts
+    student_post_ids = [p.id for p in ForumPost.query.filter_by(
+        author_id=student.id, deleted_at=None).with_entities(ForumPost.id).all()]
+    forum_reactions = ForumReaction.query.filter(
+        ForumReaction.post_id.in_(student_post_ids)).count() if student_post_ids else 0
+
+    # ---- AI explanation interactions ------------------------------
+    from src.models.quiz_explanation import QuizExplanation
+    STUDENT_VIEWABLE = ('APPROVED', 'TEACHER_APPROVED')
+    explanation_rows = QuizExplanation.query.filter_by(student_id=student.id).filter(
+        QuizExplanation.status.in_(STUDENT_VIEWABLE)).all()
+    ai_explanations_viewed = len(explanation_rows)
+    ai_explanations_helpful = sum(
+        1 for e in explanation_rows
+        if isinstance(e.feedback_summary, dict) and e.feedback_summary.get('helpful')
+    )
+
     return {
         cfg.ID_COLUMN: student.id,
         'material_completion_rate': round(material_completion_rate, 4),
@@ -120,6 +155,13 @@ def aggregate_student_features(student):
         'learning_minutes': round(learning_minutes, 2),
         'quiz_attempts': quiz_attempts,
         'correct_rate': round(correct_rate, 4),
+        'forum_posts_count': forum_posts,
+        'forum_replies_count': forum_replies,
+        'forum_questions_asked': forum_questions,
+        'forum_answers_given': forum_answers,
+        'forum_reactions_received': forum_reactions,
+        'ai_explanations_viewed': ai_explanations_viewed,
+        'ai_explanations_helpful': ai_explanations_helpful,
     }
 
 

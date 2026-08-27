@@ -9,6 +9,7 @@ from src.models.student_content_track import StudentContentTrack
 from src.controllers.material_controller import _can_student_access
 from src.config.database import db
 from src.services import learning_analytics_service as analytics
+from src.ml import ml_config as ml_cfg
 from datetime import datetime
 
 
@@ -97,7 +98,32 @@ def log_material_event(material_id):
         db.session.rollback()
         return jsonify({'error': f'Gagal mencatat aktivitas: {str(e)}'}), 500
 
+    _maybe_auto_retrain()
     return jsonify({'message': 'Aktivitas tercatat', 'activity_id': activity.id}), 201
+
+
+def _maybe_auto_retrain():
+    """Trigger background ML retrain if enough new activities since last training."""
+    import threading
+    from src.models.learning_activity import LearningActivity
+    from src.models.ml_model import MlModel
+
+    last_model = MlModel.query.filter_by(
+        model_type='decision_tree').order_by(MlModel.trained_at.desc()).first()
+    since = last_model.trained_at if last_model else datetime.min
+    new_count = LearningActivity.query.filter(
+        LearningActivity.created_at > since).count()
+    if new_count < ml_cfg.AUTO_RETRAIN_THRESHOLD:
+        return
+
+    def _bg_train():
+        try:
+            from src.controllers.ml_controller import _train_pipeline
+            _train_pipeline()
+        except Exception:
+            pass
+
+    threading.Thread(target=_bg_train, daemon=True).start()
 
 
 @jwt_required()

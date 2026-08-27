@@ -130,14 +130,23 @@ def recommend_for_student(student, student_row=None, model_version=None, fallbac
     """Generate scored recommendations for the student (ML-aware or fallback)."""
     materials = analytics.student_accessible_materials(student)
     results = []
+    all_mastered = True
+
     for material in materials:
         m = _material_metrics(student, material,
                               student_row or {k: 0.0 for k in cfg.FEATURES})
-        if m['mastery'] >= cfg.HIGH_MASTERY_CUTOFF:
-            continue  # already mastered very high
+        if m['mastery'] < cfg.HIGH_MASTERY_CUTOFF:
+            all_mastered = False
         m['score'] = score_material(m)
         m['reasons'] = _reasons_for(m, student_row or {})
         results.append(m)
+
+    if not all_mastered:
+        results = [r for r in results if r['mastery'] < cfg.HIGH_MASTERY_CUTOFF]
+    else:
+        for r in results:
+            r['score'] = round(r['score'] * 0.5, 4)
+            r['reasons'] = ['Materi sudah dikuasai. Ini adalah pengulangan untuk mempertahankan penguasaan.']
 
     results.sort(key=lambda x: (-x['score'], x['material_id']))
     results = results[:cfg.REC_MAX_RESULTS]

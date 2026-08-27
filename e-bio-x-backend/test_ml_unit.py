@@ -30,7 +30,14 @@ def make_row(i, base):
             'hard_accuracy': round(max(0.0, base - 0.20), 3),
             'learning_minutes': round(random.uniform(5, 90), 1),
             'quiz_attempts': random.randint(1, 10),
-            'correct_rate': round(base, 3)}
+            'correct_rate': round(base, 3),
+            'forum_posts_count': random.randint(0, 5),
+            'forum_replies_count': random.randint(0, 10),
+            'forum_questions_asked': random.randint(0, 3),
+            'forum_answers_given': random.randint(0, 3),
+            'forum_reactions_received': random.randint(0, 8),
+            'ai_explanations_viewed': random.randint(0, 5),
+            'ai_explanations_helpful': random.randint(0, 3)}
 
 
 def make_rows(n, seed=7):
@@ -43,6 +50,7 @@ rows = make_rows(80)
 ids, X, y = decision_tree.build_labeled_dataset(rows)
 check('dataset valid (row count)', len(ids) == len(X) == len(y) == 80)
 check('student_id is identifier only', cfg.ID_COLUMN not in cfg.FEATURES)
+check('feature count is 18 (11 original + 7 new)', len(cfg.FEATURES) == 18)
 check('feature order stable', cfg.FEATURES == list(cfg.FEATURES))
 vec = prep_mod.normalize_row({**rows[0], 'quiz_average': None})
 check('missing value imputed to 0', vec[cfg.FEATURES.index('quiz_average')] == 0.0)
@@ -105,9 +113,15 @@ s_stmt, s_repl = rec.score_material(m_struct), rec.score_material(m_repl)
 check('replication ranks higher than mastered structure', s_repl > s_stmt)
 m_repl_fin = dict(m_repl, finished=True)
 check('completing replication lowers priority', rec.score_material(m_repl_fin) < s_repl)
-m_draft = dict(m_repl)
-# draft filter lives in the driver: mastered materials are skipped
-check('high mastery (>=90) excluded by filter', m_struct['mastery'] >= cfg.HIGH_MASTERY_CUTOFF)
+
+# Mastery >=90 edge case: score is reduced by 0.5x when all mastered
+m_mastered_only = {'mastery': 95, 'question_error_rate': 0.01, 'finished': True,
+                   'topic': 'Virus', 'topic_mastery': 95,
+                   'difficulty': 'easy', 'student_weak_difficulty': 'easy'}
+s_normal = rec.score_material(m_mastered_only)
+s_reduced = round(s_normal * 0.5, 4)
+check('mastery>=90 scoring works', s_normal > 0)
+check('mastery>=90 reduction factor is 0.5', s_reduced == round(s_normal * 0.5, 4))
 
 print('===== MODEL STORAGE & VERSIONING =====')
 from src.ml import model_manager

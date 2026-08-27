@@ -20,6 +20,13 @@ FEATURES = [
     'learning_minutes',
     'quiz_attempts',
     'correct_rate',
+    'forum_posts_count',
+    'forum_replies_count',
+    'forum_questions_asked',
+    'forum_answers_given',
+    'forum_reactions_received',
+    'ai_explanations_viewed',
+    'ai_explanations_helpful',
 ]
 
 # Features used by K-Means clustering (subset of FEATURES).
@@ -96,6 +103,9 @@ REC_MAX_RESULTS = 5
 REC_MIN_SCORE = 0.10
 HIGH_MASTERY_CUTOFF = 90        # materials above this are considered mastered
 FALLBACK_RESULTS = 5
+
+# --- Auto-retrain -------------------------------------------------
+AUTO_RETRAIN_THRESHOLD = 50   # new activities since last training to trigger auto-retrain
 
 # --- Storage ------------------------------------------------------
 _BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
