@@ -46,6 +46,7 @@ def create_app():
         get_teacher_quizzes, create_quiz_teacher, get_teacher_quiz, update_quiz_teacher,
         set_quiz_status, delete_quiz_teacher, add_quiz_question, update_quiz_question,
         delete_quiz_question, duplicate_quiz_question, reorder_quiz_questions,
+        upload_quiz_question_image,
         get_question_bank, create_question_bank, update_question_bank, delete_question_bank,
         get_quiz_analytics,
         get_student_quizzes, get_student_quiz, start_student_attempt, get_student_attempt,
@@ -171,6 +172,7 @@ def create_app():
     app.add_url_rule('/api/teacher/quizzes/<quiz_id>/publish', view_func=set_quiz_status, methods=['POST'])
     app.add_url_rule('/api/teacher/quizzes/<quiz_id>/questions', view_func=add_quiz_question, methods=['POST'])
     app.add_url_rule('/api/teacher/quizzes/<quiz_id>/questions/reorder', view_func=reorder_quiz_questions, methods=['POST'])
+    app.add_url_rule('/api/teacher/quiz-image-upload', view_func=upload_quiz_question_image, methods=['POST'])
     app.add_url_rule('/api/teacher/quizzes/<quiz_id>/analytics', view_func=get_quiz_analytics, methods=['GET'])
     app.add_url_rule('/api/questions/<question_id>', view_func=update_quiz_question, methods=['PUT'])
     app.add_url_rule('/api/questions/<question_id>', view_func=delete_quiz_question, methods=['DELETE'])

@@ -12,6 +12,7 @@ class Question(db.Model):
     explanation = db.Column(db.Text, nullable=True)
     points = db.Column(db.Integer, nullable=False, default=10)
     order_index = db.Column(db.Integer, nullable=False, default=0)
+    image_url = db.Column(db.Text, nullable=True)
     bank_question_id = db.Column(db.Integer, db.ForeignKey('question_bank.id'), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=True)

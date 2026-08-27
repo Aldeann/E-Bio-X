@@ -12,6 +12,12 @@
     </div>
 
     <p class="font-medium">{{ question.text }}</p>
+    <img
+      v-if="question.image_url"
+      :src="question.image_url"
+      alt="Gambar soal"
+      class="mt-3 max-h-60 rounded-lg border border-gray-200 dark:border-gray-700 mx-auto"
+    />
 
     <div class="mt-4 space-y-2.5">
       <button

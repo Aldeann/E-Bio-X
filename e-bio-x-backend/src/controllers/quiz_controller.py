@@ -1,6 +1,7 @@
 from flask import request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy import func
+from werkzeug.utils import secure_filename
 from src.models.user import User
 from src.models.quiz import Quiz
 from src.models.question import Question
@@ -10,6 +11,7 @@ from src.models.answer import Answer
 from src.models.enrollment import Enrollment
 from src.models.course import Course
 from src.config.database import db
+from src.services import storage_service
 
 
 def _legacy_user():
@@ -619,6 +621,7 @@ def _serialize_question_teacher(q):
         'points': q.points,
         'order_index': q.order_index,
         'bank_question_id': q.bank_question_id,
+        'image_url': storage_service.out_url(q.image_url) if q.image_url else None,
         'options': options,
     }
 
@@ -675,6 +678,7 @@ def _validate_question_payload(data, bank=False):
         'difficulty': difficulty,
         'explanation': (data.get('explanation') or '').strip() or None,
         'points': points,
+        'image_url': data.get('image_url'),
         'options': options,
     }, None
 
@@ -925,6 +929,7 @@ def add_quiz_question(quiz_id):
             difficulty=bank.difficulty,
             explanation=bank.explanation,
             points=bank.points,
+            image_url=bank.image_url,
             order_index=next_order,
             bank_question_id=bank.id,
             created_at=datetime.utcnow(),
@@ -949,6 +954,7 @@ def add_quiz_question(quiz_id):
             difficulty=validated['difficulty'],
             explanation=validated['explanation'],
             points=validated['points'],
+            image_url=validated.get('image_url'),
             order_index=next_order,
             created_at=datetime.utcnow(),
         )
@@ -982,6 +988,8 @@ def update_quiz_question(question_id):
     question.difficulty = validated['difficulty']
     question.explanation = validated['explanation']
     question.points = validated['points']
+    if 'image_url' in data:
+        question.image_url = data['image_url']
     question.updated_at = datetime.utcnow()
     _apply_options(question, validated['options'])
     question.quiz.updated_at = datetime.utcnow()
@@ -1027,6 +1035,7 @@ def duplicate_quiz_question(question_id):
         difficulty=source.difficulty,
         explanation=source.explanation,
         points=source.points,
+        image_url=source.image_url,
         order_index=next_order,
         bank_question_id=source.bank_question_id,
         created_at=datetime.utcnow(),
@@ -1062,6 +1071,42 @@ def reorder_quiz_questions(quiz_id):
     return jsonify({'message': 'Urutan soal diperbarui'}), 200
 
 
+@jwt_required()
+def upload_quiz_question_image():
+    user = _cur_user()
+    if not _is_teacher(user):
+        return jsonify({'error': 'Akses khusus guru'}), 403
+
+    file = request.files.get('file')
+    if not file or not file.filename:
+        return jsonify({'error': 'File gambar wajib diunggah'}), 400
+
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    from src.controllers.material_controller import _matches_signature
+    if not _matches_signature(file, ext):
+        return jsonify({'error': 'Konten file gambar tidak valid'}), 400
+
+    allowed = {'jpg', 'jpeg', 'png', 'webp', 'gif'}
+    if ext not in allowed:
+        return jsonify({'error': 'Gambar harus berupa JPG, PNG, WEBP, atau GIF'}), 400
+
+    from src.controllers.material_controller import _read_capped
+    MAX_IMAGE_SIZE = 10 * 1024 * 1024
+    data = _read_capped(file, MAX_IMAGE_SIZE)
+    if data is None:
+        return jsonify({'error': 'Ukuran gambar maksimal 10MB'}), 400
+
+    original_name = secure_filename(file.filename) or 'question.png'
+    key = storage_service.object_key('quiz', user.id, original_name)
+    try:
+        storage_service.put_bytes(key, data, storage_service.content_type_for(original_name))
+    except storage_service.StorageError as e:
+        print('Quiz image upload failed:', e)
+        return jsonify({'error': 'Gagal mengunggah gambar ke storage'}), 500
+
+    return jsonify({'url': storage_service.public_url(key)}), 201
+
+
 # ---------------- TEACHER: question bank ----------------
 
 def _serialize_bank(bq, times_used=None):
@@ -1073,6 +1118,7 @@ def _serialize_bank(bq, times_used=None):
         'difficulty': bq.difficulty,
         'explanation': bq.explanation,
         'points': bq.points,
+        'image_url': storage_service.out_url(bq.image_url) if bq.image_url else None,
         'times_used': times_used if times_used is not None else len(bq.quiz_questions),
         'created_at': bq.created_at.isoformat() if bq.created_at else None,
         'updated_at': bq.updated_at.isoformat() if bq.updated_at else None,
@@ -1140,6 +1186,7 @@ def create_question_bank():
         difficulty=validated['difficulty'],
         explanation=validated['explanation'],
         points=validated['points'],
+        image_url=validated.get('image_url'),
         created_at=datetime.utcnow(),
     )
     db.session.add(bq)
@@ -1175,6 +1222,8 @@ def update_question_bank(bank_id):
     bq.difficulty = validated['difficulty']
     bq.explanation = validated['explanation']
     bq.points = validated['points']
+    if 'image_url' in data:
+        bq.image_url = data['image_url']
     bq.updated_at = datetime.utcnow()
     for old in list(bq.options):
         db.session.delete(old)
@@ -1238,6 +1287,7 @@ def get_quiz_analytics(quiz_id):
             'question_type': q.question_type,
             'difficulty': q.difficulty,
             'points': q.points,
+            'image_url': storage_service.out_url(q.image_url) if q.image_url else None,
             'correct_rate': round(correct / attempts * 100, 1) if attempts else 0,
             'wrong_rate': round((answered - correct) / attempts * 100, 1) if attempts else 0,
             'unanswered': attempts - answered,
@@ -1285,6 +1335,7 @@ def _question_for_student(q, shuffle_options=False):
         'text': q.text,
         'difficulty': q.difficulty,
         'points': q.points,
+        'image_url': storage_service.out_url(q.image_url) if q.image_url else None,
         'options': [{'option_id': o.id, 'option_text': o.option_text} for o in opts],
     }
 
@@ -1358,6 +1409,7 @@ def _result_payload(quiz, submission, include_detail=False):
                 'text': q.text,
                 'difficulty': q.difficulty,
                 'points': q.points,
+                'image_url': storage_service.out_url(q.image_url) if q.image_url else None,
                 'selected_option_id': ans.option_id if ans else None,
                 'is_correct': bool(ans and ans.is_correct),
                 'points_earned': ans.points_earned if ans else 0,

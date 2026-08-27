@@ -49,6 +49,12 @@
                 {{ q.correct_rate }}% benar
               </span>
             </div>
+            <img
+              v-if="q.image_url"
+              :src="q.image_url"
+              alt="Gambar soal"
+              class="mt-2 max-h-48 rounded-lg border border-gray-200 dark:border-gray-700"
+            />
             <div class="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
               <div class="flex-1 h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
                 <div

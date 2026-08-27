@@ -20,6 +20,12 @@
       </div>
 
       <p class="mt-2 font-medium">{{ q.text }}</p>
+      <img
+        v-if="q.image_url"
+        :src="q.image_url"
+        alt="Gambar soal"
+        class="mt-3 max-h-48 rounded-lg border border-gray-200 dark:border-gray-700"
+      />
 
       <div class="mt-3 space-y-1.5 text-sm">
         <div

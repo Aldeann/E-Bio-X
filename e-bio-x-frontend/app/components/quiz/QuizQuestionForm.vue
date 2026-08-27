@@ -61,6 +61,49 @@
         </div>
 
         <div>
+          <label class="block text-sm font-medium mb-1">Gambar Soal (opsional)</label>
+          <div
+            class="flex items-center gap-3 p-3 rounded-lg border border-dashed border-gray-300 dark:border-gray-600"
+            :class="uploading ? 'opacity-50 pointer-events-none' : ''"
+          >
+            <img
+              v-if="form.image_url && !uploading"
+              :src="form.image_url"
+              alt="Pratinjau gambar soal"
+              class="w-24 h-24 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+            />
+            <div v-else-if="!form.image_url && !uploading" class="w-24 h-24 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+              <Icon name="material-symbols:image" class="w-8 h-8 text-gray-400" />
+            </div>
+            <div v-else class="w-24 h-24 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+              <Icon name="material-symbols:upload" class="w-8 h-8 text-gray-500 animate-pulse" />
+            </div>
+
+            <div class="flex-1 space-y-2">
+              <p class="text-xs text-gray-500">JPG, PNG, WEBP, atau GIF · maks 10MB</p>
+              <div class="flex flex-wrap gap-2">
+                <label
+                  class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-sm font-semibold cursor-pointer hover:bg-green-200 dark:hover:bg-green-900/60 transition"
+                >
+                  <Icon name="material-symbols:file-upload" class="w-4 h-4" />
+                  {{ form.image_url ? "Ganti Gambar" : "Unggah Gambar" }}
+                  <input type="file" accept="image/*" class="hidden" @change="onFileSelect" :disabled="uploading" />
+                </label>
+                <button
+                  v-if="form.image_url"
+                  type="button"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-50 dark:hover:bg-red-900/30 transition"
+                  @click="removeImage"
+                >
+                  <Icon name="material-symbols:delete" class="w-4 h-4" />
+                  Hapus
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
           <div class="flex items-center justify-between mb-2">
             <label class="block text-sm font-medium">Pilihan Jawaban *</label>
             <button
@@ -148,6 +191,7 @@ const token = useCookie("access_token").value;
 const toast = useToast();
 
 const form = ref(defaultForm());
+const uploading = ref(false);
 
 function defaultForm() {
   return {
@@ -156,6 +200,7 @@ function defaultForm() {
     difficulty: "medium",
     explanation: "",
     points: 10,
+    image_url: "",
     options: [
       { option_text: "", is_correct: false },
       { option_text: "", is_correct: false },
@@ -198,6 +243,7 @@ const fillFrom = (q) => {
   form.value.difficulty = q.difficulty || "medium";
   form.value.explanation = q.explanation || "";
   form.value.points = q.points || 10;
+  form.value.image_url = q.image_url || "";
   if (q.question_type === "true_false") {
     form.value.options = [
       { option_text: "Benar", is_correct: false },
@@ -219,6 +265,37 @@ const fillFrom = (q) => {
 
 const close = () => {
   emit("close");
+};
+
+const onFileSelect = async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) {
+    toast.add({ title: "Ukuran gambar maksimal 10MB", color: "red" });
+    e.target.value = "";
+    return;
+  }
+  uploading.value = true;
+  const fd = new FormData();
+  fd.append("file", file);
+  try {
+    const res = await $fetch(`${config.public.backend}/api/teacher/quiz-image-upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: fd,
+    });
+    form.value.image_url = res.url;
+    toast.add({ title: "Gambar berhasil diunggah", color: "green" });
+  } catch (err) {
+    toast.add({ title: err?.data?.error || "Gagal mengunggah gambar", color: "red" });
+  } finally {
+    uploading.value = false;
+    e.target.value = "";
+  }
+};
+
+const removeImage = () => {
+  form.value.image_url = "";
 };
 
 const save = async () => {
@@ -250,6 +327,7 @@ const save = async () => {
     difficulty: form.value.difficulty,
     explanation: form.value.explanation,
     points: Number(form.value.points) || 0,
+    image_url: form.value.image_url,
     options,
   };
 

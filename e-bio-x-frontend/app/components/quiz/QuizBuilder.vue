@@ -98,6 +98,12 @@
                 </span>
               </div>
               <p class="mt-2 font-medium">{{ q.question_text }}</p>
+              <img
+                v-if="q.image_url"
+                :src="q.image_url"
+                alt="Gambar soal"
+                class="mt-2 max-h-48 rounded-lg border border-gray-200 dark:border-gray-700"
+              />
               <ul class="mt-2 space-y-1 text-sm">
                 <li
                   v-for="o in q.options"

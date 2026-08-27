@@ -12,6 +12,7 @@ class QuestionBank(db.Model):
     difficulty = db.Column(db.String(10), nullable=False, default='medium')
     explanation = db.Column(db.Text, nullable=True)
     points = db.Column(db.Integer, nullable=False, default=10)
+    image_url = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=True)
 

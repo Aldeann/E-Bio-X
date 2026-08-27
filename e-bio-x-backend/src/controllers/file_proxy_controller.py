@@ -50,6 +50,39 @@ def _material_readable(material, user):
     return not linked or bool(linked & set(enrolled_ids))
 
 
+def _quiz_image_readable(question, user):
+    """A quiz question image is readable by: admin, the teacher who owns
+    the quiz/course, or a student enrolled in the linked course (so they can
+    see images while taking the quiz / reviewing results)."""
+    if user.role == 'admin':
+        return True
+    quiz = question.quiz
+    if quiz is None:
+        return False
+    if user.role == 'teacher':
+        from src.models.course import Course
+        if quiz.course_id:
+            c = Course.query.get(quiz.course_id)
+            if c and str(c.teacher_id) == str(user.id):
+                return True
+        if quiz.created_by == user.id:
+            return True
+        return False
+    # student: enrolled in the linked course (or accessible material)
+    if quiz.status != 'published':
+        return False
+    if quiz.course_id:
+        enrolled_ids = [e.course_id for e in
+                        Enrollment.query.filter_by(student_id=user.id).all()]
+        return quiz.course_id in enrolled_ids
+    if quiz.material_id:
+        from src.models.material import Material
+        material = Material.query.get(quiz.material_id)
+        if material:
+            return _material_readable(material, user)
+    return False
+
+
 def _resolve_access(key, user):
     """Returns (allowed, owner_material_or_None)."""
     canonical = storage_service.URL_PREFIX + key
@@ -84,6 +117,21 @@ def _resolve_access(key, user):
     # forum attachments / presentation files: any authenticated member-level access
     if forum_hit is not None:
         return True, None
+    # quiz question / option images
+    from src.models.question import Question
+    from src.models.question_bank import QuestionBank
+    qq = Question.query.filter(
+        (Question.image_url == canonical) |
+        (Question.image_url.like(f'%{key}'))).first()
+    bq = None
+    if qq is None:
+        bq = QuestionBank.query.filter(
+            (QuestionBank.image_url == canonical) |
+            (QuestionBank.image_url.like(f'%{key}'))).first()
+    if qq is not None:
+        return _quiz_image_readable(qq, user), qq
+    if bq is not None:
+        return (bq.teacher_id == user.id or user.role == 'admin'), bq
     # nothing matched — deny to prevent bucket enumeration
     return False, None
 
