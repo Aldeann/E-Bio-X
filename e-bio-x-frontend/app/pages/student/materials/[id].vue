@@ -135,11 +135,6 @@ const fetchDetail = async () => {
     if (last && detail.sections.some((s) => s.id === last)) listed.push(last);
     const first = detail.sections.length > 0 ? detail.sections[0].id : null;
     activeSectionId.value = listed.length ? listed[0] : first;
-
-    if (studentState.value?.completed && detail.sections.length > 0) {
-      showCompletion.value = true;
-      activeSectionId.value = studentState.value.last_section_id || detail.sections[0].id;
-    }
   } catch (e) {
     const msg = e && e.data && e.data.error ? e.data.error : "Materi tidak dapat diakses.";
     toast.add({ title: msg, color: "red" });
