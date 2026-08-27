@@ -32,7 +32,7 @@ const form = reactive({
   course_ids: [],
 });
 
-const phases = ["A", "B", "C", "D", "E", "F"];
+const phases = ["E", "F"];
 const classes = ["X", "XI", "XII"];
 const difficulties = [
   { value: "mudah", label: "Mudah" },
