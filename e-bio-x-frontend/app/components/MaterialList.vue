@@ -124,58 +124,99 @@
       </NuxtLink>
     </div>
 
-    <!-- TEACHER: List Layout (existing) -->
-    <div v-else class="space-y-3 sm:space-y-4">
+    <!-- TEACHER: Card Grid -->
+    <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
       <div
         v-for="material in materials"
         :key="material.id"
-        class="p-3 sm:p-5 shadow-md bg-green-50 text-green-700 rounded-xl hover:shadow-lg relative dark:shadow-green-200 dark:bg-gray-900 transition"
+        class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden flex flex-col shadow-sm hover:shadow-md hover:border-green-400 transition group"
       >
-        <button
-          @click="deleteMateri(material.id)"
-          class="absolute top-3 right-3 sm:top-4 sm:right-4 text-red-600 w-6 h-6 flex items-center justify-center hover:text-red-700"
-        >
-          <Icon name="material-symbols:delete-rounded" class="w-5 h-5" />
-        </button>
-        <div class="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-          <Icon name="material-symbols:menu-book-outline-rounded" class="text-green-500 text-xl sm:text-2xl shrink-0" />
-          <h3 class="text-base sm:text-lg font-semibold text-green-800 dark:text-green-500 line-clamp-1">{{ material.title }}</h3>
+        <!-- Thumbnail -->
+        <div class="h-24 sm:h-28 relative">
+          <img
+            v-if="material.thumbnail_url"
+            :src="material.thumbnail_url"
+            :alt="material.title"
+            loading="lazy"
+            class="w-full h-full object-cover"
+          />
+          <div v-else class="w-full h-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white">
+            <Icon name="material-symbols:menu-book" class="w-10 h-10 sm:w-12 sm:h-12" />
+          </div>
           <span
             v-if="material.status === 'draft'"
-            class="text-[9px] sm:text-[10px] uppercase font-bold px-1.5 sm:px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 shrink-0"
+            class="absolute top-2 right-2 px-2 py-0.5 text-[10px] uppercase font-bold rounded-full bg-amber-100 text-amber-700"
           >
-            draft
+            Draft
           </span>
-        </div>
-        <p class="text-gray-600 dark:text-gray-300 mb-2 sm:mb-3 text-xs sm:text-sm leading-relaxed line-clamp-2">
-          {{ material.description }}
-        </p>
-        <div class="flex items-center gap-2 sm:gap-3 mb-1 text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 flex-wrap">
-          <span>{{ material.uploaded_at }}</span>
-          <span
-            v-if="material.category === 'interactive'"
-            class="px-1.5 sm:px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300"
+          <button
+            @click.stop="deleteMateri(material.id)"
+            class="absolute top-2 left-2 w-7 h-7 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition opacity-0 group-hover:opacity-100"
+            title="Hapus materi"
           >
-            Interaktif · {{ material.section_count }} bagian
-          </span>
+            <Icon name="material-symbols:delete-rounded" class="w-4 h-4" />
+          </button>
         </div>
-        <NuxtLink
-          v-if="material.category === 'interactive'"
-          :to="`/teacher/materials/builder/${material.id}`"
-          class="inline-flex items-center gap-1.5 sm:gap-2 text-green-500 hover:text-green-800 font-medium transition text-sm"
-        >
-          <Icon name="material-symbols:auto-stories" class="text-base sm:text-lg" />
-          Buka Materi
-        </NuxtLink>
-        <a
-          v-else
-          :href="material.file_url"
-          target="_blank"
-          class="inline-flex items-center gap-1.5 sm:gap-2 text-green-500 hover:text-green-800 font-medium transition text-sm"
-        >
-          <Icon name="material-symbols:open-in-new-rounded" class="text-base sm:text-lg" />
-          Lihat Materi
-        </a>
+
+        <!-- Body -->
+        <div class="p-3 sm:p-4 flex flex-col flex-1">
+          <h3 class="font-semibold text-sm sm:text-base text-gray-800 dark:text-gray-100 group-hover:text-green-600 line-clamp-2">
+            {{ material.title }}
+          </h3>
+          <p class="text-xs sm:text-sm text-gray-500 mt-1 line-clamp-2 leading-relaxed">{{ material.description }}</p>
+
+          <!-- Meta badges -->
+          <div class="mt-2 sm:mt-3 flex flex-wrap gap-1.5 sm:gap-2 text-[10px] sm:text-xs">
+            <span v-if="material.subject" class="px-1.5 sm:px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
+              {{ material.subject }}
+            </span>
+            <span v-if="material.phase" class="px-1.5 sm:px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+              Fase {{ material.phase }}{{ material.class_level ? " · " + material.class_level : "" }}
+            </span>
+            <span
+              v-if="material.category === 'interactive'"
+              class="px-1.5 sm:px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300"
+            >
+              Interaktif · {{ material.section_count }} bagian
+            </span>
+          </div>
+
+          <!-- Meta info -->
+          <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] sm:text-xs text-gray-400">
+            <span v-if="material.topic" class="flex items-center gap-1">
+              <Icon name="material-symbols:category" class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <span class="truncate max-w-[140px]">{{ material.topic }}</span>
+            </span>
+            <span class="flex items-center gap-1">
+              <Icon name="material-symbols:schedule" class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              {{ material.uploaded_at }}
+            </span>
+          </div>
+
+          <!-- Spacer -->
+          <div class="flex-1" />
+
+          <!-- Action -->
+          <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+            <NuxtLink
+              v-if="material.category === 'interactive'"
+              :to="`/teacher/materials/builder/${material.id}`"
+              class="block w-full bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm px-3 py-2 rounded-lg text-center transition font-medium"
+            >
+              <Icon name="material-symbols:auto-stories" class="w-4 h-4 inline mr-1" />
+              Buka Materi
+            </NuxtLink>
+            <a
+              v-else
+              :href="material.file_url"
+              target="_blank"
+              class="block w-full bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm px-3 py-2 rounded-lg text-center transition font-medium"
+            >
+              <Icon name="material-symbols:open-in-new-rounded" class="w-4 h-4 inline mr-1" />
+              Lihat Materi
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   </div>
