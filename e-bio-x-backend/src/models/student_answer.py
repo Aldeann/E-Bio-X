@@ -17,7 +17,7 @@ class StudentAnswer(db.Model):
     student = db.relationship('User', backref=db.backref('material_answers', lazy=True, cascade="all, delete-orphan"))
     material = db.relationship('Material', backref=db.backref('student_answers', lazy=True, cascade="all, delete-orphan"))
     section = db.relationship('MaterialSection', backref=db.backref('student_answers', lazy=True))
-    content = db.relationship('MaterialContent', backref=db.backref('student_answers', lazy=True))
+    content = db.relationship('MaterialContent', backref=db.backref('student_answers', lazy=True, cascade="all, delete-orphan"))
 
     def __repr__(self):
         return f'<StudentAnswer {self.material_id} - {self.student_id}>'

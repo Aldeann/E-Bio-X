@@ -14,7 +14,7 @@ class StudentContentTrack(db.Model):
 
     student = db.relationship('User', backref=db.backref('content_tracks', lazy=True, cascade="all, delete-orphan"))
     material = db.relationship('Material', backref=db.backref('content_tracks', lazy=True, cascade="all, delete-orphan"))
-    content = db.relationship('MaterialContent', backref=db.backref('content_tracks', lazy=True))
+    content = db.relationship('MaterialContent', backref=db.backref('content_tracks', lazy=True, cascade="all, delete-orphan"))
 
     __table_args__ = (db.UniqueConstraint('student_id', 'content_id', name='uq_student_content_track'),)
 

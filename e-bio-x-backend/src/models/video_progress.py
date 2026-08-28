@@ -17,7 +17,7 @@ class VideoProgress(db.Model):
 
     student = db.relationship('User', backref=db.backref('video_progress', lazy=True, cascade="all, delete-orphan"))
     material = db.relationship('Material', backref=db.backref('video_progress', lazy=True, cascade="all, delete-orphan"))
-    content = db.relationship('MaterialContent', backref=db.backref('video_progress', lazy=True))
+    content = db.relationship('MaterialContent', backref=db.backref('video_progress', lazy=True, cascade="all, delete-orphan"))
 
     __table_args__ = (db.UniqueConstraint('student_id', 'content_id', name='uq_student_video_progress'),)
 
