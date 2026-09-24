@@ -115,6 +115,36 @@ const handleSubmit = async (key, selected, questionIndex = null) => {
     externalResults.value[key] = {
       correct: !!res.correct,
       explanation: res.explanation || "",
+      expected: res.expected || "",
+    };
+    emit("submitted", { content_id: props.block.id, ...res });
+  } catch (e) {
+    const msg = e && e.data && e.data.error ? e.data.error : "Gagal mengirim jawaban.";
+    externalResults.value[key] = { correct: false, explanation: msg };
+  } finally {
+    submitting.value = null;
+  }
+};
+
+const handleDiagramSubmit = async (key, answers) => {
+  if (!props.materialId) return;
+  submitting.value = key;
+  try {
+    const res = await $fetch(
+      `${config.public.backend}/api/materials/${props.materialId}/answers`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: {
+          section_id: props.sectionId,
+          content_id: props.block.id,
+          answers,
+        },
+      }
+    );
+    externalResults.value[key] = {
+      correct: !!res.correct,
+      explanation: res.explanation || "",
     };
     emit("submitted", { content_id: props.block.id, ...res });
   } catch (e) {
@@ -228,16 +258,29 @@ const handleSubmit = async (key, selected, questionIndex = null) => {
       <div class="whitespace-pre-wrap">{{ data.content }}</div>
     </div>
 
+    <!-- Diagram interaktif berlabel -->
+    <div
+      v-else-if="block.type === 'diagram'"
+      class="rounded-xl border p-4 border-green-200 dark:border-green-800 bg-white dark:bg-gray-900"
+    >
+      <MaterialDiagramBlock
+        :diagram="data"
+        :interactive="interactive"
+        :external-result="externalResults['d-' + block.id] || null"
+        @submit="(answers) => handleDiagramSubmit('d-' + block.id, answers)"
+      />
+      <p v-if="submitting === 'd-' + block.id" class="text-xs text-gray-400 mt-2">
+        Menilai jawaban...
+      </p>
+    </div>
+
     <!-- Question -->
     <div v-else-if="block.type === 'question'" class="rounded-xl border p-4 border-green-200 dark:border-green-800 bg-white dark:bg-gray-900">
       <p class="font-semibold text-gray-800 dark:text-gray-100 mb-3">
         {{ data.question }}
       </p>
       <MaterialQuestionBlock
-        :question="data.question"
-        :options="data.options || []"
-        :correct-answer="data.correct_answer ?? null"
-        :explanation="data.explanation || ''"
+        :qdata="data"
         :interactive="interactive"
         :external-result="externalResults['q-' + block.id] || null"
         @submit="(sel) => handleSubmit('q-' + block.id, sel)"
@@ -265,10 +308,7 @@ const handleSubmit = async (key, selected, questionIndex = null) => {
             {{ qi + 1 }}. {{ q.question }}
           </p>
           <MaterialQuestionBlock
-            :question="q.question"
-            :options="q.options || []"
-            :correct-answer="q.correct_answer ?? null"
-            :explanation="q.explanation || ''"
+            :qdata="q"
             :interactive="interactive"
             :external-result="externalResults['z-' + block.id + '-' + qi] || null"
             @submit="(sel) => handleSubmit('z-' + block.id + '-' + qi, sel, qi)"

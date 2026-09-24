@@ -1,6 +1,12 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { useSwal } from "~/utils/swal";
+import {
+  builtinTemplates,
+  loadSavedTemplates,
+  saveBlockTemplate,
+  removeSavedTemplate,
+} from "~/utils/blockTemplates";
 
 const props = defineProps({
   materialId: { type: [String, Number], required: true },
@@ -19,6 +25,7 @@ const showPicker = ref(false);
 const pickerSectionId = ref(null);
 const showFiles = ref(false);
 const savingTitle = ref(false);
+const savedTemplates = ref([]);
 
 const componentTypes = [
   { type: "text", label: "Text", icon: "material-symbols:notes-rounded" },
@@ -30,6 +37,7 @@ const componentTypes = [
   { type: "box", label: "Info Box", icon: "material-symbols:info-outline" },
   { type: "question", label: "Pertanyaan", icon: "material-symbols:quiz-outline" },
   { type: "quiz", label: "Quiz", icon: "hugeicons:quiz-04" },
+  { type: "diagram", label: "Diagram Interaktif", icon: "material-symbols:schema" },
 ];
 
 const sections = computed(() => material.value?.sections || []);
@@ -46,11 +54,26 @@ const blockTemplate = (type) => {
     pdf: { url: "", title: "" },
     link: { url: "", label: "" },
     box: { content: "", variant: "info" },
-    question: { question: "", options: ["", ""], correct_answer: 0, explanation: "" },
+    question: {
+      qtype: "multiple_choice",
+      question: "",
+      options: ["", ""],
+      correct_answer: 0,
+      explanation: "",
+    },
     quiz: {
       title: "Latihan Soal",
-      questions: [{ question: "", options: ["", ""], correct_answer: 0, explanation: "" }],
+      questions: [
+        {
+          qtype: "multiple_choice",
+          question: "",
+          options: ["", ""],
+          correct_answer: 0,
+          explanation: "",
+        },
+      ],
     },
+    diagram: { url: "", title: "", points: [], explanation: "" },
   };
   return templates[type] || {};
 };
@@ -179,7 +202,7 @@ const openPicker = (sectionId) => {
   showPicker.value = true;
 };
 
-const addBlock = async (type) => {
+const addBlock = async (type, data = null) => {
   const sectionId = pickerSectionId.value;
   showPicker.value = false;
   if (!sectionId) return;
@@ -187,7 +210,7 @@ const addBlock = async (type) => {
     const res = await $fetch(`${config.public.backend}/api/sections/${sectionId}/contents`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
-      body: { type, data: blockTemplate(type) },
+      body: { type, data: data || blockTemplate(type) },
     });
     await fetchDetail();
     editingContentId.value = res.content.id;
@@ -255,6 +278,139 @@ const moveBlock = async (section, index, dir) => {
   }
 };
 
+// ---------- DUPLICATE & TEMPLATE ----------
+const duplicateSection = async (section) => {
+  try {
+    await $fetch(`${config.public.backend}/api/sections/${section.id}/duplicate`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    await fetchDetail();
+    toast.add({ title: "Section diduplikasi.", color: "green" });
+  } catch (e) {
+    toast.add({ title: "Gagal menduplikasi section.", color: "red" });
+  }
+};
+
+const duplicateBlock = async (content) => {
+  try {
+    const res = await $fetch(`${config.public.backend}/api/contents/${content.id}/duplicate`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    await fetchDetail();
+    editingContentId.value = res.content.id;
+    toast.add({ title: "Komponen diduplikasi.", color: "green" });
+  } catch (e) {
+    toast.add({ title: "Gagal menduplikasi komponen.", color: "red" });
+  }
+};
+
+const saveAsTemplate = async (content) => {
+  const { value } = await swal.fire({
+    title: "Simpan sebagai Template",
+    input: "text",
+    inputValue: `${typeLabel(content.type)} Template`,
+    showCancelButton: true,
+    confirmButtonText: "Simpan",
+    cancelButtonText: "Batal",
+    inputValidator: (v) => (!v || !v.trim() ? "Nama template wajib diisi" : null),
+  });
+  if (!value) return;
+  savedTemplates.value = saveBlockTemplate({
+    name: value.trim(),
+    type: content.type,
+    data: content.data,
+  });
+  toast.add({ title: "Template disimpan ke peramban ini.", color: "green" });
+};
+
+const deleteSavedTemplate = async (t) => {
+  const result = await swal.fire({
+    title: "Hapus template ini?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Hapus",
+    cancelButtonText: "Batal",
+  });
+  if (!result.isConfirmed) return;
+  savedTemplates.value = removeSavedTemplate(t.key);
+  toast.add({ title: "Template dihapus.", color: "green" });
+};
+
+// ---------- DRAG & DROP ----------
+const dragSectionIndex = ref(null);
+const overSectionIndex = ref(null);
+const dragBlockIndex = ref(null);
+const overBlockIndex = ref(null);
+
+const dragStartSection = (index, e) => {
+  dragSectionIndex.value = index;
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+};
+
+const dragOverSection = (index, e) => {
+  e.preventDefault();
+  overSectionIndex.value = index;
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+};
+
+const dropSection = async (index, e) => {
+  e.preventDefault();
+  overSectionIndex.value = null;
+  const from = dragSectionIndex.value;
+  dragSectionIndex.value = null;
+  if (from === null || from === index) return;
+  const ids = sections.value.map((s) => s.id);
+  const [removed] = ids.splice(from, 1);
+  ids.splice(index, 0, removed);
+  try {
+    await $fetch(`${config.public.backend}/api/materials/${props.materialId}/sections/reorder`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: { section_ids: ids },
+    });
+    await fetchDetail();
+  } catch (err) {
+    toast.add({ title: "Gagal mengubah urutan.", color: "red" });
+  }
+};
+
+const dragStartBlock = (index, e) => {
+  dragBlockIndex.value = index;
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+};
+
+const dragOverBlock = (index, e) => {
+  e.preventDefault();
+  overBlockIndex.value = index;
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+};
+
+const dropBlock = async (index, e) => {
+  e.preventDefault();
+  overBlockIndex.value = null;
+  const from = dragBlockIndex.value;
+  dragBlockIndex.value = null;
+  if (from === null || from === index) return;
+  const ids = activeSection.value.contents.map((c) => c.id);
+  const [removed] = ids.splice(from, 1);
+  ids.splice(index, 0, removed);
+  try {
+    await $fetch(
+      `${config.public.backend}/api/sections/${activeSection.value.id}/contents/reorder`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: { content_ids: ids },
+      }
+    );
+    await fetchDetail();
+  } catch (err) {
+    toast.add({ title: "Gagal mengubah urutan.", color: "red" });
+  }
+};
+
 // ---------- HEADER ACTIONS ----------
 const saveTitle = async () => {
   savingTitle.value = true;
@@ -297,7 +453,10 @@ const togglePublish = async () => {
   }
 };
 
-onMounted(fetchDetail);
+onMounted(() => {
+  savedTemplates.value = loadSavedTemplates();
+  fetchDetail();
+});
 </script>
 
 <template>
@@ -415,12 +574,17 @@ onMounted(fetchDetail);
           <li
             v-for="(section, index) in sections"
             :key="section.id"
-            class="group rounded-lg border transition"
-            :class="
+            draggable="true"
+            class="group rounded-lg border transition cursor-grab"
+            :class="[
               activeSectionId === section.id
                 ? 'border-green-300 bg-green-50 dark:bg-green-900/30'
-                : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800'
-            "
+                : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800',
+              overSectionIndex === index ? 'ring-2 ring-green-300 dark:ring-green-600 opacity-80' : '',
+            ]"
+            @dragstart="dragStartSection(index, $event)"
+            @dragover="dragOverSection(index, $event)"
+            @drop="dropSection(index, $event)"
           >
             <button
               @click="selectSection(section.id)"
@@ -461,6 +625,9 @@ onMounted(fetchDetail);
                 </button>
               </div>
               <div class="flex items-center gap-1">
+                <button @click="duplicateSection(section)" class="text-violet-500 hover:text-violet-700" title="Duplikasi section">
+                  <Icon name="material-symbols:content-copy" class="w-4 h-4" />
+                </button>
                 <button @click="renameSection(section)" class="text-blue-500 hover:text-blue-700" title="Edit nama">
                   <Icon name="material-symbols:edit-square" class="w-4 h-4" />
                 </button>
@@ -499,7 +666,12 @@ onMounted(fetchDetail);
             <div
               v-for="(content, index) in activeSection.contents"
               :key="content.id"
-              class="group relative rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4"
+              draggable="true"
+              class="group relative rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4 cursor-grab"
+              :class="overBlockIndex === index ? 'ring-2 ring-green-300 dark:ring-green-600 opacity-80' : ''"
+              @dragstart="dragStartBlock(index, $event)"
+              @dragover="dragOverBlock(index, $event)"
+              @drop="dropBlock(index, $event)"
             >
               <!-- block toolbar -->
               <div
@@ -527,6 +699,20 @@ onMounted(fetchDetail);
                   :title="editingContentId === content.id ? 'Tutup editor' : 'Edit'"
                 >
                   <Icon name="material-symbols:edit-square" class="w-4 h-4" />
+                </button>
+                <button
+                  @click="duplicateBlock(content)"
+                  class="text-violet-500 hover:text-violet-700 p-0.5"
+                  title="Duplikasi komponen"
+                >
+                  <Icon name="material-symbols:content-copy" class="w-4 h-4" />
+                </button>
+                <button
+                  @click="saveAsTemplate(content)"
+                  class="text-amber-500 hover:text-amber-700 p-0.5"
+                  title="Simpan sebagai template"
+                >
+                  <Icon name="material-symbols:bookmark-add" class="w-4 h-4" />
                 </button>
                 <button
                   @click="deleteBlock(content)"
@@ -596,6 +782,55 @@ onMounted(fetchDetail);
             <Icon :name="c.icon" class="w-8 h-8 text-green-600 dark:text-green-400" />
             <span class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ c.label }}</span>
           </button>
+        </div>
+
+        <div class="mt-6">
+          <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1 mb-3">
+            <Icon name="material-symbols:template" class="w-5 h-5 text-amber-500" />
+            Template
+          </h4>
+
+          <div v-if="savedTemplates.length" class="mb-3">
+            <p class="text-xs text-gray-400 mb-1">Disimpan di peramban ini</p>
+            <div class="space-y-1.5">
+              <div
+                v-for="t in savedTemplates"
+                :key="t.key"
+                class="flex items-center gap-2 p-2 rounded-lg border border-gray-200 dark:border-gray-700"
+              >
+                <Icon name="material-symbols:template" class="w-5 h-5 text-amber-500 shrink-0" />
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{{ t.name }}</p>
+                  <p class="text-xs text-gray-400">{{ typeLabel(t.type) }}</p>
+                </div>
+                <button
+                  @click="addBlock(t.type, t.data)"
+                  class="text-green-600 hover:text-green-700 text-sm font-semibold shrink-0"
+                >
+                  Pakai
+                </button>
+                <button
+                  @click="deleteSavedTemplate(t)"
+                  class="text-red-500 hover:text-red-700 shrink-0"
+                  title="Hapus template"
+                >
+                  <Icon name="material-symbols:delete-rounded" class="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <button
+              v-for="t in builtinTemplates"
+              :key="t.key"
+              @click="addBlock(t.type, t.data)"
+              class="flex flex-col items-center gap-1 p-3 rounded-xl border border-dashed border-amber-300 dark:border-amber-700 hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition"
+            >
+              <Icon :name="t.icon" class="w-6 h-6 text-amber-500" />
+              <span class="text-xs font-medium text-gray-700 dark:text-gray-200 text-center">{{ t.label }}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

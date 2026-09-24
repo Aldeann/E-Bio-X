@@ -23,6 +23,8 @@ import traceback
 import os
 import uuid
 import re
+import random
+import json
 
 load_dotenv()
 
@@ -255,16 +257,31 @@ def _serialize_material_list(material, include_analytics=False, student_progress
 
 
 def _serialize_content(content, include_answers=True):
-    data = dict(content.data) if isinstance(content.data, dict) else {}
+    # Deep-copy: pembersihan kunci jawaban (pop) tidak boleh memutasi objek
+    # JSON yang sama dengan yang ter-track di session DB.
+    data = json.loads(json.dumps(content.data)) if isinstance(content.data, dict) else {}
     if not include_answers:
         data.pop('correct_answer', None)
         if content.type == 'quiz' and isinstance(data.get('questions'), list):
             for q in data['questions']:
                 if isinstance(q, dict):
                     q.pop('correct_answer', None)
-    # Re-sign storage URLs for browser-consumable blocks so signed URLs
-    # never expire in the client (image, video, pdf, link).
-    if content.type in ('image', 'video', 'pdf', 'link') and data.get('url'):
+                    q.pop('answer', None)  # tipe matching
+        elif content.type == 'diagram':
+            # Siswa mendapat titik tanpa label benar, plus daftar label acak
+            # untuk dicocokkan (mencegah contekan saat membaca materi).
+            points = data.get('points') or []
+            if points:
+                data['points'] = [
+                    {'id': p.get('id'), 'x': p.get('x'), 'y': p.get('y')}
+                    for p in points if isinstance(p, dict)
+                ]
+                labels = [p.get('label') for p in points if isinstance(p, dict) and p.get('label')]
+                random.shuffle(labels)
+                data['labels'] = labels
+    # Re-sign storage URLs untuk blok yang dikonsumsi browser agar signed URLs
+    # tidak pernah kedaluwarsa di klien (image, video, pdf, link, diagram).
+    if content.type in ('image', 'video', 'pdf', 'link', 'diagram') and data.get('url'):
         data['url'] = storage_service.out_url(data['url']) or data['url']
     return {
         'id': content.id,
@@ -934,7 +951,7 @@ def create_content(section_id):
     data = request.get_json(silent=True) or {}
     block_type = data.get('type')
     block_data = data.get('data') or {}
-    allowed_types = ['text', 'heading', 'image', 'video', 'pdf', 'link', 'box', 'question', 'quiz']
+    allowed_types = ['text', 'heading', 'image', 'video', 'pdf', 'link', 'box', 'question', 'quiz', 'diagram']
 
     if block_type not in allowed_types:
         return jsonify({'error': f'Tipe komponen "{block_type}" tidak dikenal'}), 400
@@ -970,7 +987,7 @@ def update_content(content_id):
 
     data = request.get_json(silent=True) or {}
     if 'type' in data and data['type']:
-        allowed_types = ['text', 'heading', 'image', 'video', 'pdf', 'link', 'box', 'question', 'quiz']
+        allowed_types = ['text', 'heading', 'image', 'video', 'pdf', 'link', 'box', 'question', 'quiz', 'diagram']
         if data['type'] not in allowed_types:
             return jsonify({'error': f'Tipe komponen "{data["type"]}" tidak dikenal'}), 400
         content.type = data['type']
@@ -1032,6 +1049,93 @@ def reorder_contents(section_id):
 
     db.session.commit()
     return jsonify({'message': 'Urutan komponen berhasil diperbarui'}), 200
+
+
+# ============================================================
+# DUPLICATION (section & blok)
+# ============================================================
+
+@jwt_required()
+def duplicate_content(content_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    content = MaterialContent.query.get(content_id)
+    if not content:
+        return jsonify({'error': 'Content not found'}), 404
+
+    if not _can_manage(content.section.material, user):
+        return jsonify({'error': 'Anda hanya dapat mengubah materi milik sendiri'}), 403
+
+    section = content.section
+    old_pos = content.position
+
+    # Geser posisi blok setelah posisi salinan agar urutan tetap rapi
+    for c in section.contents:
+        if c.position > old_pos:
+            c.position += 1
+
+    copy = MaterialContent(
+        section_id=section.id,
+        type=content.type,
+        data=json.loads(json.dumps(content.data)) if content.data is not None else None,
+        position=old_pos + 1,
+    )
+    db.session.add(copy)
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Komponen berhasil diduplikasi',
+        'content': _serialize_content(copy),
+    }), 201
+
+
+@jwt_required()
+def duplicate_section(section_id):
+    user = _get_current_user()
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    section = MaterialSection.query.get(section_id)
+    if not section:
+        return jsonify({'error': 'Section not found'}), 404
+
+    if not _can_manage(section.material, user):
+        return jsonify({'error': 'Anda hanya dapat mengubah materi milik sendiri'}), 403
+
+    material = section.material
+    old_pos = section.position
+
+    for s in material.sections:
+        if s.position > old_pos:
+            s.position += 1
+
+    copy = MaterialSection(
+        material_id=material.id,
+        title=section.title,
+        position=old_pos + 1,
+    )
+    db.session.add(copy)
+    db.session.flush()
+
+    for c in sorted(section.contents, key=lambda x: x.position):
+        db.session.add(MaterialContent(
+            section_id=copy.id,
+            type=c.type,
+            data=json.loads(json.dumps(c.data)) if c.data is not None else None,
+            position=c.position,
+        ))
+    db.session.commit()
+    db.session.refresh(copy)
+
+    return jsonify({
+        'message': 'Section berhasil diduplikasi',
+        'section': {
+            'id': copy.id, 'title': copy.title, 'position': copy.position,
+            'contents': [_serialize_content(c) for c in sorted(copy.contents, key=lambda x: x.position)],
+        },
+    }), 201
 
 
 # ============================================================
@@ -1279,6 +1383,97 @@ def update_material_student_state(material_id):
     return jsonify({'message': 'Posisi belajar tersimpan', 'state': _student_state_payload(material.id, user)}), 200
 
 
+_A_OPTIONS = 'ABCDEFGHIJ'
+
+
+def _norm_text(v):
+    """Normalisasi teks untuk penilaian isian singkat (case & spasi-insensitive)."""
+    return re.sub(r'\s+', ' ', str(v or '').strip().lower())
+
+
+def _store_student_answer(user_id, material_id, section_id, content_id,
+                          selected_int, answer_json, is_correct, question_index):
+    db.session.add(StudentAnswer(
+        student_id=user_id,
+        material_id=material_id,
+        section_id=section_id,
+        content_id=content_id,
+        selected_answer=selected_int,
+        answer_data=json.dumps(answer_json, ensure_ascii=False) if answer_json else None,
+        is_correct=bool(is_correct),
+        question_index=question_index,
+    ))
+    db.session.commit()
+
+
+def _grade_choice_answer(selected_answer, expected):
+    """Penilaian pilihan tunggal / benar-salah."""
+    try:
+        selected = int(selected_answer)
+    except (TypeError, ValueError):
+        return False, None, None, {'type': 'choice', 'value': str(selected_answer)}
+    try:
+        expected_int = int(expected) if expected is not None else None
+    except (TypeError, ValueError):
+        expected_int = None
+    is_correct = (expected_int is not None and selected == expected_int)
+    display = f'Jawaban yang benar: {_A_OPTIONS[expected_int]}' if expected_int is not None else None
+    return is_correct, display, selected, None
+
+
+def _grade_multi_answer(selected_answer, expected):
+    """Penilaian multi-pilih (checkbox) — himpunan jawaban harus sama."""
+    raw = selected_answer if isinstance(selected_answer, list) else []
+    try:
+        selected = [int(x) for x in raw]
+    except (TypeError, ValueError):
+        selected = []
+    try:
+        expected_list = [int(x) for x in (expected or [])]
+    except (TypeError, ValueError):
+        expected_list = []
+    is_correct = bool(expected_list) and sorted(selected) == sorted(expected_list)
+    display = ('Jawaban yang benar: ' + ', '.join(_A_OPTIONS[i] for i in expected_list)) \
+        if expected_list else None
+    return is_correct, display, None, {'type': 'multi_select', 'value': selected}
+
+
+def _grade_short_answer(selected_answer, expected):
+    """Penilaian isian singkat — cocok case-insensitive pada daftar jawaban diterima."""
+    text = str(selected_answer or '')
+    if isinstance(expected, list) and expected:
+        accepted = [_norm_text(x) for x in expected]
+        is_correct = _norm_text(text) in accepted
+        display = ' / '.join(str(x) for x in expected)
+    else:
+        is_correct = _norm_text(text) == _norm_text(expected)
+        display = str(expected) if expected else None
+    return is_correct, display, None, {'type': 'short_answer', 'value': text}
+
+
+def _grade_matching_answer(selected_answer, expected, right_items):
+    """Penilaian menjodohkan — vektor indeks jawaban kanan per item kiri = kunci."""
+    raw = selected_answer if isinstance(selected_answer, list) else []
+    try:
+        selected = [int(x) for x in raw]
+    except (TypeError, ValueError):
+        selected = []
+    try:
+        expected_list = [int(x) for x in (expected or [])]
+    except (TypeError, ValueError):
+        expected_list = []
+    is_correct = bool(expected_list) and len(selected) == len(expected_list) \
+        and all(a == b for a, b in zip(selected, expected_list))
+    if expected_list and right_items:
+        display = ' | '.join(
+            f'{_A_OPTIONS[i]}={right_items[expected_list[i]]}' if 0 <= expected_list[i] < len(right_items) else '?'
+            for i in range(len(expected_list))
+        )
+    else:
+        display = None
+    return is_correct, display, None, {'type': 'matching', 'value': selected}
+
+
 @jwt_required()
 def submit_student_answer(material_id):
     user, material, err, code = _student_learning_guard(material_id)
@@ -1288,10 +1483,9 @@ def submit_student_answer(material_id):
     data = request.get_json(silent=True) or {}
     section_id = data.get('section_id')
     content_id = data.get('content_id')
-    selected_answer = data.get('selected_answer')
 
-    if section_id is None or content_id is None or selected_answer is None:
-        return jsonify({'error': 'section_id, content_id, dan selected_answer wajib diisi'}), 400
+    if section_id is None or content_id is None:
+        return jsonify({'error': 'section_id dan content_id wajib diisi'}), 400
 
     try:
         section = MaterialSection.query.filter_by(id=int(section_id), material_id=material.id).first()
@@ -1308,61 +1502,88 @@ def submit_student_answer(material_id):
         return jsonify({'error': 'Content tidak ditemukan pada section ini'}), 404
 
     content_data = dict(content.data) if isinstance(content.data, dict) else {}
-    expected = content_data.get('correct_answer')
     explanation = content_data.get('explanation')
     question_index = data.get('question_index')
-    if expected is None and isinstance(content_data.get('questions'), list):
+
+    # ---------- Diagram interaktif berlabel ----------
+    if content.type == 'diagram':
+        answers = data.get('answers')
+        if not isinstance(answers, dict) or not answers:
+            return jsonify({'error': 'answers wajib diisi (pemetaan titik ke label)'}), 400
+        points = content_data.get('points') or []
+        expected_map = {str(p.get('id')): str(p.get('label') or '').strip()
+                        for p in points if isinstance(p, dict) and p.get('id')}
+        correct = bool(expected_map) and len(answers) == len(points) and all(
+            str(k) in expected_map and _norm_text(v) == _norm_text(expected_map[str(k)])
+            for k, v in answers.items()
+        )
+        try:
+            _store_student_answer(user.id, material.id, section.id, content.id,
+                                  None, {'type': 'diagram', 'answers': answers}, correct, None)
+            mark_content_viewed(user.id, material.id, content.id, silent=True)
+            log_activity(user.id, material.id, 'question_answered', section_id=section.id,
+                         content_id=content.id,
+                         data={'correct': correct, 'block_type': 'diagram'}, silent=True)
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Gagal menyimpan jawaban: {str(e)}'}), 500
+        return jsonify({'message': 'Jawaban tersimpan', 'correct': correct,
+                        'explanation': explanation or None}), 201
+
+    # ---------- Soal / kuis dengan variasi tipe ----------
+    selected_answer = data.get('selected_answer')
+    if selected_answer is None:
+        return jsonify({'error': 'selected_answer wajib diisi'}), 400
+
+    question_obj = None
+    expected = content_data.get('correct_answer')
+    qtype = content_data.get('qtype') or 'multiple_choice'
+    right_items = content_data.get('right') or []
+    if isinstance(content_data.get('questions'), list):
         questions = content_data['questions']
         try:
             qi = int(question_index) if question_index is not None else None
         except (TypeError, ValueError):
             qi = None
-        if qi is not None and 0 <= qi < len(questions):
-            expected = questions[qi].get('correct_answer')
-            explanation = questions[qi].get('explanation')
+        if qi is not None and 0 <= qi < len(questions) and isinstance(questions[qi], dict):
+            question_obj = questions[qi]
         else:
             for q in questions:
                 if isinstance(q, dict) and q.get('correct_answer') is not None:
-                    expected = q.get('correct_answer')
-                    explanation = q.get('explanation')
+                    question_obj = q
                     break
+        if question_obj is not None:
+            expected = question_obj.get('correct_answer')
+            explanation = question_obj.get('explanation')
+            qtype = question_obj.get('qtype') or 'multiple_choice'
+            right_items = question_obj.get('right') or []
+
+    if qtype == 'short_answer':
+        is_correct, display, stored_int, stored_json = _grade_short_answer(selected_answer, expected)
+    elif qtype == 'multi_select':
+        is_correct, display, stored_int, stored_json = _grade_multi_answer(selected_answer, expected)
+    elif qtype == 'matching':
+        is_correct, display, stored_int, stored_json = _grade_matching_answer(selected_answer, expected, right_items)
+    else:
+        is_correct, display, stored_int, stored_json = _grade_choice_answer(selected_answer, expected)
 
     try:
-        selected = int(selected_answer)
-    except (TypeError, ValueError):
-        return jsonify({'error': 'selected_answer harus berupa angka'}), 400
-
-    try:
-        expected_int = int(expected) if expected is not None else None
-    except (TypeError, ValueError):
-        expected_int = None
-    is_correct = (expected_int is not None and selected == expected_int)
-    if expected_int is None:
-        is_correct = bool(data.get('is_correct', False))
-
-    try:
-        db.session.add(StudentAnswer(
-            student_id=user.id,
-            material_id=material.id,
-            section_id=section.id,
-            content_id=content.id,
-            selected_answer=selected,
-            is_correct=is_correct,
-            question_index=data.get('question_index'),
-        ))
-        db.session.commit()
+        _store_student_answer(user.id, material.id, section.id, content.id,
+                              stored_int, stored_json, is_correct, question_index)
         mark_content_viewed(user.id, material.id, content.id, silent=True)
-        log_activity(user.id, material.id, 'question_answered', section_id=section.id, content_id=content.id,
-                     data={'correct': is_correct, 'question_index': data.get('question_index')}, silent=True)
+        log_activity(user.id, material.id, 'question_answered', section_id=section.id,
+                     content_id=content.id,
+                     data={'correct': is_correct, 'question_index': question_index, 'qtype': qtype},
+                     silent=True)
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Gagal menyimpan jawaban: {str(e)}'}), 500
 
-    return jsonify({
-        'message': 'Jawaban tersimpan',
-        'correct': is_correct,
-        'explanation': explanation or None,
-    }), 201
+    payload = {'message': 'Jawaban tersimpan', 'correct': is_correct,
+               'explanation': explanation or None}
+    if not is_correct and display:
+        payload['expected'] = display
+    return jsonify(payload), 201
 
 
 @jwt_required()

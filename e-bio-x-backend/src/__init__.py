@@ -35,6 +35,7 @@ def create_app():
         update_material, publish_material, get_material_analytics,
         create_section, update_section, delete_section, reorder_sections,
         create_content, update_content, delete_content, reorder_contents,
+        duplicate_content, duplicate_section,
         upload_material_file, delete_material_file, record_progress,
         get_material_student_state, update_material_student_state, submit_student_answer,
         get_material_bookmarks, create_material_bookmark, delete_material_bookmark,
@@ -131,6 +132,8 @@ def create_app():
     app.add_url_rule('/api/sections/<section_id>/contents/reorder', view_func=reorder_contents, methods=['POST'])
     app.add_url_rule('/api/contents/<content_id>', view_func=update_content, methods=['PUT'])
     app.add_url_rule('/api/contents/<content_id>', view_func=delete_content, methods=['DELETE'])
+    app.add_url_rule('/api/contents/<content_id>/duplicate', view_func=duplicate_content, methods=['POST'])
+    app.add_url_rule('/api/sections/<section_id>/duplicate', view_func=duplicate_section, methods=['POST'])
     app.add_url_rule('/api/materials/<material_id>/files', view_func=upload_material_file, methods=['POST'])
     app.add_url_rule('/api/files/<path:key>', view_func=download_file, methods=['GET'])
     app.add_url_rule('/api/materials/<material_id>/files/<file_id>', view_func=delete_material_file, methods=['DELETE'])

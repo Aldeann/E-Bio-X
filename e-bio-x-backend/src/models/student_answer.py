@@ -9,7 +9,11 @@ class StudentAnswer(db.Model):
     material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=False)
     section_id = db.Column(db.Integer, db.ForeignKey('material_sections.id'), nullable=False)
     content_id = db.Column(db.Integer, db.ForeignKey('material_contents.id'), nullable=False)
-    selected_answer = db.Column(db.Integer, nullable=False)
+    # selected_answer: index opsi untuk tipe soal tunggal (multiple_choice/true_false).
+    # Untuk jawaban kompleks (multi_select/short_answer/matching/diagram) bernilai NULL
+    # dan jawaban mentah disimpan sebagai JSON string di answer_data.
+    selected_answer = db.Column(db.Integer, nullable=True)
+    answer_data = db.Column(db.Text, nullable=True)
     is_correct = db.Column(db.Boolean, nullable=False)
     question_index = db.Column(db.Integer, nullable=True)
     answered_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)

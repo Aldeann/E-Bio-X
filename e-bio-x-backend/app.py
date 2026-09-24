@@ -24,7 +24,26 @@ def uploaded_file(filename):
 def hello_world():
     return 'Server is running!'
 
+
+def _ensure_schema_compat():
+    """Dev-only helper: create_all() tidak mengubah tabel yang sudah ada.
+    Bila kolom baru (mis. student_answers.answer_data) belum ada di DB lama,
+    tambahkan lewat ALTER yang idempotent (aman dijalankan ulang)."""
+    from sqlalchemy import text
+    statements = [
+        'ALTER TABLE student_answers MODIFY selected_answer INT NULL',
+        'ALTER TABLE student_answers ADD COLUMN answer_data TEXT NULL',
+    ]
+    for stmt in statements:
+        try:
+            db.session.execute(text(stmt))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        _ensure_schema_compat()
     app.run(host='0.0.0.0', port=5000, debug=True)
