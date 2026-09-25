@@ -42,6 +42,11 @@ const form = reactive(
   JSON.parse(JSON.stringify(props.block.data || blank()[props.block.type] || {}))
 );
 
+// Blok "Pertanyaan" hanya 2 tipe: objektif (pilihan ganda) dan jawaban singkat.
+const questionType = computed(() =>
+  form.qtype === "short_answer" ? "short_answer" : "multiple_choice"
+);
+
 watch(
   () => props.block.id,
   () => {
@@ -190,8 +195,16 @@ const validate = () => {
     }
     case "question": {
       if (!d.question || !d.question.trim()) return fail("Pertanyaan wajib diisi.");
-      const filled = d.options.filter((o) => o && o.trim()).length;
-      if (filled < 2) return fail("Minimal butuh 2 pilihan jawaban.");
+      if (d.qtype === "short_answer") {
+        if (
+          !Array.isArray(d.correct_answer) ||
+          d.correct_answer.filter((s) => s && s.trim()).length === 0
+        )
+          return fail("Masukkan minimal 1 jawaban yang diterima.");
+      } else {
+        const filled = d.options.filter((o) => o && o.trim()).length;
+        if (filled < 2) return fail("Minimal butuh 2 pilihan jawaban.");
+      }
       break;
     }
     case "quiz": {
@@ -237,6 +250,24 @@ const validate = () => {
 const save = () => {
   if (!validate()) return;
   const payload = JSON.parse(JSON.stringify(form));
+  // normalisasi blok pertanyaan: 2 tipe — objektif (multiple_choice) / jawaban singkat
+  if (type.value === "question") {
+    payload.qtype = questionType.value;
+    if (questionType.value === "short_answer") {
+      payload.correct_answer = (payload.correct_answer || []).filter((s) => s && s.trim());
+      delete payload.options;
+    } else {
+      if (!Array.isArray(payload.options) || payload.options.length < 2) {
+        payload.options = ["", ""];
+      }
+      if (
+        typeof payload.correct_answer !== "number" ||
+        payload.correct_answer >= payload.options.length
+      ) {
+        payload.correct_answer = 0;
+      }
+    }
+  }
   // rapikan data menjodohkan: pastikan answer sepanjang kiri
   if (type.value === "quiz" && Array.isArray(payload.questions)) {
     for (const q of payload.questions) {
@@ -386,9 +417,18 @@ const save = () => {
     <!-- QUESTION -->
     <template v-else-if="type === 'question'">
       <div>
+        <label class="labelClass">Tipe pertanyaan</label>
+        <select :class="inputClass" :value="questionType" @change="(e) => setQuestionType(form, e.target.value)">
+          <option value="multiple_choice">Objektif (pilihan ganda)</option>
+          <option value="short_answer">Jawaban Singkat</option>
+        </select>
+      </div>
+      <div>
         <label class="labelClass">Pertanyaan</label>
         <textarea v-model="form.question" rows="2" :class="inputClass" placeholder="Tulis pertanyaan..."></textarea>
       </div>
+      <!-- Objektif: pilihan jawaban -->
+      <template v-if="questionType === 'multiple_choice'">
       <div>
         <label class="labelClass">Pilihan jawaban</label>
         <div v-for="(opt, i) in form.options" :key="i" class="flex items-center gap-2 mb-1">
@@ -410,6 +450,23 @@ const save = () => {
         </button>
         <p class="text-xs text-gray-400 mt-1">Tandai radio pada pilihan yang benar.</p>
       </div>
+      </template>
+
+      <!-- Jawaban singkat -->
+      <template v-else>
+        <div>
+          <label class="labelClass">Jawaban yang diterima (satu per baris)</label>
+          <textarea
+            :class="inputClass"
+            rows="2"
+            placeholder="contoh:&#10;sel eukariotik"
+            :value="(form.correct_answer || []).join('\n')"
+            @input="setShortCorrect(form, $event)"
+          ></textarea>
+          <p class="text-xs text-gray-400">Penilaian tidak membedakan huruf besar/kecil.</p>
+        </div>
+      </template>
+
       <div>
         <label class="labelClass">Penjelasan (opsional)</label>
         <textarea v-model="form.explanation" rows="2" :class="inputClass" placeholder="Penjelasan jawaban..."></textarea>

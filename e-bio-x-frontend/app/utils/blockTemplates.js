@@ -29,9 +29,22 @@ export const builtinTemplates = [
     type: "question",
     icon: "material-symbols:quiz-outline",
     data: {
+      qtype: "multiple_choice",
       question: "Apa kesimpulan utama dari materi ini?",
       options: ["Saya sudah paham.", "Masih perlu mengulang."],
       correct_answer: 0,
+      explanation: "",
+    },
+  },
+  {
+    key: "question-jawaban-singkat",
+    label: "Pertanyaan: Jawaban Singkat",
+    type: "question",
+    icon: "material-symbols:edit-note",
+    data: {
+      qtype: "short_answer",
+      question: "Sebutkan salah satu peranan penting dari materi ini dalam kehidupan sehari-hari.",
+      correct_answer: ["jawaban diterima 1", "jawaban diterima 2"],
       explanation: "",
     },
   },
