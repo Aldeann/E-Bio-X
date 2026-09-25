@@ -196,11 +196,8 @@ const validate = () => {
     case "question": {
       if (!d.question || !d.question.trim()) return fail("Pertanyaan wajib diisi.");
       if (d.qtype === "short_answer") {
-        if (
-          !Array.isArray(d.correct_answer) ||
-          d.correct_answer.filter((s) => s && s.trim()).length === 0
-        )
-          return fail("Masukkan minimal 1 jawaban yang diterima.");
+        // "jawaban yang diterima" opsional — kosongkan untuk soal pemantik
+        // (tanpa penilaian benar/salah).
       } else {
         const filled = d.options.filter((o) => o && o.trim()).length;
         if (filled < 2) return fail("Minimal butuh 2 pilihan jawaban.");
@@ -455,7 +452,7 @@ const save = () => {
       <!-- Jawaban singkat -->
       <template v-else>
         <div>
-          <label class="labelClass">Jawaban yang diterima (satu per baris)</label>
+          <label class="labelClass">Jawaban yang diterima (opsional)</label>
           <textarea
             :class="inputClass"
             rows="2"
@@ -463,7 +460,9 @@ const save = () => {
             :value="(form.correct_answer || []).join('\n')"
             @input="setShortCorrect(form, $event)"
           ></textarea>
-          <p class="text-xs text-gray-400">Penilaian tidak membedakan huruf besar/kecil.</p>
+          <p class="text-xs text-gray-400">
+            Kosongkan untuk soal pemantik — jawaban siswa dicatat tanpa dinilai benar/salah.
+          </p>
         </div>
       </template>
 

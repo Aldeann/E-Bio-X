@@ -65,6 +65,9 @@ const isCorrect = computed(() => {
       const acc = Array.isArray(q.value.correct_answer)
         ? q.value.correct_answer
         : [q.value.correct_answer];
+      // Tidak ada kunci (soal pemantik): jawaban apa pun yang terisi diterima.
+      if (!acc.some((a) => a !== undefined && a !== null && String(a).trim() !== ""))
+        return shortText.value.trim() !== "";
       return acc.some((a) => norm(a) === norm(shortText.value));
     }
     case "matching": {
@@ -92,7 +95,9 @@ const correctDisplay = computed(() => {
       const acc = Array.isArray(q.value.correct_answer)
         ? q.value.correct_answer
         : [q.value.correct_answer];
-      return "Jawaban yang benar: " + acc.join(" / ");
+      const nonEmpty = acc.filter((a) => a !== undefined && a !== null && String(a).trim() !== "");
+      if (nonEmpty.length === 0) return "";
+      return "Jawaban yang benar: " + nonEmpty.join(" / ");
     }
     case "matching": {
       const ans = (q.value.answer || []).map(Number);

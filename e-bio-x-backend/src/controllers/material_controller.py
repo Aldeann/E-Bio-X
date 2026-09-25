@@ -1439,15 +1439,20 @@ def _grade_multi_answer(selected_answer, expected):
 
 
 def _grade_short_answer(selected_answer, expected):
-    """Penilaian isian singkat — cocok case-insensitive pada daftar jawaban diterima."""
+    """Penilaian isian singkat — cocok case-insensitive pada daftar jawaban diterima.
+    Jika tidak ada kunci jawaban (pertanyaan pemantik), jawaban apa pun yang
+    terisi diterima tanpa dinilai benar/salah."""
     text = str(selected_answer or '')
     if isinstance(expected, list) and expected:
         accepted = [_norm_text(x) for x in expected]
         is_correct = _norm_text(text) in accepted
         display = ' / '.join(str(x) for x in expected)
-    else:
+    elif expected:
         is_correct = _norm_text(text) == _norm_text(expected)
-        display = str(expected) if expected else None
+        display = str(expected)
+    else:
+        is_correct = bool(_norm_text(text))
+        display = None
     return is_correct, display, None, {'type': 'short_answer', 'value': text}
 
 
