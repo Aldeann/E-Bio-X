@@ -85,42 +85,11 @@ def _strip_html(text):
     return re.sub(r'\s+', ' ', text).strip()
 
 
-def build_material_context(material, question_text, max_chars=6000):
-    """Retrieve only the relevant material parts (keyword-scored sections)."""
-    if not material:
-        return None
-    ctx = []
-    ctx.append(f"Judul Materi: {material.title}")
-    if material.topic:
-        ctx.append(f"Topik: {material.topic}")
-    if material.learning_objectives:
-        ctx.append(f"Tujuan Pembelajaran:\n{_strip_html(material.learning_objectives)}")
-
-    keywords = list(dict.fromkeys(w for w in re.findall(r'[a-zA-Z]{3,}', (question_text or '').lower())))
-
-    scored = []
-    for sec in material.sections or []:
-        sec_text = sec.title or ''
-        for content in (sec.contents or []):
-            if content.type in ('text', 'heading', 'box', 'link'):
-                data = content.data or {}
-                sec_text += ' ' + _strip_html(data.get('html') or data.get('text') or data.get('url') or '')
-            elif content.type in ('video', 'pdf'):
-                data = content.data or {}
-                sec_text += ' ' + _strip_html(data.get('title') or data.get('caption') or data.get('name') or '')
-        score = sum(1 for kw in keywords if kw in sec_text.lower())
-        scored.append((score, sec.title or '', sec_text))
-
-    scored.sort(key=lambda x: (-x[0], 0))
-    picked = [s for s in scored if s[0] > 0]
-    if not picked and scored:
-        picked = scored[:1]  # fallback to first section so there is SOME context
-    for _, title, sec_text in picked[:3]:
-        snippet = sec_text[:1400]
-        if title:
-            ctx.append(f"Bagian Materi - {title}:\n{snippet}")
-    joined = "\n\n".join(ctx)
-    return joined[:max_chars]
+# NOTE: material context is built by `ai_knowledge_service.material_context_parts`
+# (used by ai_explanation_controller). That is the one to use: it knows the real
+# data shape written by the material block form (`content`, not `html`). A stale
+# local builder used to live here and read the wrong keys, which silently
+# produced empty context; it was removed rather than kept to mislead.
 
 
 class AIExplanationService:
