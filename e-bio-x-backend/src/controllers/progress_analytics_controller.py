@@ -81,7 +81,8 @@ def _enrich_material_detail(user, material):
 
     section_rows = []
     mastery_rows = []
-    section_masteries = []
+    section_mastery = analytics.section_mastery_for_student(user.id, material.id)
+    sec_mastery_map = {r['section_id']: r for r in section_mastery['sections']}
     for sec in sections:
         sid = sec.id
         done = done_ids
@@ -97,19 +98,7 @@ def _enrich_material_detail(user, material):
         sec_ia_total = len(sec_interactive)
         sec_ia_correct = sum(1 for a in sec_interactive if a.is_correct)
         sec_quizzes = Quiz.query.filter_by(section_id=sid).all()
-        sec_q = analytics.quiz_performance_for(user.id, [q.id for q in sec_quizzes])
-        scores_parts = []
-        if sec_ia_total:
-            scores_parts.append(round(sec_ia_correct / sec_ia_total * 100, 1))
-        if sec_q['attempts']:
-            scores_parts.append(sec_q['best'])
-        sec_mastery = round(sum(scores_parts) / len(scores_parts), 1) if scores_parts else (100.0 if completed else 0.0)
-        section_masteries.append(sec_mastery)
-        mastery_rows.append({
-            'source': 'section', 'section_id': sid, 'title': sec.title,
-            'position': sec.position, 'score': sec_mastery,
-            'mastery': analytics.mastery_info(sec_mastery),
-        })
+        sm = sec_mastery_map.get(sid, {})
         section_rows.append({
             'section_id': sid,
             'title': sec.title,
@@ -121,6 +110,20 @@ def _enrich_material_detail(user, material):
             'quiz_count': len(sec_quizzes),
             'interactive_total': sec_ia_total,
             'interactive_correct': sec_ia_correct,
+            'quiz_answered': sm.get('quiz_answered', 0),
+            'quiz_correct': sm.get('quiz_correct', 0),
+            'answered': sm.get('answered', 0),
+            'correct': sm.get('correct', 0),
+            'mastery_status': sm.get('status', 'INSUFFICIENT_DATA'),
+            'mastery_score': sm.get('score'),
+            'mastery': sm.get('mastery'),
+        })
+        mastery_rows.append({
+            'source': 'section', 'section_id': sid, 'title': sec.title,
+            'position': sec.position, 'score': sm.get('score'),
+            'mastery': sm.get('mastery'),
+            'status': sm.get('status', 'INSUFFICIENT_DATA'),
+            'answered': sm.get('answered', 0), 'correct': sm.get('correct', 0),
         })
 
     quizzes = analytics.material_quizzes(material.id)
@@ -142,10 +145,21 @@ def _enrich_material_detail(user, material):
         })
         mastery_rows.append({
             'source': 'quiz', 'quiz_id': q.id, 'title': q.title,
-            'score': qp['best'], 'mastery': analytics.mastery_info(qp['best']),
+            'score': qp['best'] if qp['attempts'] else None,
+            'mastery': analytics.mastery_info(qp['best']) if qp['attempts'] else None,
+            'status': 'READY' if qp['attempts'] else 'INSUFFICIENT_DATA',
+            'answered': qp['attempts'], 'correct': None,
         })
 
-    overall_mastery = round(sum(section_masteries) / len(section_masteries), 1) if section_masteries else base['progress_percentage']
+    ready = [r['score'] for r in section_mastery['sections'] if r['status'] == 'READY']
+    if ready:
+        overall_mastery = round(sum(ready) / len(ready), 1)
+        overall_info = analytics.mastery_info(overall_mastery)
+        mastery_status = 'READY'
+    else:
+        overall_mastery = None
+        overall_info = None
+        mastery_status = 'INSUFFICIENT_DATA'
     interactive = analytics.interactive_stats(user.id, material.id)
     video = analytics.video_stats(user.id, material.id)
     activities = LearningActivity.query.filter_by(
@@ -155,7 +169,10 @@ def _enrich_material_detail(user, material):
     return {
         **base,
         'mastery_score': overall_mastery,
-        'mastery': analytics.mastery_info(overall_mastery),
+        'mastery': overall_info,
+        'mastery_status': mastery_status,
+        'mastery_min_sample': section_mastery['min_sample'],
+        'section_mastery': section_mastery,
         'quiz_performance': quiz_rows,
         'sections': section_rows,
         'mastery_rows': mastery_rows,
@@ -186,6 +203,29 @@ def get_student_material_detail(material_id):
     if not _can_student_access(material, user):
         return jsonify({'error': 'Materi hanya untuk kelas yang diikuti'}), 403
     return jsonify(_enrich_material_detail(user, material)), 200
+
+
+@jwt_required()
+def get_student_section_mastery(material_id):
+    """Diagnosis penguasaan per bagian untuk siswa pada satu materi.
+
+    Endpoint ringan ini adalah sumber tunggal untuk fase berikutnya
+    (rekomendasi per bagian) dan untuk panel diagnosis di UI. Ia tetap
+    memakai aturan akses materi yang sama agar tidak ada kebocoran.
+    """
+    user, err, code = _student()
+    if err:
+        return err, code
+    material = Material.query.get(material_id)
+    if not material:
+        return jsonify({'error': 'Material not found'}), 404
+    if material.status != 'published':
+        return jsonify({'error': 'Materi belum dipublikasikan'}), 403
+    if not _can_student_access(material, user):
+        return jsonify({'error': 'Materi hanya untuk kelas yang diikuti'}), 403
+    data = analytics.section_mastery_for_student(user.id, material.id)
+    data['material_title'] = material.title
+    return jsonify(data), 200
 
 
 @jwt_required()

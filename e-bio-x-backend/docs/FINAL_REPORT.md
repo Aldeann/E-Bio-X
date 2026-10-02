@@ -169,11 +169,19 @@ Dijalankan di lingkungan dev (server `http://127.0.0.1:5000`, MySQL `e_bio`):
 | `test_ml_rec_eval.py` | API evaluasi closed-loop rekomendasi (read-only, otorisasi) | **48/48 PASS** |
 | `test_ml_scope.py` | Scoping model per kelas, versi, akses materi antar kelas | **95/95 PASS** |
 | **Total komponen ML** | | **286/286 PASS** |
+| `test_section_tagging.py` | Fase 1 — penandaan bagian pada soal (`questions.section_id`) | **24/24 PASS** |
+| `test_section_mastery.py` | Fase 2 — diagnosis penguasaan per bagian (ambang minimum, fallback kuis-section, scoping) | **34/34 PASS** |
 | `scripts/verify_ml_readiness.py` | Gate pra-demo: kelengkapan data, model per kelas, scoping guru, integritas klaim & soal kuis | **59/59 PASS** |
 
 `test_tahap4.py` dan `test_tahap5_ml.py` adalah suite API end-to-end yang
 memerlukan server hidup; regresi Tahap 1–4 juga dicakup ulang oleh
 `test_ml_scope.py` dan `test_ml_rec_eval.py` di atas.
+
+Catatan `test_tahap4.py`: 1 pemeriksaan gagal pada data demo saat ini —
+`student detail outside teacher course 403` — karena seluruh 76 siswa demo terdaftar di
+kelas Guru 1, sehingga tidak ada siswa di luar cakupan guru itu untuk memicu 403 (probe
+dinamis berakhir dengan 404 "siswa tidak ditemukan"). Ini kondisi data, bukan regresi kode:
+endpoint `/api/teacher/analytics/students/<id>` tidak berubah di Fase 2.
 
 Smoke khusus keamanan (live) juga dicek: siswa terhadap `/api/users` → 403,
 siswa membuat course → 403, siswa enroll/out ke kelas → memerlukan role siswa,
@@ -210,6 +218,11 @@ guru non-owner terhadap materi/kuis/analisis → 403.
   rekomendasi; ini observasional, bukan bukti kausal.
 - Color label klaster analisis kuis lama hardcoded di frontend (3 warna) — sesuai
   jumlah klaster default.
+- Fitur "bagian materi" sudah sampai Fase 2 (penandaan soal + diagnosis penguasaan per
+  bagian). Ambang minimum 3 jawaban per bagian sengaja tidak bisa dikarang, sehingga bagian
+  dengan data sedikit tampil `INSUFFICIENT_DATA`, bukan angka. Rekomendasi per bagian,
+  gating adaptif, dan petaheatmap siswa × bagian untuk guru belum dikerjakan
+  (lihat `docs/FEATURE_BAGIAN_MASTERY.md`).
 - `SECRET_KEY` dev bernilai placeholder — ganti nilai produksi sebelum rilis.
 
 ---

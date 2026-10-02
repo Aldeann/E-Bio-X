@@ -83,6 +83,7 @@ def create_app():
     )
     from src.controllers.progress_analytics_controller import (
         get_student_dashboard, get_student_progress_list, get_student_material_detail,
+        get_student_section_mastery,
         get_student_quiz_performance, get_student_activity,
         get_teacher_analytics_overview, get_teacher_analytics_options,
         get_teacher_analytics_materials, get_teacher_analytics_material, get_teacher_analytics_quiz,
@@ -226,6 +227,7 @@ def create_app():
     app.add_url_rule('/api/student/dashboard', view_func=get_student_dashboard, methods=['GET'])
     app.add_url_rule('/api/student/progress', view_func=get_student_progress_list, methods=['GET'])
     app.add_url_rule('/api/student/progress/<material_id>', view_func=get_student_material_detail, methods=['GET'])
+    app.add_url_rule('/api/student/sections/<material_id>', view_func=get_student_section_mastery, methods=['GET'])
     app.add_url_rule('/api/student/performance', view_func=get_student_quiz_performance, methods=['GET'])
     app.add_url_rule('/api/student/activity', view_func=get_student_activity, methods=['GET'])
 

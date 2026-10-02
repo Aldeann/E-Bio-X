@@ -205,6 +205,42 @@
                       </div>
                     </div>
                   </div>
+
+                  <div v-if="materialDetail.section_mastery && materialDetail.section_mastery.sections.length" class="mt-4">
+                    <p class="text-xs font-semibold text-gray-500 mb-2">
+                      Penguasaan per Bagian
+                      <span class="font-normal text-gray-400">
+                        · minimal {{ materialDetail.section_mastery.min_sample }} jawaban per bagian
+                      </span>
+                    </p>
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-xs">
+                        <thead>
+                          <tr class="text-left text-gray-400">
+                            <th class="py-1 pr-3 font-medium">Bagian</th>
+                            <th class="py-1 pr-3 font-medium text-right">Dijawab</th>
+                            <th class="py-1 pr-3 font-medium text-right">Benar</th>
+                            <th class="py-1 pr-3 font-medium text-right">Penguasaan</th>
+                            <th class="py-1 font-medium text-right">Siswa</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="s in materialDetail.section_mastery.sections" :key="s.section_id" class="border-t border-gray-100 dark:border-gray-800">
+                            <td class="py-1.5 pr-3 truncate max-w-[16rem]">{{ s.title }}</td>
+                            <td class="py-1.5 pr-3 text-right">{{ s.answered }}</td>
+                            <td class="py-1.5 pr-3 text-right">{{ s.correct }}</td>
+                            <td class="py-1.5 pr-3 text-right">
+                              <span v-if="s.mastery" class="font-semibold" :class="masteryColor(s.mastery.label)">
+                                {{ s.mastery.label }} · {{ s.score }}
+                              </span>
+                              <span v-else class="text-gray-400" :title="s.note || ''">belum cukup data</span>
+                            </td>
+                            <td class="py-1.5 text-right text-gray-500">{{ s.students_answered }}/{{ s.total_students }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </td>
               </tr>
             </tbody>

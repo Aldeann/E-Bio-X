@@ -53,8 +53,12 @@
                 <p class="text-xs text-gray-500">Waktu Belajar</p>
               </div>
               <div class="text-center">
-                <p class="text-2xl font-bold" :class="masteryColor(detail.mastery.label)">{{ detail.mastery.label }}</p>
-                <p class="text-xs text-gray-500">Penguasaan ({{ detail.mastery.score }})</p>
+                <p class="text-2xl font-bold" :class="detail.mastery ? masteryColor(detail.mastery.label) : 'text-gray-400'">
+                  {{ detail.mastery ? detail.mastery.label : "—" }}
+                </p>
+                <p class="text-xs text-gray-500">
+                  {{ detail.mastery ? `Penguasaan (${detail.mastery.score})` : "Data belum cukup" }}
+                </p>
               </div>
             </div>
             <div class="mt-4">
@@ -83,8 +87,24 @@
                   <p class="text-xs text-gray-500">
                     {{ s.content_count }} konten · {{ s.content_viewed }}/{{ s.content_count }} dibuka
                   </p>
+                  <p class="text-xs text-gray-400 mt-0.5">
+                    {{ s.quiz_answered || 0 }} jawaban kuis · {{ s.interactive_total || 0 }} soal interaktif
+                  </p>
                 </div>
-                <span class="text-xs text-gray-500">{{ s.interactive_total }} soal interaktif</span>
+                <span
+                  v-if="s.mastery"
+                  class="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0"
+                  :class="chipClass(s.mastery.label)"
+                >
+                  {{ s.mastery.label }} · {{ s.mastery_score }}
+                </span>
+                <span
+                  v-else
+                  class="text-xs px-2 py-0.5 rounded-full shrink-0 bg-gray-100 dark:bg-gray-800 text-gray-400"
+                  title="Jawaban belum mencapai ambang minimum, skor tidak ditampilkan"
+                >
+                  belum cukup data
+                </span>
               </div>
             </div>
           </div>
@@ -169,15 +189,19 @@
               <div v-for="row in detail.mastery_rows" :key="row.source + '-' + (row.section_id || row.quiz_id)" class="flex items-center gap-3">
                 <div class="flex-1 min-w-0">
                   <p class="text-sm text-gray-800 dark:text-gray-100 truncate">{{ row.title }}</p>
-                  <p class="text-xs text-gray-400">{{ row.source === 'section' ? 'Bagian' : 'Kuis' }}</p>
+                  <p class="text-xs text-gray-400">
+                    {{ row.source === 'section' ? 'Bagian' : 'Kuis' }}
+                    <template v-if="row.status === 'INSUFFICIENT_DATA'"> · data belum cukup</template>
+                  </p>
                 </div>
                 <div class="w-24">
-                  <div class="flex items-center gap-2">
+                  <div v-if="row.mastery" class="flex items-center gap-2">
                     <div class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                       <div class="h-full rounded-full" :class="barColor(row.mastery.label)" :style="{ width: (row.score || 0) + '%' }"></div>
                     </div>
                     <span class="text-xs font-bold w-9 text-right" :class="masteryColor(row.mastery.label)">{{ row.score || 0 }}</span>
                   </div>
+                  <span v-else class="block text-right text-xs text-gray-400">—</span>
                 </div>
               </div>
               <div v-if="detail.mastery_rows.length === 0" class="text-sm text-gray-500">Data penguasaan belum tersedia.</div>
@@ -256,6 +280,15 @@ const masteryColor = (label) => {
 const barColor = (label) => {
   const map = { "Baik Sekali": "bg-green-600", Baik: "bg-emerald-500", Cukup: "bg-amber-500", Kurang: "bg-red-500" };
   return map[label] || "bg-gray-400";
+};
+const chipClass = (label) => {
+  const map = {
+    "Baik Sekali": "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-400",
+    Baik: "bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-400",
+    Cukup: "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-400",
+    Kurang: "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-400",
+  };
+  return map[label] || "bg-gray-100 dark:bg-gray-800 text-gray-500";
 };
 const activityIcon = (t) => {
   const map = {

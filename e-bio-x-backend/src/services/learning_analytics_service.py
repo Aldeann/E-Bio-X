@@ -17,7 +17,7 @@ from src.models.submission import Submission
 from src.models.course import Course
 from src.models.enrollment import Enrollment
 from src.models.user import User
-from sqlalchemy import func, distinct
+from sqlalchemy import func, distinct, case, or_
 
 
 # Canonical difficulty keys used by the ML layer, plus the Indonesian
@@ -327,6 +327,213 @@ def interactive_stats(student_id, material_id):
         'interactive_accuracy': round(correct / total * 100, 1) if total else 0.0,
         'difficulty_accuracy': _difficulty_accuracy_material(student_id, material_id),
     }
+
+
+# ============================================================
+# PER-SECTION MASTERY (Fase 2)
+# ============================================================
+#
+# "Bagian" = MaterialSection. Jawaban salah harus bisa ditelusuri per
+# bagian, bukan hanya per materi. Diagnosis di bawah menggabungkan dua
+# sumber jawaban yang benar-benar tercatat bagiannya:
+#   1. jawaban kuis (Answer) yang SOAL-nya bertag `Question.section_id`
+#      (atau soal tanpa tag pada kuis yang section_id-nya eksplisit), dan
+#   2. jawaban soal interaktif (StudentAnswer.section_id).
+# Bila jawaban sebuah bagian belum mencapai ambang minimum, skor TIDAK
+# dikarang: statusnya INSUFFICIENT_DATA dan hanya hitungan mentah yang
+# dilaporkan. Prinsip ini sama dengan lapisan ML.
+
+MIN_SECTION_SAMPLE = 3
+
+
+def _section_quiz_stats(student_id, material_id):
+    """Hitungan jawaban kuis per bagian untuk satu siswa.
+
+    Sumber bagian: `Question.section_id` bila ada. Bila soal tidak
+    bertag tetapi kuis punya `Quiz.section_id`, jawaban diatribusikan ke
+    bagian kuis itu (aturan eksplisit, bukan tebakan). Soal tanpa tag
+    dan kuis tanpa tag tidak muncul di sini - lebih baik tidak dihitung
+    daripada dipetakan ke bagian yang tidak bisa dibuktikan.
+    """
+    rows = db.session.query(
+        Question.section_id, Quiz.section_id,
+        func.count(Answer.id),
+        func.sum(case((Answer.is_correct.is_(True), 1), else_=0)),
+    ).join(Question, Question.id == Answer.question_id
+    ).join(Submission, Submission.id == Answer.submission_id
+    ).join(Quiz, Quiz.id == Submission.quiz_id
+    ).filter(
+        Answer.student_id == student_id,
+        Submission.status == 'submitted',
+        Quiz.material_id == material_id,
+        Answer.is_correct.isnot(None),
+        or_(Question.section_id.isnot(None), Quiz.section_id.isnot(None)),
+    ).group_by(Question.section_id, Quiz.section_id).all()
+    out = {}
+    for q_sid, quiz_sid, total, correct in rows:
+        sid = q_sid if q_sid is not None else quiz_sid
+        if sid is None:
+            continue
+        bucket = out.setdefault(int(sid), {'answered': 0, 'correct': 0})
+        bucket['answered'] += int(total or 0)
+        bucket['correct'] += int(correct or 0)
+    return out
+
+
+def _section_interactive_stats(student_id, material_id):
+    """Hitungan jawaban soal interaktif per bagian untuk satu siswa."""
+    rows = db.session.query(
+        StudentAnswer.section_id,
+        func.count(StudentAnswer.id),
+        func.sum(case((StudentAnswer.is_correct.is_(True), 1), else_=0)),
+    ).filter(
+        StudentAnswer.student_id == student_id,
+        StudentAnswer.material_id == material_id,
+    ).group_by(StudentAnswer.section_id).all()
+    return {int(sid): {'answered': int(total or 0), 'correct': int(correct or 0)}
+            for sid, total, correct in rows}
+
+
+def _section_mastery_row(section, answered, correct):
+    """Satu baris diagnosis dengan ambang sampel yang jujur."""
+    row = {
+        'section_id': section.id,
+        'title': section.title,
+        'position': section.position,
+        'answered': answered,
+        'correct': correct,
+        'wrong': answered - correct,
+    }
+    if answered >= MIN_SECTION_SAMPLE:
+        score = round(correct / answered * 100, 1)
+        row.update({
+            'score': score,
+            'status': 'READY',
+            'mastery': mastery_info(score),
+            'note': None,
+        })
+    else:
+        row.update({
+            'score': None,
+            'status': 'INSUFFICIENT_DATA',
+            'mastery': None,
+            'note': f"Butuh minimal {MIN_SECTION_SAMPLE} jawaban; baru {answered}.",
+        })
+    return row
+
+
+def section_mastery_for_student(student_id, material_id):
+    """Diagnosis penguasaan per bagian untuk satu siswa pada satu materi.
+
+    Mengembalikan SELURUH bagian materi (termasuk yang belum ada
+    jawabannya) agar peta pemahaman tidak menyembunyikan bagian kosong.
+    """
+    sections = MaterialSection.query.filter_by(
+        material_id=material_id).order_by(MaterialSection.position).all()
+    quiz_stats = _section_quiz_stats(student_id, material_id)
+    ia_stats = _section_interactive_stats(student_id, material_id)
+    rows = []
+    for sec in sections:
+        q = quiz_stats.get(sec.id, {'answered': 0, 'correct': 0})
+        i = ia_stats.get(sec.id, {'answered': 0, 'correct': 0})
+        answered = q['answered'] + i['answered']
+        correct = q['correct'] + i['correct']
+        row = _section_mastery_row(sec, answered, correct)
+        row.update({
+            'quiz_answered': q['answered'],
+            'quiz_correct': q['correct'],
+            'interactive_total': i['answered'],
+            'interactive_correct': i['correct'],
+        })
+        rows.append(row)
+    return {
+        'material_id': material_id,
+        'min_sample': MIN_SECTION_SAMPLE,
+        'sections': rows,
+        'sections_with_data': sum(1 for r in rows if r['status'] == 'READY'),
+        'sections_insufficient': sum(1 for r in rows if r['status'] != 'READY'),
+    }
+
+
+def section_mastery_class(material_id, teacher_id, student_ids=None):
+    """Ringkasan penguasaan per bagian untuk seluruh kelas seorang guru.
+
+    Jujur secara konstruksi: sebuah bagian hanya mendapat skor bila kelas
+    sudah menghasilkan minimal MIN_SECTION_SAMPLE jawaban pada bagian itu.
+    Di bawah ambang, hitungan mentah dan cakupan siswa tetap dilaporkan
+    tetapi akurasi/penguasaan tetap None berstatus INSUFFICIENT_DATA.
+    """
+    if student_ids is None:
+        student_ids = teacher_student_ids(teacher_id)
+    sections = MaterialSection.query.filter_by(
+        material_id=material_id).order_by(MaterialSection.position).all()
+    total_students = len(student_ids)
+    result = {
+        'material_id': material_id,
+        'min_sample': MIN_SECTION_SAMPLE,
+        'total_students': total_students,
+        'sections': [],
+    }
+    if not sections:
+        return result
+
+    buckets = {}
+
+    def _bucket(sid):
+        return buckets.setdefault(int(sid), {'answered': 0, 'correct': 0, 'students': set()})
+
+    if student_ids:
+        q_rows = db.session.query(
+            Question.section_id, Quiz.section_id, Answer.student_id,
+            Answer.is_correct,
+        ).join(Question, Question.id == Answer.question_id
+        ).join(Submission, Submission.id == Answer.submission_id
+        ).join(Quiz, Quiz.id == Submission.quiz_id
+        ).filter(
+            Answer.student_id.in_(student_ids),
+            Submission.status == 'submitted',
+            Quiz.material_id == material_id,
+            Answer.is_correct.isnot(None),
+            or_(Question.section_id.isnot(None), Quiz.section_id.isnot(None)),
+        ).all()
+        for q_sid, quiz_sid, stid, ok in q_rows:
+            sid = q_sid if q_sid is not None else quiz_sid
+            if sid is None:
+                continue
+            b = _bucket(sid)
+            b['answered'] += 1
+            if ok:
+                b['correct'] += 1
+            b['students'].add(stid)
+
+        ia_rows = db.session.query(
+            StudentAnswer.section_id, StudentAnswer.student_id,
+            StudentAnswer.is_correct,
+        ).filter(
+            StudentAnswer.material_id == material_id,
+            StudentAnswer.student_id.in_(student_ids),
+        ).all()
+        for sid, stid, ok in ia_rows:
+            if sid is None:
+                continue
+            b = _bucket(sid)
+            b['answered'] += 1
+            if ok:
+                b['correct'] += 1
+            b['students'].add(stid)
+
+    rows = []
+    for sec in sections:
+        b = buckets.get(sec.id, {'answered': 0, 'correct': 0, 'students': set()})
+        row = _section_mastery_row(sec, b['answered'], b['correct'])
+        row['students_answered'] = len(b['students'])
+        row['total_students'] = total_students
+        rows.append(row)
+
+    result['sections'] = rows
+    result['sections_with_data'] = sum(1 for r in rows if r['status'] == 'READY')
+    result['sections_insufficient'] = sum(1 for r in rows if r['status'] != 'READY')
+    return result
 
 
 def normalize_difficulty(value):
@@ -753,6 +960,7 @@ def material_analytics(material, teacher_id):
         status_dist[sl] = status_dist.get(sl, 0) + 1
 
     difficulty = difficulty_analytics(material.id, teacher_id, quiz_ids=quiz_ids, student_ids=student_ids)
+    section_mastery = section_mastery_class(material.id, teacher_id, student_ids=student_ids)
 
     return {
         'empty': False,
@@ -769,6 +977,7 @@ def material_analytics(material, teacher_id):
         'interactive': interactive,
         'quiz': quiz_totals,
         'section_completion': section_completion,
+        'section_mastery': section_mastery,
         'per_student': sorted(per_student, key=lambda p: p['learning_seconds'], reverse=True),
         'mastery_distribution': mastery_dist,
         'status_distribution': status_dist,
