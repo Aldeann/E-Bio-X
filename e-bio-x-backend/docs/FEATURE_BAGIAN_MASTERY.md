@@ -74,12 +74,13 @@ jujur dan bisa diperbaiki guru; data salah menipu guru dan siswa.
 
 ### 3.1 Sumber jawaban
 
-Dua sumber, keduanya benar-benar menyimpan bagian asal jawabannya:
+Tiga sumber, semuanya benar-benar menyimpan bagian asal jawabannya:
 
 | Sumber | Tabel | Penentu bagian |
 |---|---|---|
 | Jawaban kuis | `Answer` → `Question` → `Submission` → `Quiz` | `Question.section_id`; bila soal tidak bertag tapi kuis punya `Quiz.section_id`, jawaban itu memakai bagian kuis (aturan eksplisit, bukan tebakan) |
 | Jawaban interaktif | `StudentAnswer` | `StudentAnswer.section_id` |
+| Jawaban latihan | `PracticeAnswer` | `PracticeAnswer.section_id` (lihat §5) |
 
 Aturan yang sengaja ditegakkan:
 
@@ -88,6 +89,7 @@ Aturan yang sengaja ditegakkan:
 - `Answer.is_correct IS NULL` diabaikan.
 - Soal **tanpa** tag bagian dan kuis **tanpa** `section_id` tidak dipetakan ke bagian mana pun
   — lebih baik tidak terhitung daripada dipetakan ke bagian yang tidak bisa dibuktikan.
+- Latihan memakai **jawaban terakhir per soal**, bukan jumlah percobaan (§5.4).
 
 ### 3.2 Ambang minimum & kejujuran angka
 
@@ -124,7 +126,9 @@ dan `mastery_status = 'INSUFFICIENT_DATA'` — UI menampilkan "Data belum cukup"
       "answered": 4, "correct": 3, "wrong": 1,
       "quiz_answered": 3, "quiz_correct": 2,
       "interactive_total": 1, "interactive_correct": 1,
-      "score": 75.0, "status": "READY",
+      "practice_answered": 2, "practice_correct": 1, "practice_attempts": 3,
+      "score_sources": ["kuis", "interaktif", "latihan"],
+      "score": 71.4, "status": "READY",
       "mastery": {"label": "Baik", "min_score": 75, "max_score": 89, "score": 75.0},
       "note": null
     },
@@ -137,6 +141,10 @@ dan `mastery_status = 'INSUFFICIENT_DATA'` — UI menampilkan "Data belum cukup"
 
 Seluruh bagian materi dikembalikan, termasuk yang belum punya jawaban, supaya peta pemahaman
 tidak menyembunyikan bagian kosong.
+
+`answered`/`correct` adalah gabungan tiga sumber, dan `score_sources` menyebutkan sumber mana
+saja yang benar-benar menyumbang angka pada baris itu. Rinciannya (`quiz_*`, `interactive_*`,
+`practice_*`) selalu ikut, jadi gabungan tidak pernah menutupi asal-usulnya.
 
 Aturan akses identik dengan `/api/student/progress/<material_id>`: materi harus `published`
 dan siswa harus berhak atas materi tersebut (403 kalau tidak).
@@ -165,8 +173,12 @@ antar kelas. Ringkasan kelas memakai ambang minimum yang sama; bagian di bawah a
 
 **Siswa — halaman progres** `GET /api/student/progress/<material_id>` kini menambah:
 `section_mastery` (payload lengkap di atas), `mastery_status`, `mastery_min_sample`,
-serta `sections[].{quiz_answered, quiz_correct, answered, correct, mastery_status,
-mastery_score, mastery}` dan `mastery_rows[].status`. Kunci lama tidak dihapus.
+serta `sections[].{quiz_answered, quiz_correct, practice_answered, practice_correct,
+practice_total, score_sources, answered, correct, mastery_status, mastery_score,
+mastery}` dan `mastery_rows[].status`. Kunci lama tidak dihapus.
+
+`practice_total` = berapa soal latihan yang **sudah disetujui guru** untuk bagian itu; dipakai
+UI untuk menyalakan tombol Latihan dan mematikan tombol dengan alasan bila belum ada soalnya.
 
 ### 3.4 UI Fase 2
 
@@ -310,30 +322,131 @@ prompt tidak memuat bagian sebelah.
 
 ---
 
-## 5. Cara demo (alur yang bisa ditunjukkan)
+## 5. Fase 3d — latihan siswa dari soal yang sudah disetujui
+
+3a–3c menyiapkan soal latihannya, tapi belum ada yang memakainya. 3d menutup
+loop itu: guru menyetujui soal → siswa bisa mengerjakannya dari halaman progres.
+
+### 5.1 Tabel jawaban yang terpisah
+
+`practice_answers` (baru) dipakai untuk jawaban latihan, **bukan** `student_answers`.
+
+Alasannya bukan sekadar Luhur kode: `student_answers.content_id` adalah `NOT NULL` dan menunjuk
+`material_contents`, jadi maknanya "siswa menjawab blok interaktif milik materi ini". Jawaban
+soal bank menunjuk `question_bank`, bukan blok materi. Memaksanya masuk ke sana berarti
+mengarang relasi yang tidak ada, dan membuat hitungan kuis/interaktif ikut tercampur latihan
+tanpa disadari. Tabel terpisah membuat sumber data tidak bisa tercampur diam-diam —
+dan jadi tidak perlu kolom penanda pada tabel lama.
+
+Kolom: `student_id`, `material_id`, `section_id`, `bank_question_id`, `selected_option`,
+`is_correct`, `attempt_no`, `question_snapshot`, `answered_at`.
+
+`question_snapshot` menyimpan teks soal seperti yang tampil saat dijawab. Kalau guru menyunting
+soalnya belakangan, catatan lama tetap bisa dibaca apa adanya yang dinilai siswa.
+
+### 5.2 Endpoint siswa
+
+| Method | Path | Fungsi |
+|---|---|---|
+| GET | `/api/student/practice/<mid>/sections` | Bagian mana yang punya soal latihan + progress siswa |
+| GET | `/api/student/practice/<mid>/sections/<sid>` | Soal `APPROVED` bagian itu, **tanpa** kunci |
+| POST | `/api/student/practice/<mid>/sections/<sid>/answer` | Nilai satu jawaban + catat-legal |
+
+Gerbang yang sama untuk ketiganya: role siswa, materi `published`, siswa berhak atas materi itu,
+dan bagian benar-benar milik materi tersebut (bagian materi lain → 404).
+
+### 5.3 Aturan yang dijaga
+
+1. **Hanya `APPROVED`.** `DRAFT` dan `REJECTED` tidak muncul di daftar, tidak bisa diambil,
+   dan menjawabnya ditolak 403. Status dicek **lagi** di endpoint jawaban, bukan hanya saat
+   pemuatan — status bisa berubah di antara keduanya.
+2. **Kunci jawaban tidak pernah ada di respons pemuatan.** `is_correct`, `explanation`,
+   `misconception`, dan `feedback` per opsi baru muncul setelah jawaban terkirim. Diperiksa
+   dengan menelusuri seluruh payload.
+3. **Penilaian di server.** Klien mengirim `selected_option`, dan server mencocokkannya dengan
+   `order_index` yang tersimpan di database. Mengirim `option_id` baris (yang menunjuk kunci)
+   tidak dipercaya — kalau tidak cocok dengan `order_index`, jawabannya 400.
+4. **Bagian kosong tidak dikaryakan.** Tanpa soal `APPROVED`, jawabannya 200 dengan daftar kosong
+   dan alasan tertulis. Tidak ada fallback ke bagian lain, tidak ada soal racikan, bukan 404.
+5. **Tidak ada kebocoran antar kelas.** Sama seperti halaman progres: materi harus dipublikasikan
+   dan siswa harus mengikuti kelasnya. Id atau opsi yang tidak berbentuk angka dijawab 4xx
+   yang jujur, bukan 500.
+
+### 5.4 Mengulang tidak menggelembungkan angka
+
+Soal boleh diulang sebagai latihan dan **semua percobaan disimpan** apa adanya
+(`attempt_no` naik). Yang dihitung untuk diagnosis adalah **jawaban terakhir per soal**:
+mengulang satu soal yang salah sampai benar tetap terhitung sebagai satu soal terjawab. Dengan
+itu, angka `practice_answered` tidak bisa dibuat naik hanya dengan mengulang-ulang, dan
+`practice_attempts` tetap melaporkan berapa kali sebenarnya siswa mencoba.
+
+### 5.5 UI
+
+- `student/progress/[material_id].vue`
+  - tiap bagian punya tombol **Latihan (n)**; `n` = soal yang disetujui guru. Kalau `n = 0`,
+    tombol mati dengan penjelasan "Belum ada soal latihan yang disetujui guru untuk bagian ini".
+  - ringkasan jawaban tiap bagian mentions jumlah soal latihan yang sudah dikerjakan.
+  - ada catatan bahwa angka penguasaan adalah gabungan kuis + interaktif + latihan.
+- `student/SectionPracticeModal.vue` (baru) — satu soal pada satu waktu: pilih opsi →
+  **Periksa Jawaban** → langsung tampil pembahasan, miskonsepsi yang diuji, dan alasan tiap
+  opsi (bukan hanya opsi yang benar). Di akhir ada rekap jawaban latihan bagian itu.
+
+### 5.6 Test
+
+`test_student_practice.py` — **73/73 PASS**, antara lain memverifikasi: tabel terpisah ada dan
+`student_answers` lama tidak berubah; hanya `APPROVED` yang terlihat dan bisa dijawab;
+`is_correct`/`explanation`/`misconception`/`feedback` tidak bocor di respons muat; bagian kosong
+200 + alasan; `option_id` ditolak; soal bagian lain dan status `DRAFT` ditolak; lima percobaan
+tetap dihitung satu soal terjawab; diagnosis Fase 2 menerima latihan sebagai sumber terpisah,
+`score_sources` terbuka, ambang minimum tetap berlaku, dan 3 soal latihan benar menghasilkan
+`66.7` (2 benar dari 3, tidak dikarang); siswa luar kelas 403; id/opsi rusak jadi 4xx
+yang jujur, bukan 500.
+
+### 5.7 Data demo
+
+`scripts/tag_demo_practice_sections.py` menautkan 6 soal bank lama ke bagian yang benar-benar
+membahas isinya (eksplisit, tanpa pencocokan teks), dan
+`scripts/seed_practice_feedback.py` mengisi pembahasan, miskonsepsi, dan feedback per opsi
+untuk soal-soal itu. Keduanya idempoten, default dry-run, dan **tidak pernah menyetujui soal**
+— itu tetap keputusan guru.
+
+Hasil di data demo: bagian "Bagaimana Struktur Virus?" 4 soal, "Cara Virus Berkembang Biak" 1,
+"Kekayaan Keanekaragaman Hayati Indonesia" 1, "Pemanfaatan dan Pelestarian Keanekaragaman
+Hayati" 1. Dua draf AI lain sengaja dibiarkan `DRAFT` untuk peragaan persetujuan langsung.
+
+---
+
+## 6. Cara demo (alur yang bisa ditunjukkan)
 
 1. Login sebagai guru, buka sebuah kuis, isi kolom "Bagian Materi" pada kuis, tekan
    **Terapkan bagian ke semua soal**. Lencana bagian langsung muncul di tiap soal.
 2. Login sebagai siswa, kerjakan kuis itu sehingga tiap bagian punya jawaban
-   (perLU minimal 3 jawaban per bagian agar skor muncul).
+   (perlu minimal 3 jawaban per bagian agar skor muncul).
 3. Buka **Riwayat Belajar → materi → detail**: tiap bagian menampilkan jumlah jawaban kuis,
-   jumlah soal interaktif, dan lencana penguasaan. Bagian dengan < 3 jawaban tampil
-   "belum cukup data" — itu disengaja, bukan bug.
+   jumlah soal interaktif, jumlah soal latihan, dan lencana penguasaan. Bagian dengan < 3 jawaban
+   tampil "belum cukup data" — itu disengaja, bukan bug.
 4. Login sebagai guru, buka **Analytics → Per Materi**, klik baris materi: tabel
    "Penguasaan per Bagian" menampilkan akurasi per bagian dan berapa siswa yang menjawabnya.
-5. (Fase 3) Login sebagai guru, buka menu **Latihan Bagian**:
+5. (Fase 3a–3c) Login sebagai guru, buka menu **Latihan Bagian**:
    - di tab "Bagian Materi" tekan **Buat draf** pada sebuah bagian → masuk tab "Antrean
      Review" → periksa isi soalnya → **Setujui**. Bagian itu kini punya soal latihan yang
      benar-benar disetujui manusia.
    - buka **Bank Soal** untuk melihat lencana status yang sama, dan untuk menulis soal
      sendiri yang langsung tertaut ke bagian.
+6. (Fase 3d) Di halaman progres siswa, tekan **Latihan** pada bagian yang sudah punya soal
+   disetujui: satu soal muncul, siswa memilih opsi, lalu **Periksa Jawaban** langsung
+   menampilkan pembahasan, miskonsepsi, dan alasan tiap opsi.
+7. Muat ulang halaman progres: bagian itu kini menampilkan jumlah soal latihan yang dikerjakan,
+   dan angkanya masuk ke lencana penguasaan sebagai sumber tersendiri.
 
-Data demo sudah punya 3 draf AI yang menunggu review pada bagian "Bagaimana Struktur Virus?"
+Data demo sudah punya 2 draf AI yang menunggu review pada bagian "Bagaimana Struktur Virus?"
 (materi `[DEMO] VIRUS`), jadi langkah review bisa langsung ditunjukkan tanpa memanggil AI.
+Empat bagian lain sudah punya soal latihan yang disetujui, jadi langkah 6 bisa langsung
+ditunjukkan juga.
 
 ---
 
-## 6. Batasan yang perlu diketahui
+## 7. Batasan yang perlu diketahui
 
 - **Data demo belum bertag bagian.** Semua soal yang ada sekarang masih `section_id = NULL`,
   jadi di data demo diagnosis siswa akan didominasi `INSUFFICIENT_DATA` sampai guru menandai
@@ -342,18 +455,23 @@ Data demo sudah punya 3 draf AI yang menunggu review pada bagian "Bagaimana Stru
 - Ambang 3 jawaban dipilih agar angka tidak berubah-ubah karena satu soal. Ini konstanta kode,
   belum bisa diatur guru.
 - Diagnosis baru untuk **materi**; belum ada agregasi lintas materi per bagian.
-- Bobot gabungan kuis + interaktif dihitung pada tingkat jawaban (bukan rata-rata dua
-  persentase), sehingga kuis dengan 10 soal memberi bobot lebih besar daripada 1 soal interaktif.
+- Bobot gabungan kuis + interaktif + latihan dihitung pada tingkat jawaban (bukan rata-rata
+  persentase), sehingga kuis dengan 10 soal memberi bobot lebih besar daripada 1 soal latihan.
+  Karena bobot latihan ikut masuk, **soal latihan yang jauh lebih mudah akan menaikkan skor
+  penguasaan** — ini konsekuensi dari memasukkan latihan sebagai sumber, dan_numbers sumbernya
+  selalu ditampilkan per baris supaya bisa dinilai.
 - **Bagian dengan isi tipis menghasilkan soal yang tidak berguna.** Contoh di data demo:
   bagian "Siklus Replikasi Virus" hanya berisi satu kalimat ringkasan, sehingga AI tidak
   punya facts untuk diuji. Pertanyaan meta otomatis dibuang dan dilaporkan di
   `skipped_count`, tapi jawaban terbaiknya tetap: guru yang menambah isi bagian.
 - **Penyedia AI kadang sibuk (HTTP 503 "high demand").** Sudah ditangani 3 percobaan dengan
   jeda pendek, tapi kalau gagal tetap gagal dengan pesan jujur — tidak ada soal karangan.
-  Untuk demo, siapkan draf lebih dulu (sudah tersedia 3 draf) daripada bergantung pada AI live.
-- **Soal latihan belum bisa dipakai siswa.** 3a–3c baru menyiapkan dan menyetujui soal;
-  student-facing practice runner dan rekomendasi per bagian (bagian yang lemah → latihan
-  mana) belum ada. Rekomendasi masih per-materi (`Recommendation.material_id` NOT NULL),
-  belum ada gating, dan belum ada peta panas siswa × bagian.
+  Untuk demo, siapkan draf lebih dulu (sudah tersedia 2 draf) daripada bergantung pada AI live.
+- **Rekomendasi per bagian belum ada.** Yang ada baru latihan per bagian;/engine rekomendasi
+  masih per-materi (`Recommendation.material_id` NOT NULL), belum ada gating, dan belum ada
+  peta panas siswa × bagian.
+- **Tidak ada batas percobaan latihan.** Siswa boleh mengerjakan berkali-kali (§5.4).
+  Yang perlu diketahui guru: angka latihan bertumpu pada **jawaban terakhir**, bukan banyaknya
+  percobaan, jadi mengulang-ulang tidak membuat angka terlihat naik.
 - **Guru masih harus menandai bagian soal kuis sendiri** supaya diagnosis Fase 2 punya
   sumber jawaban; tidak ada tebakan otomatis.

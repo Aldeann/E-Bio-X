@@ -15,6 +15,7 @@ from src.models.enrollment import Enrollment
 from src.controllers.material_controller import _can_student_access, _can_manage
 from src.config.database import db
 from src.services import learning_analytics_service as analytics
+from src.services import student_practice_service as spractice
 
 
 def _user():
@@ -82,6 +83,10 @@ def _enrich_material_detail(user, material):
     section_rows = []
     mastery_rows = []
     section_mastery = analytics.section_mastery_for_student(user.id, material.id)
+    # Berapa soal latihan yang sudah disetujui guru per bagian. Disini supaya
+    # halaman progres bisa menyalakan tombol Latihan tanpa permintaan kedua,
+    # dan mematikan tombol dengan alasan bila belum ada soalnya.
+    practice_total_map = spractice.approved_count_map([s.id for s in sections])
     sec_mastery_map = {r['section_id']: r for r in section_mastery['sections']}
     for sec in sections:
         sid = sec.id
@@ -112,6 +117,10 @@ def _enrich_material_detail(user, material):
             'interactive_correct': sec_ia_correct,
             'quiz_answered': sm.get('quiz_answered', 0),
             'quiz_correct': sm.get('quiz_correct', 0),
+            'practice_answered': sm.get('practice_answered', 0),
+            'practice_correct': sm.get('practice_correct', 0),
+            'practice_total': practice_total_map.get(sid, 0),
+            'score_sources': sm.get('score_sources', []),
             'answered': sm.get('answered', 0),
             'correct': sm.get('correct', 0),
             'mastery_status': sm.get('status', 'INSUFFICIENT_DATA'),

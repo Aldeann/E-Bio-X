@@ -17,6 +17,7 @@ from .submission import Submission
 from .answer import Answer
 from .question_bank import QuestionBank
 from .question_bank_option import QuestionBankOption
+from .practice_answer import PracticeAnswer
 from .forum import (
     Forum, ForumMember, ForumPost, ForumReaction, ForumMention,
     ForumAttachment, ForumQuestion, ForumAnswer, ForumFeedback,

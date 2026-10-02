@@ -17,6 +17,7 @@ from src.models.submission import Submission
 from src.models.course import Course
 from src.models.enrollment import Enrollment
 from src.models.user import User
+from src.services.student_practice_service import latest_attempts
 from sqlalchemy import func, distinct, case, or_
 
 
@@ -334,11 +335,15 @@ def interactive_stats(student_id, material_id):
 # ============================================================
 #
 # "Bagian" = MaterialSection. Jawaban salah harus bisa ditelusuri per
-# bagian, bukan hanya per materi. Diagnosis di bawah menggabungkan dua
+# bagian, bukan hanya per materi. Diagnosis di bawah menggabungkan tiga
 # sumber jawaban yang benar-benar tercatat bagiannya:
 #   1. jawaban kuis (Answer) yang SOAL-nya bertag `Question.section_id`
-#      (atau soal tanpa tag pada kuis yang section_id-nya eksplisit), dan
-#   2. jawaban soal interaktif (StudentAnswer.section_id).
+#      (atau soal tanpa tag pada kuis yang section_id-nya eksplisit),
+#   2. jawaban soal interaktif (StudentAnswer.section_id), dan
+#   3. jawaban latihan (PracticeAnswer.section_id), satu baris per soal
+#      memakai jawaban TERAKHIR (lihat student_practice_service).
+# Ketiganya melaporkan ANGKA MEREKA SENDIRI di baris yang sama, jadi gabungan
+# tidak pernah menutupi asal-usulnya.
 # Bila jawaban sebuah bagian belum mencapai ambang minimum, skor TIDAK
 # dikarang: statusnya INSUFFICIENT_DATA dan hanya hitungan mentah yang
 # dilaporkan. Prinsip ini sama dengan lapisan ML.
@@ -394,6 +399,25 @@ def _section_interactive_stats(student_id, material_id):
             for sid, total, correct in rows}
 
 
+def _section_practice_stats(material_id, student_ids):
+    """Hitungan latihan per bagian, satu soal = jawaban terakhir.
+
+    Dihitung dari tabel `practice_answers` yang terpisah, bukan dari
+    `student_answers`: keduanya memang jenis aktivitas berbeda dan tidak boleh
+    tercampur diam-diam. latest_attempts() sudah memakai jawaban terakhir per soal.
+    """
+    out = {}
+    for sid, _stid, _bqid, ok, attempts in latest_attempts(material_id, student_ids):
+        bucket = out.setdefault(int(sid), {
+            'answered': 0, 'correct': 0, 'attempts': 0, 'students': set()})
+        bucket['answered'] += 1
+        bucket['attempts'] += attempts
+        if ok:
+            bucket['correct'] += 1
+        bucket['students'].add(_stid)
+    return out
+
+
 def _section_mastery_row(section, answered, correct):
     """Satu baris diagnosis dengan ambang sampel yang jujur."""
     row = {
@@ -432,18 +456,32 @@ def section_mastery_for_student(student_id, material_id):
         material_id=material_id).order_by(MaterialSection.position).all()
     quiz_stats = _section_quiz_stats(student_id, material_id)
     ia_stats = _section_interactive_stats(student_id, material_id)
+    practice = _section_practice_stats(material_id, student_id)
     rows = []
     for sec in sections:
         q = quiz_stats.get(sec.id, {'answered': 0, 'correct': 0})
         i = ia_stats.get(sec.id, {'answered': 0, 'correct': 0})
-        answered = q['answered'] + i['answered']
-        correct = q['correct'] + i['correct']
+        p = practice.get(sec.id, {
+            'answered': 0, 'correct': 0, 'attempts': 0})
+        answered = q['answered'] + i['answered'] + p['answered']
+        correct = q['correct'] + i['correct'] + p['correct']
         row = _section_mastery_row(sec, answered, correct)
         row.update({
             'quiz_answered': q['answered'],
             'quiz_correct': q['correct'],
             'interactive_total': i['answered'],
             'interactive_correct': i['correct'],
+            'practice_answered': p['answered'],
+            'practice_correct': p['correct'],
+            'practice_attempts': p['attempts'],
+            # Sumber mana saja yang menyumbang angka di baris ini.
+            # Disajikan terbuka supaya gabungan tiga sumber tidak pernah
+            # dibaca sebagai satu sumber tunggal.
+            'score_sources': [name for name, count in (
+                ('kuis', q['answered']),
+                ('interaktif', i['answered']),
+                ('latihan', p['answered']),
+            ) if count],
         })
         rows.append(row)
     return {
@@ -521,6 +559,14 @@ def section_mastery_class(material_id, teacher_id, student_ids=None):
             if ok:
                 b['correct'] += 1
             b['students'].add(stid)
+
+        # Latihan: satu baris per (siswa, soal) berisi jawaban terakhir, jadi
+        # kelas yang mengerjakan ulang soal yang sama tidak menambah bukti.
+        for sid, p in _section_practice_stats(material_id, student_ids).items():
+            b = _bucket(sid)
+            b['answered'] += p['answered']
+            b['correct'] += p['correct']
+            b['students'].update(p['students'])
 
     rows = []
     for sec in sections:

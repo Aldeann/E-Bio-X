@@ -89,8 +89,24 @@
                   </p>
                   <p class="text-xs text-gray-400 mt-0.5">
                     {{ s.quiz_answered || 0 }} jawaban kuis · {{ s.interactive_total || 0 }} soal interaktif
+                    <template v-if="s.practice_answered">
+                      · {{ s.practice_answered }} soal latihan
+                    </template>
                   </p>
                 </div>
+                <button
+                  class="text-xs px-2.5 py-1 rounded-lg shrink-0 transition border"
+                  :class="s.practice_total
+                    ? 'border-green-600 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-400 cursor-not-allowed'"
+                  :disabled="!s.practice_total"
+                  :title="s.practice_total
+                    ? `${s.practice_total} soal latihan disetujui guru untuk bagian ini`
+                    : 'Belum ada soal latihan yang disetujui guru untuk bagian ini'"
+                  @click="openPractice(s)"
+                >
+                  Latihan{{ s.practice_total ? ` (${s.practice_total})` : '' }}
+                </button>
                 <span
                   v-if="s.mastery"
                   class="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0"
@@ -107,6 +123,10 @@
                 </span>
               </div>
             </div>
+            <p class="text-xs text-gray-400 mt-2">
+              Angka penguasaan di bawah adalah gabungan jawaban kuis, soal interaktif, dan latihan;
+              rincian per sumber ada di tiap bagian.
+            </p>
           </div>
 
           <!-- Interactive & video -->
@@ -237,6 +257,15 @@
         </div>
       </div>
     </template>
+
+    <StudentSectionPracticeModal
+      :open="practiceOpen"
+      :material-id="detail ? detail.material_id : null"
+      :section-id="practiceSection ? practiceSection.section_id : null"
+      :section-title="practiceSection ? practiceSection.title : ''"
+      @close="closePractice"
+      @answered="onPracticeAnswered"
+    />
   </div>
 </template>
 
@@ -248,6 +277,22 @@ const toast = useToast();
 
 const detail = ref(null);
 const loading = ref(true);
+const practiceOpen = ref(false);
+const practiceSection = ref(null);
+
+const openPractice = (section) => {
+  if (!section.practice_total) return;
+  practiceSection.value = section;
+  practiceOpen.value = true;
+};
+const closePractice = () => {
+  practiceOpen.value = false;
+  practiceSection.value = null;
+};
+// Jawaban latihan ikut dihitung pada diagnosis per bagian (Fase 2), jadi
+// angka di halaman ini disegarkan dari server setelah menjawab - bukan
+// optimistic di lokal, supaya yang tampil sama dengan yang tersimpan.
+const onPracticeAnswered = () => load();
 
 const minutesOf = (s) => {
   s = s || 0;

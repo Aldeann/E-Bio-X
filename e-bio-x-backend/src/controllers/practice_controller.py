@@ -1,6 +1,6 @@
-"""Teacher endpoints for practice questions per material section (Fase 3).
+"""Practice questions per material section (Fase 3).
 
-Three jobs, in the order the workflow runs:
+Teacher side, in the order the workflow runs:
 
 1. ``GET  /api/teacher/practice/sections`` - sections the teacher owns with raw
    draft counts, so the UI can say "bagian ini belum ada soal latihan" instead
@@ -10,16 +10,28 @@ Three jobs, in the order the workflow runs:
    section tag comes from the section record, never from the model output.
 3. ``POST /api/teacher/practice/drafts/<id>/approve|reject`` - the teacher's
    decision. Only APPROVED questions can be used as practice later.
+
+Student side (3d):
+
+4. ``GET  /api/student/practice/<material_id>/sections`` - which sections have
+   practice questions, and how many this student already answered.
+5. ``GET  /api/student/practice/<material_id>/sections/<section_id>`` - the
+   APPROVED questions of one section, without the answer key.
+6. ``POST /api/student/practice/<material_id>/sections/<section_id>/answer`` -
+   grade one answer and record the attempt.
 """
 from flask import request, jsonify
 from flask_jwt_extended import jwt_required
 from datetime import datetime
 
 from src.config.database import db
+from src.models.material import Material
 from src.models.material_section import MaterialSection
 from src.models.question_bank import QuestionBank
 from src.models.question_bank_option import QuestionBankOption
 from src.services import practice_bank_service as practice
+from src.services import student_practice_service as spractice
+from src.services.learning_analytics_service import student_can_access_material
 from src.controllers.quiz_controller import (
     _cur_user,
     _is_teacher,
@@ -248,3 +260,175 @@ def reject_bank_draft(bank_id):
         'message': 'Draf ditolak dan tidak akan dipakai sebagai latihan',
         'question': _serialize_bank(bq),
     }), 200
+
+
+# ============================================================
+# STUDENT SIDE (Fase 3d)
+# ============================================================
+#
+# Gate yang dipakai ketiganya sama: siswa, materi sudah dipublikasikan, dan
+# siswa berhak atas materi itu (kelas yang diikuti). Bagian juga harus benar
+# milik materi tersebut, jadi tidak ada jalan untuk menjangkau bagian materi
+# lain hanya karena tahu id-nya.
+
+def _int_or_none(value):
+    """Id dari kiriman yang mungkin rusak. None berarti "tidak ada id",
+    bukan exception 500 dari dalam SQLAlchemy."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _practice_guard(material_id, section_id=None):
+    user = _cur_user()
+    if not user:
+        return None, None, (jsonify({'error': 'User not found'}), 404)
+    if user.role != 'student':
+        return None, None, (jsonify({'error': 'Endpoint ini khusus siswa'}), 403)
+
+    material = Material.query.get(_int_or_none(material_id))
+    if not material:
+        return None, None, (jsonify({'error': 'Materi tidak ditemukan'}), 404)
+    if material.status != 'published':
+        return None, None, (jsonify({'error': 'Materi belum dipublikasikan'}), 403)
+    if not student_can_access_material(user, material):
+        return None, None, (
+            jsonify({'error': 'Materi hanya untuk kelas yang diikuti'}), 403)
+
+    section = None
+    if section_id is not None:
+        section = MaterialSection.query.filter_by(
+            id=_int_or_none(section_id), material_id=material.id).first()
+        if not section:
+            return None, None, (
+                jsonify({'error': 'Bagian tidak ditemukan pada materi ini'}), 404)
+    return user, (material, section), None
+
+
+@jwt_required()
+def get_student_practice_sections(material_id):
+    """Bagian mana dari materi ini yang punya soal latihan, dan progress siswa."""
+    user, ctx, err = _practice_guard(material_id)
+    if err:
+        return err
+    material, _ = ctx
+
+    sections = MaterialSection.query.filter_by(
+        material_id=material.id).order_by(MaterialSection.position).all()
+    approved = spractice.approved_count_map([s.id for s in sections])
+    stats = spractice.practice_stats(user.id, material.id)
+
+    rows = []
+    for sec in sections:
+        st = stats.get(sec.id, {'answered': 0, 'correct': 0, 'attempts': 0})
+        total = approved.get(sec.id, 0)
+        rows.append({
+            'section_id': sec.id,
+            'title': sec.title,
+            'position': sec.position,
+            # 0 = tidak ada soal yang disetujui guru. UI_DISABLE tombolnya
+            # dan menjelaskan kenapa, bukan membuat soal lain.
+            'practice_total': total,
+            'practice_answered': st['answered'],
+            'practice_correct': st['correct'],
+            'practice_attempts': st['attempts'],
+            'available': total > 0,
+        })
+
+    return jsonify({
+        'material_id': material.id,
+        'material_title': material.title,
+        'sections': rows,
+        'sections_with_practice': sum(1 for r in rows if r['available']),
+        'sections_total': len(rows),
+        # Reminder supaya angka latihan tidak dibaca sebagai nilai Finally.
+        'note': 'Hanya soal yang sudah disetujui guru yang dihitung sebagai latihan.',
+    }), 200
+
+
+@jwt_required()
+def get_student_practice_questions(material_id, section_id):
+    """Soal latihan satu bagian. Kunci jawaban TIDAK ikut di respons ini."""
+    user, ctx, err = _practice_guard(material_id, section_id)
+    if err:
+        return err
+    material, section = ctx
+
+    items = spractice.approved_for_section(section.id)
+    served = items[:spractice.MAX_SERVED]
+    stats = spractice.practice_stats(user.id, material.id).get(
+        section.id, {'answered': 0, 'correct': 0, 'attempts': 0})
+
+    message = None
+    if not items:
+        message = (f'Belum ada soal latihan yang disetujui guru untuk bagian '
+                   f'"{section.title}".')
+    elif len(items) > len(served):
+        message = (f'Bagian ini punya {len(items)} soal latihan; '
+                   f'{len(served)} yang ditampilkan sekaligus.')
+
+    return jsonify({
+        'material_id': material.id,
+        'section_id': section.id,
+        'section_title': section.title,
+        'questions': [spractice.question_for_student(bq) for bq in served],
+        'total_available': len(items),
+        'total_served': len(served),
+        'practice_answered': stats['answered'],
+        'practice_correct': stats['correct'],
+        'message': message,
+    }), 200
+
+
+@jwt_required()
+def submit_student_practice_answer(material_id, section_id):
+    """Nilai satu jawaban latihan dan catat-legal sebagai bukti belajar.
+
+    Server memuat ulang soalnya dari bank dan mencocokkan `selected_option`
+    dengan `order_index` yang tersimpan, jadi kiriman klien tidak bisa memilih
+    kunci jawaban secara langsung.
+    """
+    user, ctx, err = _practice_guard(material_id, section_id)
+    if err:
+        return err
+    material, section = ctx
+
+    data = request.get_json(silent=True) or {}
+    raw = data.get('selected_option', data.get('selected_index'))
+    if raw is None:
+        return jsonify({'error': 'Opsi jawaban belum dikirim'}), 400
+    try:
+        selected = int(raw)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Opsi jawaban tidak valid'}), 400
+
+    bq = QuestionBank.query.get(_int_or_none(data.get('bank_question_id')))
+    if not bq:
+        return jsonify({'error': 'Soal latihan tidak ditemukan'}), 404
+    # Diperiksa ulang di sini, bukan hanya saat pemuatan: status bisa berubah
+    # di antara keduanya dan soalnya bisa saja bukan milik bagian ini.
+    if bq.status != 'APPROVED':
+        return jsonify({'error': 'Soal ini belum disetujui guru, tidak bisa dikerjakan'}), 403
+    if bq.section_id != section.id:
+        return jsonify({'error': 'Soal ini bukan milik bagian yang diminta'}), 400
+
+    graded = spractice.grade(bq, selected)
+    if graded is None:
+        return jsonify({'error': 'Opsi jawaban tidak ditemukan pada soal ini'}), 400
+
+    row = spractice.record(user.id, material.id, section.id, bq, graded)
+    db.session.commit()
+
+    stats = spractice.practice_stats(user.id, material.id).get(
+        section.id, {'answered': 0, 'correct': 0, 'attempts': 0})
+
+    payload = dict(graded)
+    payload.update({
+        'section_id': section.id,
+        'section_title': section.title,
+        'attempt_no': row.attempt_no,
+        'practice_answered': stats['answered'],
+        'practice_correct': stats['correct'],
+    })
+    return jsonify(payload), 200

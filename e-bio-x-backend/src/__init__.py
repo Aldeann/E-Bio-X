@@ -65,6 +65,8 @@ def create_app():
     from src.controllers.practice_controller import (
         get_practice_sections, generate_section_drafts, get_draft_queue,
         approve_bank_draft, reject_bank_draft,
+        get_student_practice_sections, get_student_practice_questions,
+        submit_student_practice_answer,
     )
     from src.controllers.forum_controller import (
         list_forums, create_forum, get_forum_detail, update_forum, delete_forum,
@@ -207,6 +209,12 @@ def create_app():
     app.add_url_rule('/api/teacher/practice/drafts', view_func=get_draft_queue, methods=['GET'])
     app.add_url_rule('/api/teacher/practice/drafts/<bank_id>/approve', view_func=approve_bank_draft, methods=['POST'])
     app.add_url_rule('/api/teacher/practice/drafts/<bank_id>/reject', view_func=reject_bank_draft, methods=['POST'])
+
+    # Student practice runner (Fase 3d). Only APPROVED questions are ever served;
+    # the answer key appears only in the response to an answer.
+    app.add_url_rule('/api/student/practice/<material_id>/sections', view_func=get_student_practice_sections, methods=['GET'])
+    app.add_url_rule('/api/student/practice/<material_id>/sections/<section_id>', view_func=get_student_practice_questions, methods=['GET'])
+    app.add_url_rule('/api/student/practice/<material_id>/sections/<section_id>/answer', view_func=submit_student_practice_answer, methods=['POST'])
 
     app.add_url_rule('/api/student/quizzes', view_func=get_student_quizzes, methods=['GET'])
     app.add_url_rule('/api/student/quizzes/<quiz_id>', view_func=get_student_quiz, methods=['GET'])
