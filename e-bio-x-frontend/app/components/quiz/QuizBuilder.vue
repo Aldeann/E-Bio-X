@@ -24,6 +24,9 @@
               <span v-if="quiz.material_title" class="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                 {{ quiz.material_title }}
               </span>
+              <span v-if="quiz.section_title" class="px-2 py-1 rounded-full bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300">
+                Bagian: {{ quiz.section_title }}
+              </span>
               <span class="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                 Durasi {{ quiz.duration || "-" }} menit
               </span>
@@ -33,6 +36,14 @@
             </div>
           </div>
           <div class="flex flex-wrap gap-2">
+            <button
+              v-if="quiz.section_id"
+              class="border border-teal-600 text-teal-700 dark:text-teal-300 px-3 py-2 rounded-lg hover:bg-teal-50 dark:hover:bg-gray-800 transition flex items-center gap-1 text-sm"
+              title="Tetapkan bagian kuis ini ke semua soal"
+              @click="applySectionToAll"
+            >
+              <Icon name="material-symbols:label" class="w-4 h-4" /> Terapkan bagian ke semua soal
+            </button>
             <NuxtLink
               :to="`/teacher/quizzes/${quiz.id}/preview`"
               class="border border-green-600 text-green-700 dark:text-green-400 px-3 py-2 rounded-lg hover:bg-green-50 dark:hover:bg-gray-800 transition flex items-center gap-1 text-sm"
@@ -91,6 +102,9 @@
                 </span>
                 <span class="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-400">
                   {{ difficultyLabel(q.difficulty) }}
+                </span>
+                <span v-if="q.section_title" class="text-xs px-2 py-0.5 rounded-full bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300">
+                  {{ q.section_title }}
                 </span>
                 <span class="text-xs text-gray-500">Bobot {{ q.points }} poin</span>
                 <span v-if="q.bank_question_id" class="text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1">
@@ -167,6 +181,8 @@
       :quiz-id="quizId"
       :question="editingQuestion"
       :bank-question="bankQuestion"
+      :sections="sections"
+      :default-section-id="quiz?.section_id ?? null"
       @close="questionModal = false; editingQuestion = null; bankQuestion = null"
       @saved="onQuestionSaved"
     />
@@ -240,6 +256,7 @@ const bankQuestion = ref(null);
 const bankModal = ref(false);
 const bankItems = ref([]);
 const bankSearch = ref("");
+const sections = ref([]);
 
 const sortedQuestions = computed(() =>
   [...(quiz.value?.questions || [])].sort((a, b) => a.order_index - b.order_index)
@@ -257,10 +274,25 @@ const load = async () => {
     quiz.value = await $fetch(`${config.public.backend}/api/teacher/quizzes/${props.quizId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+    await loadSections();
   } catch (e) {
     toast.add({ title: "Gagal memuat kuis", color: "red" });
   } finally {
     loading.value = false;
+  }
+};
+
+const loadSections = async () => {
+  sections.value = [];
+  const materialId = quiz.value?.material_id;
+  if (!materialId) return;
+  try {
+    const material = await $fetch(`${config.public.backend}/api/materials/${materialId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    sections.value = material?.sections || [];
+  } catch (e) {
+    sections.value = [];
   }
 };
 
@@ -403,6 +435,30 @@ const publish = async () => {
     emit("updated", quiz.value);
   } catch (e) {
     toast.add({ title: e?.data?.error || "Gagal mempublikasikan kuis", color: "red" });
+  }
+};
+
+const applySectionToAll = async () => {
+  if (!quiz.value?.section_id) return;
+  const result = await swal.fire({
+    title: "Terapkan bagian ke semua soal?",
+    text: "Semua soal pada kuis ini akan ditandai dengan bagian materi yang dipilih di pengaturan kuis.",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "Terapkan",
+    cancelButtonText: "Batal",
+  });
+  if (!result.isConfirmed) return;
+  try {
+    const res = await $fetch(`${config.public.backend}/api/teacher/quizzes/${props.quizId}/questions/section`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ section_id: quiz.value.section_id }),
+    });
+    toast.add({ title: res.message || "Bagian diterapkan", color: "green" });
+    await load();
+  } catch (e) {
+    toast.add({ title: e?.data?.error || "Gagal menerapkan bagian", color: "red" });
   }
 };
 

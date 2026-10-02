@@ -26,6 +26,9 @@ _COMPAT_COLUMNS = [
     ('student_answers', 'answer_data', 'ALTER TABLE student_answers ADD COLUMN answer_data TEXT NULL'),
     # Per-class models: NULL means pooled, a value means that teacher.
     ('ml_models', 'teacher_id', 'ALTER TABLE ml_models ADD COLUMN teacher_id INT NULL'),
+    # Subtopic tag on quiz questions: NULL = not tagged. Lets wrong answers
+    # be attributed to a material section (Fase 1 per-section diagnosis).
+    ('questions', 'section_id', 'ALTER TABLE questions ADD COLUMN section_id INT NULL'),
 ]
 
 

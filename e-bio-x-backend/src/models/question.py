@@ -14,11 +14,16 @@ class Question(db.Model):
     order_index = db.Column(db.Integer, nullable=False, default=0)
     image_url = db.Column(db.Text, nullable=True)
     bank_question_id = db.Column(db.Integer, db.ForeignKey('question_bank.id'), nullable=True)
+    # Subtopic the question assesses (e.g. "Struktur Tubuh Virus").
+    # NULL = not tagged yet. This is what lets a wrong answer be mapped to
+    # a material section instead of only to the whole material.
+    section_id = db.Column(db.Integer, db.ForeignKey('material_sections.id'), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=True)
 
     quiz = db.relationship('Quiz', backref=db.backref('questions', lazy=True, cascade="all, delete-orphan", order_by="Question.order_index"))
     bank_question = db.relationship('QuestionBank', backref=db.backref('quiz_questions', lazy=True))
+    section = db.relationship('MaterialSection', backref=db.backref('questions', lazy=True))
 
     def __repr__(self):
         return f'<Question {self.id}>'

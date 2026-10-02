@@ -623,6 +623,8 @@ def _serialize_question_teacher(q):
         'points': q.points,
         'order_index': q.order_index,
         'bank_question_id': q.bank_question_id,
+        'section_id': q.section_id,
+        'section_title': q.section.title if q.section else None,
         'image_url': storage_service.out_url(q.image_url) if q.image_url else None,
         'options': options,
     }
@@ -695,6 +697,58 @@ def _apply_options(question, options):
             is_correct=bool(o.get('is_correct')),
             order_index=idx,
         ))
+
+
+def _normalize_title(text):
+    return ' '.join((text or '').strip().lower().split())
+
+
+def _section_from_topic(quiz, topic):
+    """Exact (normalized) match between a bank topic and a material section.
+
+    Only an exact title match is trusted. A fuzzy match would silently tag
+    questions to the wrong subtopic, which is worse than leaving them
+    untagged; the teacher can always set the section by hand.
+    """
+    if not quiz.material_id or not topic:
+        return None
+    want = _normalize_title(topic)
+    if not want:
+        return None
+    for section in quiz.material.sections:
+        if _normalize_title(section.title) == want:
+            return section.id
+    return None
+
+
+def _resolve_question_section(quiz, data, current, allow_quiz_default):
+    """Resolve the material-section tag for a question.
+
+    - When the payload carries `section_id`, it must belong to the quiz's
+      material (or be empty/NULL to clear the tag).
+    - Otherwise the question keeps its current tag; when adding a question
+      that has no tag yet, the quiz's own section is used as the default.
+    Returns (section_id, error_message).
+    """
+    if 'section_id' in data:
+        raw = data.get('section_id')
+        if raw in (None, '', 'null', 0):
+            return None, None
+        try:
+            sid = int(raw)
+        except (TypeError, ValueError):
+            return None, 'Bagian materi tidak valid'
+        if not quiz.material_id:
+            return None, 'Kuis belum tertaut ke materi, bagian tidak bisa ditandai'
+        section = MaterialSection.query.filter_by(id=sid, material_id=quiz.material_id).first()
+        if not section:
+            return None, 'Bagian tidak ditemukan pada materi kuis ini'
+        return section.id, None
+    if current is not None:
+        return current, None
+    if allow_quiz_default:
+        return quiz.section_id, None
+    return None, None
 
 
 # ---------------- TEACHER: quiz management ----------------
@@ -918,12 +972,21 @@ def add_quiz_question(quiz_id):
     next_order = max([q.order_index for q in quiz.questions] or [-1]) + 1
     question_obj = None
 
+    # Tag the question to a material section. Explicit payload wins; a
+    # question added to a section-scoped quiz inherits that section; a
+    # bank question without an explicit section may match its topic title.
+    section_id, sec_err = _resolve_question_section(quiz, data, None, allow_quiz_default=True)
+    if sec_err:
+        return jsonify({'error': sec_err}), 400
+
     if data.get('bank_question_id'):
         bank = QuestionBank.query.get(int(data['bank_question_id']))
         if not bank:
             return jsonify({'error': 'Soal bank tidak ditemukan'}), 404
         if bank.teacher_id != user.id and user.role != 'admin':
             return jsonify({'error': 'Anda tidak berhak menggunakan soal bank tersebut'}), 403
+        if section_id is None and bank.topic:
+            section_id = _section_from_topic(quiz, bank.topic)
         question_obj = Question(
             quiz_id=quiz.id,
             text=bank.question_text,
@@ -934,6 +997,7 @@ def add_quiz_question(quiz_id):
             image_url=bank.image_url,
             order_index=next_order,
             bank_question_id=bank.id,
+            section_id=section_id,
             created_at=datetime.utcnow(),
         )
         db.session.add(question_obj)
@@ -958,6 +1022,7 @@ def add_quiz_question(quiz_id):
             points=validated['points'],
             image_url=validated.get('image_url'),
             order_index=next_order,
+            section_id=section_id,
             created_at=datetime.utcnow(),
         )
         db.session.add(question_obj)
@@ -985,11 +1050,17 @@ def update_quiz_question(question_id):
     if err:
         return jsonify({'error': err}), 400
 
+    section_id, sec_err = _resolve_question_section(
+        question.quiz, data, current=question.section_id, allow_quiz_default=False)
+    if sec_err:
+        return jsonify({'error': sec_err}), 400
+
     question.text = validated['question_text']
     question.question_type = validated['question_type']
     question.difficulty = validated['difficulty']
     question.explanation = validated['explanation']
     question.points = validated['points']
+    question.section_id = section_id
     if 'image_url' in data:
         question.image_url = data['image_url']
     question.updated_at = datetime.utcnow()
@@ -1040,6 +1111,7 @@ def duplicate_quiz_question(question_id):
         image_url=source.image_url,
         order_index=next_order,
         bank_question_id=source.bank_question_id,
+        section_id=source.section_id,
         created_at=datetime.utcnow(),
     )
     db.session.add(clone)
@@ -1071,6 +1143,56 @@ def reorder_quiz_questions(quiz_id):
     quiz.updated_at = datetime.utcnow()
     db.session.commit()
     return jsonify({'message': 'Urutan soal diperbarui'}), 200
+
+
+@jwt_required()
+def set_quiz_questions_section(quiz_id):
+    """Apply one material section to every question in a quiz.
+
+    This is an explicit teacher action used to retag an existing quiz in
+    one step. It never guesses a subtopic; it stores exactly the section
+    the teacher chose (or clears the tag when section_id is empty).
+    """
+    user = _cur_user()
+    if not _is_teacher(user):
+        return jsonify({'error': 'Akses khusus guru'}), 403
+    quiz = Quiz.query.get(quiz_id)
+    if not quiz:
+        return jsonify({'error': 'Kuis tidak ditemukan'}), 404
+    if not _can_manage_quiz(quiz, user):
+        return jsonify({'error': 'Anda tidak berhak mengelola kuis ini'}), 403
+
+    data = request.get_json(silent=True) or {}
+    if 'section_id' not in data:
+        return jsonify({'error': 'section_id wajib diisi'}), 400
+
+    raw = data.get('section_id')
+    if raw in (None, '', 'null', 0):
+        section_id = None
+    else:
+        try:
+            sid = int(raw)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Bagian materi tidak valid'}), 400
+        if not quiz.material_id:
+            return jsonify({'error': 'Kuis belum tertaut ke materi'}), 400
+        section = MaterialSection.query.filter_by(id=sid, material_id=quiz.material_id).first()
+        if not section:
+            return jsonify({'error': 'Bagian tidak ditemukan pada materi kuis ini'}), 400
+        section_id = section.id
+
+    changed = 0
+    for q in quiz.questions:
+        if q.section_id != section_id:
+            q.section_id = section_id
+            changed += 1
+    quiz.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({
+        'message': f'{changed} soal diperbarui',
+        'updated': changed,
+        'section_id': section_id,
+    }), 200
 
 
 @jwt_required()

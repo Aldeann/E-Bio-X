@@ -50,6 +50,20 @@
         </div>
 
         <div>
+          <label class="block text-sm font-medium mb-1">Bagian Materi (opsional)</label>
+          <select
+            v-model="form.section_id"
+            class="w-full dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
+          >
+            <option :value="null">Tidak ditandai / semua bagian</option>
+            <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.title }}</option>
+          </select>
+          <p class="text-xs text-gray-500 mt-1">
+            Bagian yang diuji soal ini. Dipakai agar jawaban salah bisa ditelusuri per bagian materi, bukan hanya per materi.
+          </p>
+        </div>
+
+        <div>
           <label class="block text-sm font-medium mb-1">Pertanyaan *</label>
           <textarea
             v-model="form.question_text"
@@ -183,6 +197,8 @@ const props = defineProps({
   quizId: { type: Number, default: null },
   question: { type: Object, default: null },
   bankQuestion: { type: Object, default: null },
+  sections: { type: Array, default: () => [] },
+  defaultSectionId: { type: Number, default: null },
 });
 const emit = defineEmits(["close", "saved"]);
 
@@ -201,6 +217,7 @@ function defaultForm() {
     explanation: "",
     points: 10,
     image_url: "",
+    section_id: null,
     options: [
       { option_text: "", is_correct: false },
       { option_text: "", is_correct: false },
@@ -244,6 +261,7 @@ const fillFrom = (q) => {
   form.value.explanation = q.explanation || "";
   form.value.points = q.points || 10;
   form.value.image_url = q.image_url || "";
+  form.value.section_id = q.section_id ?? null;
   if (q.question_type === "true_false") {
     form.value.options = [
       { option_text: "Benar", is_correct: false },
@@ -328,6 +346,7 @@ const save = async () => {
     explanation: form.value.explanation,
     points: Number(form.value.points) || 0,
     image_url: form.value.image_url,
+    section_id: form.value.section_id ? Number(form.value.section_id) : null,
     options,
   };
 
@@ -366,12 +385,17 @@ watch(
   () => props.open,
   (val) => {
     if (val) {
-      if (props.question) fillFrom(props.question);
-      else if (props.bankQuestion) {
+      if (props.question) {
+        fillFrom(props.question);
+      } else if (props.bankQuestion) {
         form.value = defaultForm();
         fillFrom(props.bankQuestion);
+        // A new question defaults to the quiz's own section; the teacher
+        // can still change it per question.
+        form.value.section_id = props.defaultSectionId ?? null;
       } else {
         form.value = defaultForm();
+        form.value.section_id = props.defaultSectionId ?? null;
       }
     }
   }
