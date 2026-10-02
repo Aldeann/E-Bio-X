@@ -35,9 +35,9 @@ def score_material(m, weights=None):
     relevance = 0.5
     if topic and topic_mastery is not None:
         relevance = max(0.0, 1.0 - topic_mastery / 100.0)
-    difficulty = m.get('difficulty')
+    difficulty = analytics.normalize_difficulty(m.get('difficulty'))
     weak = m.get('student_weak_difficulty')
-    difficulty_fit = 1.0 if (difficulty and difficulty in ('easy', 'medium', 'hard') and difficulty == weak) else 0.5
+    difficulty_fit = 1.0 if (difficulty and difficulty == weak) else 0.5
 
     return round(
         mastery_gap * w['mastery_gap']
@@ -62,19 +62,44 @@ def _reasons_for(m, student_row):
     if m.get('topic') and m.get('topic_mastery') is not None and m['topic_mastery'] < 75:
         reasons.append(f'Topik {m["topic"]} perlu penguatan')
     if m.get('difficulty') and m.get('student_weak_difficulty'):
-        reasons.append(f'Fokus pada tingkat {m["difficulty"]}')
+        # normalize again here: this is the display layer, so an
+        # unrecognised raw value must never reach the student.
+        _d = analytics.normalize_difficulty(m['difficulty'])
+        if _d:
+            reasons.append(f'Fokus pada tingkat {analytics.difficulty_label(_d)}')
     if not reasons:
         reasons.append('Direkomendasikan berdasarkan perkembangan belajar Anda')
     return reasons[:4]
 
 
 def _student_weak_difficulty(row):
+    """Difficulty level the student is weakest at, or None.
+
+    Only levels the student ACTUALLY answered are considered. The test
+    must be "were any questions answered at this level", NOT "is the
+    accuracy above zero": a student who answered every easy question
+    wrongly has easy_accuracy = 0.0, and treating that as "never
+    attempted" hid the very level they need the most help with.
+
+    `row` supplies `<level>_attempted` counts (see
+    feature_service.aggregate_student_features). When that metadata is
+    absent - e.g. an older cached row - we return None rather than guess,
+    because guessing would send the weakest student to the wrong level.
+    """
     levels = ['easy', 'medium', 'hard']
-    acc = {k: (row.get(f'{k}_accuracy') or 0.0) for k in levels}
-    # only consider levels the student actually attempted
-    if not any(row.get(f'{k}_accuracy') is not None and row.get(f'{k}_accuracy') > 0 for k in levels):
-        return None
-    return min(levels, key=lambda k: acc.get(k, 1.0))
+    counts = {k: row.get(f'{k}_attempted') for k in levels}
+    if all(c is None for c in counts.values()):
+        return None                      # no attempt metadata -> no claim
+
+    attempted = [k for k in levels
+                 if counts.get(k) is not None and counts.get(k) > 0]
+    if not attempted:
+        return None                      # nothing attempted at any level
+
+    # Lowest accuracy among attempted levels. `levels` is ordered
+    # easy -> hard, so min() breaks ties toward the more foundational
+    # level, which is the right default when everything is at 0.
+    return min(attempted, key=lambda k: row.get(f'{k}_accuracy') or 0.0)
 
 
 def _material_metrics(student, material, student_row):
@@ -121,13 +146,18 @@ def _material_metrics(student, material, student_row):
         'question_error_rate': round(error_rate, 4),
         'finished': finished,
         'topic_mastery': round(topic_mastery, 1) if topic_mastery is not None else None,
-        'difficulty': (material.difficulty or '').lower() or None,
+        'difficulty': analytics.normalize_difficulty(material.difficulty),
         'student_weak_difficulty': _student_weak_difficulty(student_row),
     }
 
 
 def recommend_for_student(student, student_row=None, model_version=None, fallback_reason=None):
-    """Generate scored recommendations for the student (ML-aware or fallback)."""
+    """Rank a student's materials by transparent rules (REC_WEIGHTS).
+
+    No trained model is consulted. `model_version` is accepted for
+    backward compatibility but must stay None so the stored ranking is
+    never attributed to the Decision Tree (which only labels the profile).
+    """
     materials = analytics.student_accessible_materials(student)
     results = []
     all_mastered = True
@@ -151,7 +181,17 @@ def recommend_for_student(student, student_row=None, model_version=None, fallbac
     results.sort(key=lambda x: (-x['score'], x['material_id']))
     results = results[:cfg.REC_MAX_RESULTS]
 
-    _persist(student.id, results, 'ml' if not fallback_reason else 'fallback', model_version)
+    # The ranking is computed by score_material() from transparent rules
+    # (REC_WEIGHTS) - no trained model is consulted here. Labelling it
+    # 'ml' overstated what produced the result; 'rule' is the truth, and
+    # it keeps 'ml' meaningful for anything genuinely model-driven.
+    #
+    # `model_version` is therefore left as the caller supplied it, and the
+    # only caller (the student recommendations endpoint) supplies nothing.
+    # The Decision Tree shaped the student's profile LABEL, not the order
+    # of these materials; stamping its version here would misattribute
+    # the ranking to a model that never ran.
+    _persist(student.id, results, 'fallback' if fallback_reason else 'rule', model_version)
     return results
 
 
@@ -183,6 +223,19 @@ def fallback_recommendations(student):
 
 
 def _persist(student_id, results, rec_type, model_version):
+    keep = {item['material_id'] for item in results}
+
+    # Drop rows this student no longer receives. Without this the table
+    # only ever grows and existing_recommendations() keeps returning
+    # materials that dropped out of the top-N, so the student sees stale
+    # advice and the closed-loop evaluation counts clicks for
+    # recommendations that are no longer on screen.
+    stale = Recommendation.query.filter(
+        Recommendation.student_id == student_id,
+        Recommendation.material_id.notin_(keep) if keep else True).all()
+    for s in stale:
+        db.session.delete(s)
+
     for item in results:
         record = Recommendation.query.filter_by(
             student_id=student_id, material_id=item['material_id']).first()

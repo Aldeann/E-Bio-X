@@ -558,9 +558,11 @@ def _student_can_take(quiz, user):
         material = quiz.material
         if not material or material.status != 'published':
             return False
-        if material.course_links:
-            enrolled = {e.course_id for e in user.enrollments}
-            return any(c.id in enrolled for c in material.course_links)
+        # Same rule as the material endpoints. This used to fall through
+        # to True when the material had no course link, letting a student
+        # from another class take that class's quiz.
+        from src.services.learning_analytics_service import student_can_access_material
+        return student_can_access_material(user, material)
     return True
 
 

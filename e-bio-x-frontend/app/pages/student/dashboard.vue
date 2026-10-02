@@ -57,6 +57,63 @@
           <p v-if="profile.message" class="text-sm text-green-800 dark:text-green-200 mt-1">
             {{ profile.message }}
           </p>
+          <!-- Which class model produced this label. A student can sit in
+               more than one class, so without this the badge above looks
+               like a verdict on the student when it is really the class's
+               model speaking. -->
+          <p
+            v-if="profile.model_scope"
+            class="text-xs mt-2 pt-2 border-t border-green-200 dark:border-green-800 text-gray-600 dark:text-gray-400"
+          >
+            <Icon
+              :name="profile.model_scope.scope === 'class' ? 'material-symbols:groups' : 'material-symbols:info'"
+              class="w-3.5 h-3.5 inline -mt-0.5"
+            />
+            {{ profile.model_scope.note }}
+          </p>
+          <!-- The cluster badge can come from a different model than the
+               mastery badge (another class's K-Means, or the pooled one).
+               When it does, say so instead of letting it ride silently
+               under the mastery model's note above. -->
+          <p
+            v-if="clusterScopeDiffers()"
+            class="text-xs mt-1 text-gray-600 dark:text-gray-400"
+          >
+            <Icon
+              name="material-symbols:scatter-plot"
+              class="w-3.5 h-3.5 inline -mt-0.5"
+            />
+            {{ profile.cluster_scope.note }}
+          </p>
+          <!-- Evidence behind the label, not just the verdict. These are
+               the Decision Tree's own feature importances compared against
+               the real class averages stored at training time. -->
+          <div
+            v-if="profile.factors && profile.factors.length"
+            class="mt-2 pt-2 border-t border-green-200 dark:border-green-800"
+          >
+            <p class="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-1">
+              Faktor utama:
+            </p>
+            <ul class="space-y-1">
+              <li
+                v-for="(f, fi) in profile.factors"
+                :key="fi"
+                class="text-xs text-gray-600 dark:text-gray-300"
+              >
+                <Icon
+                  :name="f.direction === 'below' ? 'material-symbols:trending-down' : 'material-symbols:trending-up'"
+                  class="w-3.5 h-3.5 inline -mt-0.5"
+                  :class="f.direction === 'below' ? 'text-red-500' : 'text-green-600'"
+                />
+                {{ featureLabel(f.feature) }}:
+                <span class="font-semibold">{{ formatFactorValue(f.feature, f.value) }}</span>
+                <span class="text-gray-400">
+                  (rata-rata kelas {{ formatFactorValue(f.feature, f.cohort_average) }})
+                </span>
+              </li>
+            </ul>
+          </div>
         </div>
 
         <div
@@ -224,6 +281,62 @@ const clusterLabelMap = {
 };
 
 const clusterLabel = (label) => clusterLabelMap[label] || label;
+
+// Human labels + number formatting for the Decision Tree's explanation
+// factors. The backend emits raw feature keys and 0..1 ratios; showing
+// "section_completion_rate 0.42" to a student helps nobody.
+const featureLabelMap = {
+  material_completion_rate: "Penyelesaian materi",
+  section_completion_rate: "Penyelesaian bagian materi",
+  interactive_accuracy: "Akurasi soal interaktif",
+  quiz_average: "Rata-rata kuis",
+  quiz_best_score: "Nilai kuis terbaik",
+  easy_accuracy: "Akurasi soal mudah",
+  medium_accuracy: "Akurasi soal sedang",
+  hard_accuracy: "Akurasi soal sulit",
+  learning_minutes: "Waktu belajar",
+  quiz_attempts: "Percobaan kuis",
+  correct_rate: "Tingkat jawaban benar",
+  forum_posts_count: "Posting forum",
+  forum_replies_count: "Balasan forum",
+  forum_questions_asked: "Pertanyaan diajukan",
+  forum_answers_given: "Jawaban diberikan",
+  forum_reactions_received: "Reaksi diterima",
+  ai_explanations_viewed: "Penjelasan AI dilihat",
+  ai_explanations_helpful: "Penjelasan AI membantu",
+};
+const featureLabel = (f) => featureLabelMap[f] || f;
+
+const RATIO_FEATURES = new Set([
+  "material_completion_rate",
+  "section_completion_rate",
+  "interactive_accuracy",
+  "quiz_average",
+  "quiz_best_score",
+  "easy_accuracy",
+  "medium_accuracy",
+  "hard_accuracy",
+  "correct_rate",
+]);
+const formatFactorValue = (feature, value) => {
+  const v = Number(value) || 0;
+  if (RATIO_FEATURES.has(feature)) return Math.round(v * 100) + "%";
+  if (feature === "learning_minutes") return Math.round(v) + " mnt";
+  return String(Math.round(v));
+};
+
+// True unless the cluster badge clearly came from the same class model as
+// the mastery badge. A pooled K-Means is always shown, because the mastery
+// note names only the Decision Tree and must not be read as covering the
+// cluster too.
+const clusterScopeDiffers = () => {
+  const p = profile.value;
+  if (!p || !p.cluster_label || !p.cluster_scope) return false;
+  const m = p.model_scope || {};
+  const c = p.cluster_scope;
+  if (c.scope !== "class") return true;
+  return m.scope !== c.scope || m.teacher_id !== c.teacher_id;
+};
 
 const masteryBar = (v) => {
   if (v >= 75) return "bg-green-600";

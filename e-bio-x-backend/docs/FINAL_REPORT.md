@@ -31,7 +31,12 @@ demo, penelitian, dan pengembangan selanjutnya.
   tadinya ikut diserialisasi menjadi key JSON `"200"`) diganti `return jsonify(...), 200`.
 - Tidak ada data tiruan / angka fabrikasi di dashboard, analitik, maupun ML.
   Pipeline ML melaporkan `INSUFFICIENT_DATA` secara jujur ketika dataset tidak
-  mencukupi (masih 0 baris `ml_models`, karena jumlah sampel riil < ambang).
+  mencukupi.
+  > **Status sudah berubah sejak laporan ini ditulis.** Saat audit awal
+  > `ml_models` memang kosong karena sampel riil di bawah ambang. Sekarang
+  > data aktivitas siswa sudah memadai dan model **sudah dilatih per kelas**
+  > (lihat `docs/ML_DOCUMENTATION.md` §7). Baris di bawah adalah catatan
+  > keadaan waktu audit, bukan keadaan sekarang.
 
 ---
 
@@ -42,8 +47,9 @@ Hasil pemeriksaan konsistensi:
 - Tidak ada `material_progress`, `StudentAnswer`, maupun `answers` duplikat/ber-orphan.
 - 2 materi (published), 9 kuis (6 draft, 3 published), 1 profil pembelajaran,
   1 rekomendasi, 4 learning sessions, 1 students answer interaktif.
-- `ml_models` kosong (model artifact belum di-train) — konsisten dengan status
-  INSUFFICIENT_DATA; tanpa fabrikasi.
+- `ml_models` kosong **pada waktu audit** (model artifact belum di-train) —
+  konsisten dengan status INSUFFICIENT_DATA saat itu; tanpa fabrikasi.
+  Sekarang sudah terisi: satu model per kelas guru.
 
 > Catatan: tabel `student_learning_profiles` **tidak memiliki kolom `status`**;
 > kolom aktual mengikuti model Tahap 5 (mis. `prediction_status`). Ini informasi
@@ -157,9 +163,17 @@ Dijalankan di lingkungan dev (server `http://127.0.0.1:5000`, MySQL `e_bio`):
 
 | Suite | Cakupan | Hasil |
 |---|---|---|
-| `test_ml_unit.py` | Unit ML offline (DT, K-Means, rekomendasi, penyimpanan model) | **30/30 PASS** |
-| `test_tahap5_ml.py` | API ML end-to-end (train, profil, rekomendasi, analitik guru, regresi Tahap 1–4) | **32/32 PASS** |
-| `test_tahap4.py` | API end-to-end (tracking, materi berkunci, kuis baru, analitik guru, regresi) | **83/83 PASS** |
+| `test_ml_unit.py` | Unit ML offline (DT, K-Means, rekomendasi, penyimpanan/versi model) | **32/32 PASS** |
+| `test_ml_leakage.py` | Anti-leakage label, penjelasan, distribusi kelas | **45/45 PASS** |
+| `test_ml_difficulty.py` | Metadata tingkat kesulitan, imputasi & normalisasi | **66/66 PASS** |
+| `test_ml_rec_eval.py` | API evaluasi closed-loop rekomendasi (read-only, otorisasi) | **48/48 PASS** |
+| `test_ml_scope.py` | Scoping model per kelas, versi, akses materi antar kelas | **95/95 PASS** |
+| **Total komponen ML** | | **286/286 PASS** |
+| `scripts/verify_ml_readiness.py` | Gate pra-demo: kelengkapan data, model per kelas, scoping guru, integritas klaim & soal kuis | **59/59 PASS** |
+
+`test_tahap4.py` dan `test_tahap5_ml.py` adalah suite API end-to-end yang
+memerlukan server hidup; regresi Tahap 1–4 juga dicakup ulang oleh
+`test_ml_scope.py` dan `test_ml_rec_eval.py` di atas.
 
 Smoke khusus keamanan (live) juga dicek: siswa terhadap `/api/users` → 403,
 siswa membuat course → 403, siswa enroll/out ke kelas → memerlukan role siswa,
@@ -180,9 +194,20 @@ guru non-owner terhadap materi/kuis/analisis → 403.
 
 ## 8. Keterbatasan / Catatan Lanjutan
 
-- Model ML belum di-train ({INSUFFICIENT_DATA}) karena belum ada dataset riil yang
-  cukup; pipeline siap & ter-uji unit. Sebelum presentasi: jalankan
-  `POST /api/ml/train` (guru/admin) setelah data bertambah.
+- Model ML **sudah dilatih per kelas** dari data aktivitas yang tersedia:
+  Decision Tree (klasifikasi penguasaan) dan K-Means (pengelompokan) dilatih
+  terpisah untuk tiap guru, dievaluasi dengan repeated stratified CV + baseline
+  mayoritas (lihat `docs/ML_DOCUMENTATION.md`). Kelas yang datanya di bawah
+  ambang tetap melaporkan `INSUFFICIENT_DATA` secara jujur (mis. guru tanpa
+  siswa). Retrain kapan saja via `POST /api/ml/train` (guru/admin).
+- Peringkat materi pada rekomendasi dihitung oleh aturan transparan
+  (`REC_WEIGHTS`), **bukan** oleh model terlatih; karena itu rekamannya
+  bertipe `rule` dan tidak distempel versi model. Decision Tree memberi label
+  profil, K-Means memberi klaster — dua hal terpisah dari urutan rekomendasi.
+- Evaluasi closed-loop rekomendasi (funnel/calibration/completion_yield) sudah
+  tersedia sebagai endpoint tetapi **belum punya data klik/penyelesaian**,
+  sehingga bucket-nya `INSUFFICIENT_DATA` sampai siswa benar-benar memakai
+  rekomendasi; ini observasional, bukan bukti kausal.
 - Color label klaster analisis kuis lama hardcoded di frontend (3 warna) — sesuai
   jumlah klaster default.
 - `SECRET_KEY` dev bernilai placeholder — ganti nilai produksi sebelum rilis.

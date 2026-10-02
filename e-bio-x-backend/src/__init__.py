@@ -2,7 +2,7 @@ import pymysql
 pymysql.install_as_MySQLdb()
 from flask import Flask
 from flask_migrate import Migrate
-from src.config.database import init_db, db
+from src.config.database import init_db, db, ensure_schema_compat
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from datetime import timedelta
@@ -23,6 +23,14 @@ def create_app():
     # Database & Migration
     init_db(app)
     Migrate(app, db)
+
+    # Post-release columns (e.g. ml_models.teacher_id for per-class
+    # models) have to be applied explicitly: create_all() leaves existing
+    # tables alone. Runs on every boot and is a no-op once applied, so a
+    # fresh checkout and an old database converge on the same schema.
+    with app.app_context():
+        db.create_all()
+        ensure_schema_compat()
 
     # CORS
     CORS(app, resources={r"/api/*": {"origins": os.getenv("FRONTEND_URL")}})
@@ -86,6 +94,7 @@ def create_app():
         get_teacher_ml_analytics,
         train_ml, retrain_ml, predict_student,
         get_teacher_ml_mastery, get_teacher_ml_clusters,
+        get_recommendation_evaluation,
     )
     from src.controllers.ai_explanation_controller import (
         generate_question_explanation, generate_bank_explanation, batch_generate_explanations,
@@ -238,6 +247,7 @@ def create_app():
     app.add_url_rule('/api/teacher/analytics/ml', view_func=get_teacher_ml_analytics, methods=['GET'])
     app.add_url_rule('/api/teacher/analytics/ml/mastery', view_func=get_teacher_ml_mastery, methods=['GET'])
     app.add_url_rule('/api/teacher/analytics/ml/clusters', view_func=get_teacher_ml_clusters, methods=['GET'])
+    app.add_url_rule('/api/ml/evaluation/recommendations', view_func=get_recommendation_evaluation, methods=['GET'])
     app.add_url_rule('/api/ml/train', view_func=train_ml, methods=['POST'])
     app.add_url_rule('/api/ml/retrain', view_func=retrain_ml, methods=['POST'])
     app.add_url_rule('/api/ml/predict/<student_id>', view_func=predict_student, methods=['POST'])

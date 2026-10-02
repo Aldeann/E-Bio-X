@@ -368,8 +368,8 @@ def get_teacher_analytics_student(student_id):
         return jsonify({'error': 'Siswa bukan anggota kelas Anda'}), 403
 
     materials = analytics.teacher_materials({}, teacher_id=teacher.id)
-    material_rows = [analytics.material_row_for(target.id, m) for m in materials if any(
-        c.id in {e.course_id for e in enrolled} for c in (m.course_links or [])) or not m.course_links]
+    material_rows = [analytics.material_row_for(target.id, m) for m in materials
+                     if _can_student_access(m, target)]
     quiz_ids = []
     for m in materials:
         quiz_ids += [q.id for q in analytics.material_quizzes(m.id)]

@@ -25,6 +25,19 @@ DESCRIPTIONS = {
 
 
 def _composite(means):
+    """Group performance score used ONLY to rank and name clusters.
+
+    These are the same three features that baseline_label() uses to build
+    the Decision Tree's training label (cfg.BASELINE_WEIGHTS). That is
+    deliberate for NAMING - a cluster really should be called
+    "High Achievement" according to the same yardstick the product uses
+    everywhere else.
+
+    It does mean a cluster name and a DT label are not independent
+    evidence about the same student: both trace back to these three
+    features. Anywhere the two are presented side by side, that
+    correlation must be stated rather than read as corroboration.
+    """
     parts = [means.get(f, 0.0) for f in ('material_completion_rate', 'quiz_average', 'interactive_accuracy')]
     return float(sum(parts) / len(parts)) if parts else 0.0
 

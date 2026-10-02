@@ -98,6 +98,16 @@ def aggregate_student_features(student):
         b = diff.get(level)
         return (b['correct'] / b['total']) if b and b['total'] else 0.0
 
+    # How many questions the student ACTUALLY answered per difficulty.
+    # `*_accuracy` alone cannot express this: a level never attempted and
+    # a level attempted-but-all-wrong both collapse to 0.0, which used to
+    # hide the weakest level from recommendation.difficulty_fit.
+    # These are METADATA, deliberately NOT model features - they are not
+    # in cfg.FEATURES, so trained artifacts are unaffected.
+    def diff_total(level):
+        b = diff.get(level)
+        return b['total'] if b else 0
+
     # ---- quiz ----------------------------------------------------
     scores = [r.percentage for r in quiz_rows if r.percentage is not None]
     quiz_average = (sum(scores) / len(scores)) / 100.0 if scores else 0.0
@@ -152,6 +162,9 @@ def aggregate_student_features(student):
         'easy_accuracy': round(diff_acc('easy'), 4),
         'medium_accuracy': round(diff_acc('medium'), 4),
         'hard_accuracy': round(diff_acc('hard'), 4),
+        'easy_attempted': diff_total('easy'),
+        'medium_attempted': diff_total('medium'),
+        'hard_attempted': diff_total('hard'),
         'learning_minutes': round(learning_minutes, 2),
         'quiz_attempts': quiz_attempts,
         'correct_rate': round(correct_rate, 4),

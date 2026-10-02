@@ -1,4 +1,6 @@
-from flask import request, jsonify
+import threading
+
+from flask import request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.models.user import User
 from src.models.material import Material
@@ -98,32 +100,80 @@ def log_material_event(material_id):
         db.session.rollback()
         return jsonify({'error': f'Gagal mencatat aktivitas: {str(e)}'}), 500
 
-    _maybe_auto_retrain()
+    _maybe_auto_retrain(user.id)
     return jsonify({'message': 'Aktivitas tercatat', 'activity_id': activity.id}), 201
 
 
-def _maybe_auto_retrain():
-    """Trigger background ML retrain if enough new activities since last training."""
-    import threading
+# One retrain at a time, process-wide. Without this, every activity logged
+# past the threshold spawns its own training thread, and a burst of clicks
+# from one class starts dozens of concurrent fits that fight over the same
+# model versions and the same database session.
+_retrain_lock = threading.Lock()
+# Newest training attempt we have already considered, so the next burst of
+# activity does not immediately re-trigger on the same threshold crossing.
+_retrain_last_attempt = None
+
+
+def _maybe_auto_retrain(student_id=None):
+    """Retrain the affected class models in the background.
+
+    Scoped to the teachers of the student whose activity was just logged:
+    a class's model should be refreshed by that class's own activity, not
+    by whatever anyone else in the system is doing.
+    """
+    global _retrain_last_attempt
+
     from src.models.learning_activity import LearningActivity
     from src.models.ml_model import MlModel
 
-    last_model = MlModel.query.filter_by(
-        model_type='decision_tree').order_by(MlModel.trained_at.desc()).first()
-    since = last_model.trained_at if last_model else datetime.min
-    new_count = LearningActivity.query.filter(
-        LearningActivity.created_at > since).count()
-    if new_count < ml_cfg.AUTO_RETRAIN_THRESHOLD:
+    teacher_ids = analytics.student_teacher_ids(student_id) if student_id else []
+    if not teacher_ids:
         return
 
-    def _bg_train():
-        try:
-            from src.controllers.ml_controller import _train_pipeline
-            _train_pipeline()
-        except Exception:
-            pass
+    if _retrain_lock.locked():
+        return
 
-    threading.Thread(target=_bg_train, daemon=True).start()
+    for tid in teacher_ids:
+        last_model = MlModel.query.filter_by(
+            model_type='decision_tree', teacher_id=tid).order_by(
+            MlModel.trained_at.desc()).first()
+        since = last_model.trained_at if last_model else datetime.min
+        new_count = LearningActivity.query.filter(
+            LearningActivity.created_at > since).count()
+        if new_count < ml_cfg.AUTO_RETRAIN_THRESHOLD:
+            continue
+        if _retrain_last_attempt and since <= _retrain_last_attempt:
+            continue
+
+        if not _retrain_lock.acquire(blocking=False):
+            return
+        _retrain_last_attempt = datetime.utcnow()
+
+        def _bg_train(class_teacher_id=tid):
+            try:
+                from src.controllers.ml_controller import _train_pipeline
+                teacher = User.query.get(class_teacher_id)
+                if teacher is None:
+                    return
+                with _app_context():
+                    _train_pipeline(teacher)
+            except Exception:
+                # Logged, not swallowed. A silent pass here meant a class
+                # could sit on a stale model for months with no signal
+                # that anything was wrong.
+                current_app.logger.exception(
+                    'Auto-retrain gagal untuk kelas guru id=%s', class_teacher_id)
+            finally:
+                _retrain_lock.release()
+
+        threading.Thread(target=_bg_train, daemon=True).start()
+        return
+
+
+def _app_context():
+    """Background threads need their own app context to touch the db."""
+    from flask import current_app
+    return current_app.app.app_context()
 
 
 @jwt_required()

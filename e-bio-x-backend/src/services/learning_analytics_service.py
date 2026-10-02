@@ -19,6 +19,26 @@ from src.models.enrollment import Enrollment
 from src.models.user import User
 from sqlalchemy import func, distinct
 
+
+# Canonical difficulty keys used by the ML layer, plus the Indonesian
+# labels teachers actually pick in the material form. Bridged in
+# normalize_difficulty() below.
+_DIFFICULTY_CANONICAL = ('easy', 'medium', 'hard')
+_DIFFICULTY_ALIASES = {
+    'mudah': 'easy',
+    'sangat mudah': 'easy',
+    'sedang': 'medium',
+    'menengah': 'medium',
+    'sulit': 'hard',
+    'sangat sulit': 'hard',
+}
+
+_DIFFICULTY_LABELS = {
+    'easy': 'mudah',
+    'medium': 'sedang',
+    'hard': 'sulit',
+}
+
 # ============================================================
 # MASTERY
 # ============================================================
@@ -309,17 +329,50 @@ def interactive_stats(student_id, material_id):
     }
 
 
+def normalize_difficulty(value):
+    """Map any stored difficulty label onto 'easy' | 'medium' | 'hard'.
+
+    Materials are authored with Indonesian labels ('mudah', 'sedang',
+    'sulit') while the ML layer compares against English keys
+    ('easy', 'medium', 'hard'). Without this bridge the difficulty
+    features silently never matched. Returns None when unknown, so
+    callers can decline to guess.
+    """
+    if value is None:
+        return None
+    key = str(value).strip().lower()
+    if key in _DIFFICULTY_CANONICAL:
+        return key
+    if key in _DIFFICULTY_ALIASES:
+        return _DIFFICULTY_ALIASES[key]
+    # numeric levels (1..3) used by older question blocks
+    if key in ('1', '2', '3'):
+        return {'1': 'easy', '2': 'medium', '3': 'hard'}[key]
+    return None
+
+
+def difficulty_label(canonical):
+    """Indonesian display label for a canonical difficulty key."""
+    return _DIFFICULTY_LABELS.get(canonical, canonical or '')
+
+
 def _difficulty_accuracy_material(student_id, material_id):
+    """Accuracy per difficulty for one student on one material.
+
+    Only an explicit `difficulty` field counts. `heading.level` used to be
+    read as a difficulty, which is wrong: it is an HTML heading level
+    (1-6), so headings were bucketed as "difficulty 2"/"difficulty 3"
+    while real questions were never classified at all.
+    """
     rows = StudentAnswer.query.filter_by(student_id=student_id, material_id=material_id).all()
     by_diff = {}
     for r in rows:
-        section = MaterialSection.query.get(r.section_id)
         content = MaterialContent.query.get(r.content_id)
         diff = None
         if content and isinstance(content.data, dict):
-            diff = content.data.get('difficulty') or content.data.get('level')
+            diff = normalize_difficulty(content.data.get('difficulty'))
         if not diff:
-            diff = 'medium'
+            diff = 'medium'      # unclassified content defaults to medium
         bucket = by_diff.setdefault(diff, {'total': 0, 'correct': 0})
         bucket['total'] += 1
         if r.is_correct:
@@ -374,17 +427,64 @@ def video_stats(student_id, material_id):
 # STUDENT SCOPING
 # ============================================================
 
+def material_course_ids(material):
+    """Every course a material is attached to.
+
+    `course_links` is the many-to-many the current form writes; the single
+    `course_id` column is the legacy field and is still set on the seeded
+    materials. The teacher-side rule (`material_controller._is_course_teacher`)
+    already treats both as "attached to this course", so access decisions
+    must not read only half of it.
+    """
+    ids = {c.id for c in (material.course_links or [])}
+    if material.course_id:
+        ids.add(material.course_id)
+    return ids
+
+
+def student_can_access_material(student, material, enrolled_course_ids=None,
+                                teacher_ids=None):
+    """Can this student see this material at all?
+
+    - Attached to courses -> only students enrolled in one of them.
+    - NOT attached        -> NOT public. It belongs to the teacher who
+      created it, so only students of that teacher's classes see it.
+      Treating "no course link" as "visible to everyone" leaked one
+      class's material into another class's dashboard, recommendations
+      and ML features - which is exactly the per-class separation this
+      system exists to keep honest.
+    - No attachment and no owner -> nobody. An unassigned material is not
+      a class material; showing it to all students is the same leak.
+
+    `enrolled_course_ids` / `teacher_ids` let a caller that already knows
+    them reuse the sets instead of re-querying per material.
+    """
+    if material.status != 'published':
+        return False
+    if enrolled_course_ids is None:
+        enrolled_course_ids = {e.course_id for e in student.enrollments}
+    linked = material_course_ids(material)
+    if linked:
+        return bool(linked & enrolled_course_ids)
+    if material.teacher_id is None:
+        return False
+    if teacher_ids is None:
+        teacher_ids = set(student_teacher_ids(student.id))
+    return material.teacher_id in teacher_ids
+
+
 def student_accessible_materials(student):
-    materials = Material.query.filter_by(status='published')
+    """Published materials this student may see, using the rule above.
+
+    This is the single source of truth for "which materials are this
+    student's": the dashboard, progress page, recommendations and ML
+    features all funnel through here.
+    """
     enrolled_ids = {e.course_id for e in student.enrollments}
-    result = []
-    for m in materials:
-        if m.course_links:
-            if any(c.id in enrolled_ids for c in m.course_links):
-                result.append(m)
-        else:
-            result.append(m)
-    return result
+    teacher_ids = set(student_teacher_ids(student.id))
+    materials = Material.query.filter_by(status='published')
+    return [m for m in materials
+            if student_can_access_material(student, m, enrolled_ids, teacher_ids)]
 
 
 def material_status_for(student_id, material_id):
@@ -487,6 +587,20 @@ def teacher_student_users(teacher_id):
 
 def teacher_student_ids(teacher_id):
     return [u.id for u in teacher_student_users(teacher_id)]
+
+
+def student_teacher_ids(student_id):
+    """Teachers of every class this student is enrolled in, ascending.
+
+    A student can sit in more than one class, so this is a list and not a
+    single id. Callers that need a single model must pick one explicitly
+    and say which - see model_manager.resolve_scope.
+    """
+    rows = (db.session.query(Course.teacher_id)
+            .join(Enrollment, Enrollment.course_id == Course.id)
+            .filter(Enrollment.student_id == student_id)
+            .distinct().all())
+    return sorted({r[0] for r in rows if r[0] is not None})
 
 
 def teacher_materials(filters=None, teacher_id=None):

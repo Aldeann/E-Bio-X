@@ -31,24 +31,65 @@
           <p class="font-semibold">{{ trainResult.success ? "Training Berhasil" : "Training Gagal" }}</p>
           <p v-if="trainResult.message" class="mt-1">{{ trainResult.message }}</p>
           <div v-if="trainResult.details" class="mt-2 space-y-1 text-xs">
+            <p v-if="trainResult.details.scope">
+              Cakupan: <b>{{ trainResult.details.scope }}</b>
+              <template v-if="trainResult.details.analysis_students != null">
+                · {{ trainResult.details.analysis_students }} siswa dianalisis
+              </template>
+              <template v-if="trainResult.details.trained_class_count != null">
+                · {{ trainResult.details.trained_class_count }} kelas terlatih
+              </template>
+            </p>
             <p v-if="trainResult.details.decision_tree">
               Decision Tree: <b>{{ trainResult.details.decision_tree.status }}</b>
+              <template v-if="trainResult.details.decision_tree.model_version">
+                · v{{ trainResult.details.decision_tree.model_version }}
+              </template>
               <template v-if="trainResult.details.decision_tree.training_sample_count">
                 · {{ trainResult.details.decision_tree.training_sample_count }} sampel
               </template>
-              <template v-if="trainResult.details.decision_tree.metrics?.accuracy">
+              <!-- `!== undefined` not a truthiness test: an accuracy of 0.0
+                   is a real, bad result and must not silently disappear. -->
+              <template
+                v-if="trainResult.details.decision_tree.metrics
+                  && trainResult.details.decision_tree.metrics.accuracy !== undefined
+                  && trainResult.details.decision_tree.metrics.accuracy !== null"
+              >
                 · Accuracy: {{ trainResult.details.decision_tree.metrics.accuracy }}
+                (baseline {{ trainResult.details.decision_tree.metrics.majority_baseline }})
               </template>
+            </p>
+            <!-- INSUFFICIENT_DATA needs its reason shown, otherwise it
+                 looks like the same failure as a crash. -->
+            <p
+              v-if="trainResult.details.decision_tree && trainResult.details.decision_tree.message"
+              class="opacity-80"
+            >
+              {{ trainResult.details.decision_tree.message }}
             </p>
             <p v-if="trainResult.details.kmeans">
               K-Means: <b>{{ trainResult.details.kmeans.status }}</b>
+              <template v-if="trainResult.details.kmeans.k">
+                · k={{ trainResult.details.kmeans.k }}
+              </template>
               <template v-if="trainResult.details.kmeans.training_sample_count">
                 · {{ trainResult.details.kmeans.training_sample_count }} sampel
               </template>
-              <template v-if="trainResult.details.kmeans.silhouette">
+              <template v-if="trainResult.details.kmeans.silhouette != null">
                 · Silhouette: {{ trainResult.details.kmeans.silhouette }}
               </template>
             </p>
+            <!-- Admin training fans out to every class; a teacher only
+                 ever sees their own, so the list stays short. -->
+            <ul
+              v-if="trainResult.details.classes && trainResult.details.classes.length > 1"
+              class="mt-2 space-y-0.5 list-disc list-inside opacity-90"
+            >
+              <li v-for="c in trainResult.details.classes" :key="c.scope">
+                {{ c.scope }}: {{ c.decision_tree.status }}
+                ({{ c.analysis_students }} siswa)
+              </li>
+            </ul>
           </div>
         </div>
       </div>
@@ -59,6 +100,48 @@
     </div>
 
     <template v-else-if="data">
+      <!-- Which model produced these numbers. Without this the class
+           figures below read as if a model trained on the class produced
+           them, which is not true when the class is too small and the
+           pooled fallback is in use. -->
+      <div
+        v-if="data.model && data.model.training_scope"
+        class="mb-6 p-3 rounded-xl border text-sm flex items-start gap-2"
+        :class="
+          data.model.training_scope === 'class'
+            ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/30'
+            : 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/30'
+        "
+      >
+        <Icon
+          :name="data.model.training_scope === 'class' ? 'mdi:check-circle' : 'mdi:alert-circle'"
+          class="w-5 h-5 shrink-0 mt-0.5"
+          :class="data.model.training_scope === 'class' ? 'text-green-600' : 'text-amber-600'"
+        />
+        <div>
+          <p class="font-semibold text-gray-800 dark:text-gray-100">
+            {{
+              data.model.training_scope === "class"
+                ? "Angka di halaman ini memakai model kelas Anda sendiri"
+                : data.model.training_scope === "pooled"
+                  ? "Belum ada model khusus kelas Anda"
+                  : "Belum ada model yang bisa dipakai"
+            }}
+          </p>
+          <p v-if="data.model.training_scope_note" class="text-xs text-gray-600 dark:text-gray-300 mt-1">
+            {{ data.model.training_scope_note }}
+          </p>
+          <p
+            v-if="data.model.training_scope === 'class'"
+            class="text-xs text-gray-500 mt-1"
+          >
+            Model v{{ data.model.model_version }} dilatih dari
+            {{ data.model.training_sample_count }} siswa kelas Anda ·
+            {{ data.model.class_analyzed }} siswa dianalisis di halaman ini
+          </p>
+        </div>
+      </div>
+
       <!-- Overview -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <div class="rounded-xl border border-green-200 dark:border-green-800 bg-white dark:bg-gray-900 p-4">
@@ -195,6 +278,23 @@
               </div>
             </div>
             <p class="text-xs text-gray-400 mt-2">Nilai silhouette digunakan untuk melihat seberapa baik data terpisah dalam cluster.</p>
+            <!-- Which model produced these cluster names, and the fact that
+                 the names are ranked within THIS model rather than on a
+                 system-wide scale. -->
+            <p
+              v-if="data.clusters.training_scope_note"
+              class="text-xs mt-1"
+              :class="data.clusters.training_scope === 'class' ? 'text-green-600' : 'text-amber-600'"
+            >
+              <Icon
+                :name="data.clusters.training_scope === 'class' ? 'mdi:check-circle' : 'mdi:alert-circle'"
+                class="w-3.5 h-3.5 inline -mt-0.5"
+              />
+              {{ data.clusters.training_scope_note }}
+            </p>
+            <p v-if="data.clusters.interpretation_note" class="text-xs text-gray-500 mt-1">
+              {{ data.clusters.interpretation_note }}
+            </p>
           </template>
           <p v-else class="text-sm text-gray-500">Model K-Means belum tersedia.</p>
         </div>

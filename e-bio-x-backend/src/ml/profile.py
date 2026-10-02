@@ -69,6 +69,8 @@ def generate_profile(student, dt_artifact=None, km_artifact=None):
         'factors': factors,
         'summary': _readable_summary(row),
         'model_version': (dt_artifact.get('_meta') or {}).get('model_version'),
+        'cluster_model_version': ((km_artifact.get('_meta') or {}).get('model_version')
+                                  if km_artifact else None),
         'message': _profile_message(cluster_label),
     }
     _persist(student.id, profile, row)

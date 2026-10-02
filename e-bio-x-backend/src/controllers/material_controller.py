@@ -15,7 +15,9 @@ from src.models.user import User
 from src.models.course import Course
 from src.models.enrollment import Enrollment
 from src.config.database import db
-from src.services.learning_analytics_service import log_activity, mark_content_viewed
+from src.services.learning_analytics_service import (
+    log_activity, mark_content_viewed, student_can_access_material,
+    student_accessible_materials)
 from src.services import storage_service
 from datetime import datetime
 from dotenv import load_dotenv
@@ -67,12 +69,11 @@ def _can_view_detail(material, user):
 
 
 def _can_student_access(material, user):
-    if material.status != 'published':
-        return False
-    if material.course_links:
-        enrolled_ids = {e.course_id for e in user.enrollments}
-        return any(c.id in enrolled_ids for c in material.course_links)
-    return True
+    # Delegates to the service so there is ONE access rule. This used to
+    # return True for any material with no course link, which made such a
+    # material visible to every student in the school; see
+    # learning_analytics_service.student_can_access_material.
+    return student_can_access_material(user, material)
 
 
 def _is_enrolled(course, user):
@@ -102,10 +103,6 @@ def _resolve_owned_course_ids(user, course_ids):
     if user.role != 'admin':
         query = query.filter(Course.teacher_id == user.id)
     return [c.id for c in query.all()]
-
-
-def _student_course_ids(user):
-    return [e.course_id for e in Enrollment.query.filter_by(student_id=user.id).all()]
 
 
 def _allowed_file(filename):
@@ -547,12 +544,9 @@ def get_all_material():
         materials = Material.query.filter_by(teacher_id=user.id).all()
         return jsonify([_serialize_material_list(m, include_analytics=True) for m in materials]), 200
     else:
-        enrolled_ids = _student_course_ids(user)
-        materials = Material.query.filter_by(status='published').all()
-        materials = [
-            m for m in materials
-            if not m.course_links or any(c.id in enrolled_ids for c in m.course_links)
-        ]
+        # One source of truth for "which materials are this student's",
+        # so an unlinked material cannot slip into another class's list.
+        materials = student_accessible_materials(user)
         progress_map = _student_progress_map(user, [m.id for m in materials])
         return jsonify([
             _serialize_material_list(

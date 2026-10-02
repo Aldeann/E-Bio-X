@@ -33,8 +33,6 @@ def _material_readable(material, user):
         return True
     if material.teacher_id == user.id:
         return True
-    enrolled_ids = [e.course_id for e in
-                    Enrollment.query.filter_by(student_id=user.id).all()]
     linked = {c.id for c in material.course_links}
     if material.course_id:
         linked.add(material.course_id)
@@ -44,10 +42,13 @@ def _material_readable(material, user):
                 Course.id.in_(linked), Course.teacher_id == user.id).count():
             return True
         return False
-    # student: published + reachable through one of their classes
+    # student: published + reachable through one of their classes.
+    # Delegates to the shared rule; the old `not linked or ...` made a
+    # material with no course link readable by every student.
     if material.status != 'published':
         return False
-    return not linked or bool(linked & set(enrolled_ids))
+    from src.services.learning_analytics_service import student_can_access_material
+    return student_can_access_material(user, material)
 
 
 def _quiz_image_readable(question, user):

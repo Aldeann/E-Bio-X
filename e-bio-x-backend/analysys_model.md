@@ -108,12 +108,30 @@ Distribusi cukup seimbang dengan standar deviasi 1.25.
 
 ## **🌳 Decision Tree Analysis**
 
-### **Performa Model:**
-- **Accuracy 100%**: Model **sempurna** dalam memprediksi cluster berdasarkan skor dan waktu kerja
-- **Precision, Recall, F1-Score semua 100%**: Tidak ada kesalahan prediksi sama sekali
-- **Cross-validation 96%**: Meski training accuracy 100%, CV menunjukkan kemungkinan sedikit overfitting
+> ### ⚠️ SEMUA ANGKA DI BAGIAN INI TIDAK LAGI SAH
+>
+> Angka 100% di bawah berasal dari pipeline versi lama yang **bocor
+> (label leakage)**: label `mastery_level` dihitung dari skor komposit,
+> dan `score` ikut dipakai sebagai input model. Model itu tidak sedang
+> memprediksi — ia sedang membaca jawaban langsung dari soal, jadi 100%
+> di sini tidak berarti apa pun.
+>
+> Pipeline sekarang tidak memakai `quiz_average`,
+> `material_completion_rate`, dan `interactive_accuracy` sebagai input
+> (`cfg.DT_FEATURES`), dan dievaluasi dengan repeated stratified CV
+> dibanding baseline kelas terbanyak. Angka sebaiknya dibaca di
+> `docs/ML_DOCUMENTATION.md` §3 dan dicek langsung lewat
+> `scripts/verify_ml_readiness.py`.
+>
+> Bagian ini sengaja dibiarkan apa adanya sebagai catatan sejarah, bukan
+> sebagai klaim performa.
 
-### **Confusion Matrix:**
+### **Performa Model (versi lama — sudah tidak sah):**
+- ~~**Accuracy 100%**~~ — artefak kebocoran label, bukan performa model
+- ~~**Precision, Recall, F1-Score semua 100%**~~ —idem
+- **Cross-validation 96%**: meski training accuracy 100%, CV menunjukkan kemungkinan sedikit overfitting
+
+### **Confusion Matrix (versi lama):**
 ```
         Prediksi
 Aktual   0   1   2
