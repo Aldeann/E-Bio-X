@@ -71,37 +71,45 @@
               v-if="form.question_type === 'multiple_choice'"
               type="button"
               class="text-sm text-green-600 hover:text-green-700 flex items-center gap-1"
-              @click="form.options.push({ option_text: '', is_correct: false })"
+              @click="form.options.push({ option_text: '', is_correct: false, feedback: '' })"
             >
               <Icon name="material-symbols:add-circle" class="w-4 h-4" /> Tambah Pilihan
             </button>
           </div>
           <p class="text-xs text-gray-500 mb-2">Klik lingkaran di kiri untuk menandai jawaban yang benar.</p>
-          <div v-for="(o, i) in form.options" :key="i" class="flex items-center gap-2 mb-2">
-            <button
-              type="button"
-              class="w-6 h-6 shrink-0 flex items-center justify-center rounded-full border-2 transition"
-              :class="o.is_correct ? 'bg-green-600 border-green-600 text-white' : 'border-gray-300 text-transparent hover:border-green-400'"
-              :title="o.is_correct ? 'Jawaban benar' : 'Tandai sebagai benar'"
-              @click="form.options = form.options.map((x, idx) => ({ ...x, is_correct: idx === i ? !x.is_correct : false }))"
-            >
-              <Icon name="material-symbols:check" class="w-4 h-4" />
-            </button>
+          <div v-for="(o, i) in form.options" :key="i" class="mb-3">
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                class="w-6 h-6 shrink-0 flex items-center justify-center rounded-full border-2 transition"
+                :class="o.is_correct ? 'bg-green-600 border-green-600 text-white' : 'border-gray-300 text-transparent hover:border-green-400'"
+                :title="o.is_correct ? 'Jawaban benar' : 'Tandai sebagai benar'"
+                @click="form.options = form.options.map((x, idx) => ({ ...x, is_correct: idx === i ? !x.is_correct : false }))"
+              >
+                <Icon name="material-symbols:check" class="w-4 h-4" />
+              </button>
+              <input
+                v-model="o.option_text"
+                type="text"
+                placeholder="Pilihan jawaban..."
+                class="flex-1 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
+              />
+              <span v-if="o.is_correct" class="text-xs text-green-600 dark:text-green-400 w-16 text-center">Benar</span>
+              <button
+                v-if="form.options.length > 2"
+                type="button"
+                class="text-red-500 hover:text-red-600"
+                @click="form.options.splice(i, 1)"
+              >
+                <Icon name="material-symbols:delete" class="w-5 h-5" />
+              </button>
+            </div>
             <input
-              v-model="o.option_text"
+              v-model="o.feedback"
               type="text"
-              placeholder="Pilihan jawaban..."
-              class="flex-1 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
+              :placeholder="o.is_correct ? 'Alasan kenapa opsi ini benar (opsional)' : 'Kesalahpahaman yang dituju pengecoh ini (opsional)'"
+              class="mt-1 ml-8 w-full dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-green-500"
             />
-            <span v-if="o.is_correct" class="text-xs text-green-600 dark:text-green-400 w-16 text-center">Benar</span>
-            <button
-              v-if="form.options.length > 2"
-              type="button"
-              class="text-red-500 hover:text-red-600"
-              @click="form.options.splice(i, 1)"
-            >
-              <Icon name="material-symbols:delete" class="w-5 h-5" />
-            </button>
           </div>
         </div>
 
@@ -151,13 +159,45 @@
         </div>
 
         <div>
+          <label class="block text-sm font-medium mb-1">Bagian Materi</label>
+          <select
+            v-model="form.section_id"
+            class="w-full dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
+          >
+            <option :value="null">Tidak ditautkan ke bagian</option>
+            <optgroup v-for="g in sectionGroups" :key="g.material_id" :label="g.material_title">
+              <option v-for="s in g.rows" :key="s.section_id" :value="s.section_id">
+                {{ s.position + 1 }}. {{ s.title }}
+              </option>
+            </optgroup>
+          </select>
+          <p class="text-xs text-gray-500 mt-1">
+            Bagian ini dipakai untuk memilih soal latihan. Topik mengikuti judul bagian secara otomatis.
+          </p>
+        </div>
+
+        <div>
           <label class="block text-sm font-medium mb-1">Topik (opsional)</label>
           <input
             v-model="form.topic"
             type="text"
             placeholder="Contoh: Virus"
-            class="w-full dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
+            :disabled="!!form.section_id"
+            class="w-full dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 disabled:opacity-60"
           />
+          <p v-if="form.section_id" class="text-xs text-gray-500 mt-1">
+            Terisi otomatis dari judul bagian. Kosongkan tautan bagian bila ingin memakai topik bebas.
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Miskonsepsi yang diuji (opsional)</label>
+          <textarea
+            v-model="form.misconception"
+            rows="2"
+            placeholder="Contoh: virus dianggap sel hidup karena bisa berkembang biak sendiri"
+            class="w-full dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
+          ></textarea>
         </div>
 
         <div class="flex gap-2 pt-2">
@@ -202,13 +242,31 @@ const isEdit = computed(() => !!props.question);
 const saving = ref(false);
 const uploading = ref(false);
 const questionInput = ref(null);
+const sections = ref([]);
 let initialSnapshot = "";
 
 const isDirty = computed(() => JSON.stringify(form.value) !== initialSnapshot);
 
+const sectionGroups = computed(() => {
+  const map = new Map();
+  for (const row of sections.value) {
+    if (!map.has(row.material_id)) {
+      map.set(row.material_id, {
+        material_id: row.material_id,
+        material_title: row.material_title,
+        rows: [],
+      });
+    }
+    map.get(row.material_id).rows.push(row);
+  }
+  return Array.from(map.values());
+});
+
 function defaultForm() {
   return {
     topic: "",
+    section_id: null,
+    misconception: "",
     question_type: "multiple_choice",
     question_text: "",
     difficulty: "medium",
@@ -216,12 +274,25 @@ function defaultForm() {
     points: 10,
     image_url: "",
     options: [
-      { option_text: "", is_correct: false },
-      { option_text: "", is_correct: false },
-      { option_text: "", is_correct: false },
+      { option_text: "", is_correct: false, feedback: "" },
+      { option_text: "", is_correct: false, feedback: "" },
+      { option_text: "", is_correct: false, feedback: "" },
     ],
   };
 }
+
+// The section list is what the teacher can link a practice question to, so it
+// is loaded once per open instead of being passed in by each caller.
+const loadSections = async () => {
+  try {
+    const data = await $fetch(`${config.public.backend}/api/teacher/practice/sections`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    sections.value = data?.sections || [];
+  } catch {
+    sections.value = [];
+  }
+};
 
 const onTypeChange = async () => {
   if (form.value.question_type === "true_false") {
@@ -241,8 +312,8 @@ const onTypeChange = async () => {
       }
     }
     form.value.options = [
-      { option_text: "Benar", is_correct: false },
-      { option_text: "Salah", is_correct: false },
+      { option_text: "Benar", is_correct: false, feedback: "" },
+      { option_text: "Salah", is_correct: false, feedback: "" },
     ];
   }
 };
@@ -251,21 +322,31 @@ const applyInitial = () => {
   form.value = defaultForm();
   if (props.question) {
     form.value.topic = props.question.topic || "";
+    form.value.section_id = props.question.section_id ?? null;
+    form.value.misconception = props.question.misconception || "";
     form.value.question_type = props.question.question_type || "multiple_choice";
     form.value.question_text = props.question.question_text || "";
     form.value.difficulty = props.question.difficulty || "medium";
     form.value.explanation = props.question.explanation || "";
-    form.value.points = props.question.points || 10;
+    form.value.points = props.question.points ?? 10;
     form.value.image_url = props.question.image_url || "";
     if (form.value.question_type === "true_false") {
-      form.value.options = [
-        { option_text: "Benar", is_correct: false },
-        { option_text: "Salah", is_correct: false },
-      ];
+      form.value.options = (props.question.options || []).map((o) => ({
+        option_text: o.option_text,
+        is_correct: !!o.is_correct,
+        feedback: o.feedback || "",
+      }));
+      if (form.value.options.length !== 2) {
+        form.value.options = [
+          { option_text: "Benar", is_correct: false, feedback: "" },
+          { option_text: "Salah", is_correct: false, feedback: "" },
+        ];
+      }
     } else {
       form.value.options = (props.question.options || []).map((o) => ({
         option_text: o.option_text,
         is_correct: !!o.is_correct,
+        feedback: o.feedback || "",
       }));
     }
   }
@@ -326,7 +407,11 @@ const save = async () => {
     toast.add({ title: "Pertanyaan wajib diisi", color: "red" });
     return;
   }
-  const options = form.value.options.map((o) => ({ option_text: o.option_text, is_correct: o.is_correct }));
+  const options = form.value.options.map((o) => ({
+    option_text: o.option_text,
+    is_correct: o.is_correct,
+    feedback: o.feedback || "",
+  }));
   if (options.some((o) => !o.option_text.trim())) {
     toast.add({ title: "Semua pilihan jawaban wajib diisi", color: "red" });
     return;
@@ -342,6 +427,8 @@ const save = async () => {
 
   const body = {
     topic: form.value.topic,
+    section_id: form.value.section_id ?? null,
+    misconception: form.value.misconception,
     question_type: form.value.question_type,
     question_text: form.value.question_text,
     difficulty: form.value.difficulty,
@@ -380,6 +467,7 @@ watch(
   (val) => {
     if (val) {
       applyInitial();
+      loadSections();
       document.addEventListener("keydown", onKeydown);
     } else {
       document.removeEventListener("keydown", onKeydown);

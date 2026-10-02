@@ -8,6 +8,9 @@ class QuestionBankOption(db.Model):
     option_text = db.Column(db.String(255), nullable=False)
     is_correct = db.Column(db.Boolean, nullable=False, default=False)
     order_index = db.Column(db.Integer, nullable=False, default=0)
+    # Why this option is right or wrong. Optional; AI drafts fill it in so the
+    # teacher reviewing the draft can judge the distractor, not just the key.
+    feedback = db.Column(db.Text, nullable=True)
 
     def __repr__(self):
         return f'<QuestionBankOption {self.id}>'

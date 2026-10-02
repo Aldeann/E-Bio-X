@@ -29,6 +29,19 @@ _COMPAT_COLUMNS = [
     # Subtopic tag on quiz questions: NULL = not tagged. Lets wrong answers
     # be attributed to a material section (Fase 1 per-section diagnosis).
     ('questions', 'section_id', 'ALTER TABLE questions ADD COLUMN section_id INT NULL'),
+    # Practice questions per material section (Fase 3). section_id is only set
+    # from a section the teacher explicitly chose. source/status carry the
+    # review trail: only APPROVED questions may be served as practice.
+    ('question_bank', 'section_id', 'ALTER TABLE question_bank ADD COLUMN section_id INT NULL'),
+    ('question_bank', 'source', "ALTER TABLE question_bank ADD COLUMN source VARCHAR(20) NOT NULL DEFAULT 'teacher'"),
+    ('question_bank', 'status', "ALTER TABLE question_bank ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'APPROVED'"),
+    ('question_bank', 'generated_by', 'ALTER TABLE question_bank ADD COLUMN generated_by VARCHAR(20) NULL'),
+    ('question_bank', 'model_name', 'ALTER TABLE question_bank ADD COLUMN model_name VARCHAR(100) NULL'),
+    ('question_bank', 'prompt_version', 'ALTER TABLE question_bank ADD COLUMN prompt_version VARCHAR(20) NULL'),
+    ('question_bank', 'reviewed_by', 'ALTER TABLE question_bank ADD COLUMN reviewed_by INT NULL'),
+    ('question_bank', 'reviewed_at', 'ALTER TABLE question_bank ADD COLUMN reviewed_at DATETIME NULL'),
+    ('question_bank', 'misconception', 'ALTER TABLE question_bank ADD COLUMN misconception TEXT NULL'),
+    ('question_bank_options', 'feedback', 'ALTER TABLE question_bank_options ADD COLUMN feedback TEXT NULL'),
 ]
 
 

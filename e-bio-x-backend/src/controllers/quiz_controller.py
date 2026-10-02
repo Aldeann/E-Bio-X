@@ -1234,6 +1234,8 @@ def upload_quiz_question_image():
 # ---------------- TEACHER: question bank ----------------
 
 def _serialize_bank(bq, times_used=None):
+    section = getattr(bq, 'section', None)
+    material = section.material if section else None
     return {
         'id': bq.id,
         'question_text': bq.question_text,
@@ -1241,9 +1243,21 @@ def _serialize_bank(bq, times_used=None):
         'topic': bq.topic,
         'difficulty': bq.difficulty,
         'explanation': bq.explanation,
+        'misconception': bq.misconception,
         'points': bq.points,
         'image_url': storage_service.out_url(bq.image_url) if bq.image_url else None,
         'times_used': times_used if times_used is not None else len(bq.quiz_questions),
+        'section_id': bq.section_id,
+        'section_title': section.title if section else None,
+        'material_id': material.id if material else None,
+        'material_title': material.title if material else None,
+        'source': bq.source or 'teacher',
+        'status': bq.status or 'APPROVED',
+        'generated_by': bq.generated_by,
+        'model_name': bq.model_name,
+        'prompt_version': bq.prompt_version,
+        'reviewed_by': bq.reviewed_by,
+        'reviewed_at': bq.reviewed_at.isoformat() if bq.reviewed_at else None,
         'created_at': bq.created_at.isoformat() if bq.created_at else None,
         'updated_at': bq.updated_at.isoformat() if bq.updated_at else None,
         'options': [{
@@ -1251,8 +1265,30 @@ def _serialize_bank(bq, times_used=None):
             'option_text': o.option_text,
             'is_correct': o.is_correct,
             'order_index': o.order_index,
+            'feedback': o.feedback,
         } for o in sorted(bq.options, key=lambda x: x.order_index)],
     }
+
+
+def _resolve_bank_section(user, raw):
+    """Resolve the section a bank question is tagged to.
+
+    Explicit only. Like the quiz-question tag in Fase 1, the topic string is
+    never matched against section titles, so an ambiguous tag stays None instead
+    of attaching the question to the wrong section.
+    """
+    if raw in (None, '', 'null'):
+        return None, None
+    try:
+        section_id = int(raw)
+    except (TypeError, ValueError):
+        return None, 'Bagian materi tidak valid'
+    section = MaterialSection.query.get(section_id)
+    if not section or not section.material:
+        return None, 'Bagian materi tidak ditemukan'
+    if not _teacher_owns_material(user, section.material):
+        return None, 'Anda tidak berhak menautkan soal ke bagian ini'
+    return section, None
 
 
 @jwt_required()
@@ -1276,6 +1312,18 @@ def get_question_bank():
         query = query.filter(QuestionBank.difficulty == difficulty)
     if qtype:
         query = query.filter(QuestionBank.question_type == qtype)
+    section_id = (data.get('section_id') or '').strip()
+    if section_id:
+        try:
+            query = query.filter(QuestionBank.section_id == int(section_id))
+        except ValueError:
+            return jsonify({'error': 'section_id tidak valid'}), 400
+    status = (data.get('status') or '').strip().upper()
+    if status:
+        query = query.filter(QuestionBank.status == status)
+    source = (data.get('source') or '').strip()
+    if source:
+        query = query.filter(QuestionBank.source == source)
     items = query.order_by(QuestionBank.created_at.desc()).all()
     usage_counts = {}
     if items:
@@ -1313,6 +1361,21 @@ def create_question_bank():
         image_url=validated.get('image_url'),
         created_at=datetime.utcnow(),
     )
+    section, err = _resolve_bank_section(user, data.get('section_id'))
+    if err:
+        return jsonify({'error': err}), 400
+    if section:
+        bq.section_id = section.id
+        # The topic follows the section the teacher picked, so the two can never
+        # disagree in the bank list.
+        bq.topic = section.title
+    bq.misconception = (data.get('misconception') or '').strip() or None
+    # Teacher-written questions are approved by definition: the author is the
+    # reviewer. AI drafts arrive through the draft endpoint instead.
+    bq.source = 'teacher'
+    bq.status = 'APPROVED'
+    bq.reviewed_by = user.id
+    bq.reviewed_at = datetime.utcnow()
     db.session.add(bq)
     db.session.flush()
     for idx, o in enumerate(validated['options']):
@@ -1321,6 +1384,7 @@ def create_question_bank():
             option_text=(o.get('option_text') or '').strip(),
             is_correct=bool(o.get('is_correct')),
             order_index=idx,
+            feedback=(o.get('feedback') or '').strip() or None,
         ))
     db.session.commit()
     return jsonify({'message': 'Soal bank berhasil ditambahkan', 'question': _serialize_bank(bq)}), 201
@@ -1342,10 +1406,22 @@ def update_question_bank(bank_id):
         return jsonify({'error': err}), 400
     bq.question_text = validated['question_text']
     bq.question_type = validated['question_type']
-    bq.topic = (data.get('topic') or '').strip() or None
     bq.difficulty = validated['difficulty']
     bq.explanation = validated['explanation']
     bq.points = validated['points']
+    if 'section_id' in data:
+        section, err = _resolve_bank_section(user, data.get('section_id'))
+        if err:
+            return jsonify({'error': err}), 400
+        bq.section_id = section.id if section else None
+        if section:
+            bq.topic = section.title
+    # A tagged question always shows its section title as the topic, so the two
+    # cannot drift apart. Topic is only free text while there is no section.
+    if 'topic' in data and not bq.section_id:
+        bq.topic = (data.get('topic') or '').strip() or None
+    if 'misconception' in data:
+        bq.misconception = (data.get('misconception') or '').strip() or None
     if 'image_url' in data:
         bq.image_url = data['image_url']
     bq.updated_at = datetime.utcnow()
@@ -1357,6 +1433,7 @@ def update_question_bank(bank_id):
             option_text=(o.get('option_text') or '').strip(),
             is_correct=bool(o.get('is_correct')),
             order_index=idx,
+            feedback=(o.get('feedback') or '').strip() or None,
         ))
     db.session.commit()
     return jsonify({'message': 'Soal bank berhasil diperbarui', 'question': _serialize_bank(bq)}), 200

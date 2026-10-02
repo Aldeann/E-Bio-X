@@ -14,7 +14,7 @@
     </div>
 
     <div class="bg-white dark:bg-gray-900 border border-green-200 dark:border-gray-700 rounded-xl shadow-md p-4 mb-3">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
         <input
           v-model="filters.q"
           type="text"
@@ -31,6 +31,12 @@
           <option value="easy">Mudah</option>
           <option value="medium">Sedang</option>
           <option value="hard">Sulit</option>
+        </select>
+        <select v-model="filters.status" class="dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm">
+          <option value="">Semua status</option>
+          <option value="APPROVED">Disetujui</option>
+          <option value="DRAFT">Menunggu review</option>
+          <option value="REJECTED">Ditolak</option>
         </select>
       </div>
     </div>
@@ -72,6 +78,16 @@
         <div class="flex items-start justify-between gap-3">
           <div class="flex-1 min-w-0">
             <div class="flex flex-wrap items-center gap-2">
+              <span
+                class="text-xs px-2 py-0.5 rounded-full"
+                :class="statusClass(b.status)"
+              >{{ statusLabel(b.status) }}</span>
+              <span
+                v-if="b.source === 'ai'"
+                class="text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-400"
+              >
+                Draf AI
+              </span>
               <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-400">
                 {{ typeLabel(b.question_type) }}
               </span>
@@ -111,7 +127,11 @@
                 <span>{{ o.option_text }}</span>
               </li>
               <li v-if="b.explanation" class="pt-1 text-gray-500 italic">Pembahasan: {{ b.explanation }}</li>
+              <li v-if="b.misconception" class="text-gray-500 italic">Miskonsepsi: {{ b.misconception }}</li>
             </ul>
+            <p v-if="b.section_title" class="mt-2 text-xs text-blue-600 dark:text-blue-400">
+              Latihan untuk bagian: {{ b.section_title }}
+            </p>
           </div>
           <div class="flex gap-0.5 shrink-0">
             <button
@@ -170,17 +190,26 @@ const loading = ref(true);
 const formOpen = ref(false);
 const editing = ref(null);
 const generatingId = ref(null);
-const filters = reactive({ q: "", type: "", difficulty: "" });
+const filters = reactive({ q: "", type: "", difficulty: "", status: "" });
 
-const hasActiveFilter = computed(() => !!(filters.q || filters.type || filters.difficulty));
+const hasActiveFilter = computed(() => !!(filters.q || filters.type || filters.difficulty || filters.status));
 
 const typeLabel = (t) => (t === "true_false" ? "Benar/Salah" : "Pilihan Ganda");
 const difficultyLabel = (d) => (d === "easy" ? "Mudah" : d === "hard" ? "Sulit" : "Sedang");
+const statusLabel = (s) =>
+  s === "DRAFT" ? "Menunggu review" : s === "REJECTED" ? "Ditolak" : "Disetujui";
+const statusClass = (s) =>
+  s === "DRAFT"
+    ? "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300"
+    : s === "REJECTED"
+      ? "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+      : "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-400";
 
 const resetFilters = () => {
   filters.q = "";
   filters.type = "";
   filters.difficulty = "";
+  filters.status = "";
 };
 
 const generateExplanation = async (b) => {
@@ -207,6 +236,7 @@ const load = async () => {
     if (filters.q) params.set("q", filters.q);
     if (filters.type) params.set("type", filters.type);
     if (filters.difficulty) params.set("difficulty", filters.difficulty);
+    if (filters.status) params.set("status", filters.status);
     const qs = params.toString() ? `?${params.toString()}` : "";
     const data = await $fetch(`${config.public.backend}/api/teacher/question-bank${qs}`, {
       headers: { Authorization: `Bearer ${token}` },

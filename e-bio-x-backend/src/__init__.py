@@ -62,6 +62,10 @@ def create_app():
         get_student_quizzes, get_student_quiz, start_student_attempt, get_student_attempt,
         save_student_answer, submit_student_attempt, get_student_attempt_result, get_student_quiz_result,
     )
+    from src.controllers.practice_controller import (
+        get_practice_sections, generate_section_drafts, get_draft_queue,
+        approve_bank_draft, reject_bank_draft,
+    )
     from src.controllers.forum_controller import (
         list_forums, create_forum, get_forum_detail, update_forum, delete_forum,
         create_post, create_reply, update_post, delete_post, upload_forum_attachment,
@@ -196,6 +200,13 @@ def create_app():
     app.add_url_rule('/api/teacher/question-bank', view_func=create_question_bank, methods=['POST'])
     app.add_url_rule('/api/teacher/question-bank/<bank_id>', view_func=update_question_bank, methods=['PUT'])
     app.add_url_rule('/api/teacher/question-bank/<bank_id>', view_func=delete_question_bank, methods=['DELETE'])
+
+    # ===== Practice questions per material section (Fase 3) =====
+    app.add_url_rule('/api/teacher/practice/sections', view_func=get_practice_sections, methods=['GET'])
+    app.add_url_rule('/api/teacher/practice/sections/<section_id>/drafts', view_func=generate_section_drafts, methods=['POST'])
+    app.add_url_rule('/api/teacher/practice/drafts', view_func=get_draft_queue, methods=['GET'])
+    app.add_url_rule('/api/teacher/practice/drafts/<bank_id>/approve', view_func=approve_bank_draft, methods=['POST'])
+    app.add_url_rule('/api/teacher/practice/drafts/<bank_id>/reject', view_func=reject_bank_draft, methods=['POST'])
 
     app.add_url_rule('/api/student/quizzes', view_func=get_student_quizzes, methods=['GET'])
     app.add_url_rule('/api/student/quizzes/<quiz_id>', view_func=get_student_quiz, methods=['GET'])

@@ -171,6 +171,7 @@ Dijalankan di lingkungan dev (server `http://127.0.0.1:5000`, MySQL `e_bio`):
 | **Total komponen ML** | | **286/286 PASS** |
 | `test_section_tagging.py` | Fase 1 — penandaan bagian pada soal (`questions.section_id`) | **24/24 PASS** |
 | `test_section_mastery.py` | Fase 2 — diagnosis penguasaan per bagian (ambang minimum, fallback kuis-section, scoping) | **34/34 PASS** |
+| `test_practice_drafts.py` | Fase 3a–3c — soal latihan per bagian (tautan bagian, draf AI, persetujuan guru, tanpa fallback karangan) | **80/80 PASS** |
 | `scripts/verify_ml_readiness.py` | Gate pra-demo: kelengkapan data, model per kelas, scoping guru, integritas klaim & soal kuis | **59/59 PASS** |
 
 `test_tahap4.py` dan `test_tahap5_ml.py` adalah suite API end-to-end yang
@@ -218,11 +219,14 @@ guru non-owner terhadap materi/kuis/analisis → 403.
   rekomendasi; ini observasional, bukan bukti kausal.
 - Color label klaster analisis kuis lama hardcoded di frontend (3 warna) — sesuai
   jumlah klaster default.
-- Fitur "bagian materi" sudah sampai Fase 2 (penandaan soal + diagnosis penguasaan per
-  bagian). Ambang minimum 3 jawaban per bagian sengaja tidak bisa dikarang, sehingga bagian
-  dengan data sedikit tampil `INSUFFICIENT_DATA`, bukan angka. Rekomendasi per bagian,
-  gating adaptif, dan petaheatmap siswa × bagian untuk guru belum dikerjakan
-  (lihat `docs/FEATURE_BAGIAN_MASTERY.md`).
+- Fitur "bagian materi" sudah sampai Fase 3a–3c. Ambang minimum 3 jawaban per bagian
+  sengaja tidak bisa dikarang, sehingga bagian dengan data sedikit tampil
+  `INSUFFICIENT_DATA`, bukan angka. Latihan per bagian memakai soal bank yang ditautkan
+  eksplisit ke bagian; draf AI **wajib** disetujui guru sebelum bisa dipakai, dan modul
+  draf tidak punya fallback rule-based — tanpa `AI_API_KEY` atau saat penyedia AI sibuk
+  (HTTP 503), sistem menolak dengan pesan jujur, bukan soal karangan. Pelajar berjalan
+  untuk siswa, rekomendasi per bagian, gating adaptif, dan peta panas siswa × bagian untuk
+  guru belum dikerjakan (lihat `docs/FEATURE_BAGIAN_MASTERY.md`).
 - `SECRET_KEY` dev bernilai placeholder — ganti nilai produksi sebelum rilis.
 
 ---
