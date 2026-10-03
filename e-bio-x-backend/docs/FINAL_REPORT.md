@@ -174,6 +174,7 @@ Dijalankan di lingkungan dev (server `http://127.0.0.1:5000`, MySQL `e_bio`):
 | `test_practice_drafts.py` | Fase 3a–3c — soal latihan per bagian (tautan bagian, draf AI, persetujuan guru, tanpa fallback karangan) | **80/80 PASS** |
 | `test_student_practice.py` | Fase 3d — latihan siswa (hanya soal APPROVED, kunci tidak bocor, penilaian di server, sumber terpisah di diagnosis) | **73/73 PASS** |
 | `scripts/tag_demo_quiz_sections.py` | Data demo — menautkan 26 soal kuis demo ke bagian materi (eksplisit, 4 soal ambigu dibiarkan `NULL`, idempoten) | **26 soal, 0 masalah** |
+| `scripts/fix_demo_section_interactive.py` | Data demo — memindahkan soal interaktif + jawabannya ke bagian yang cocok (tanpa angka baru, invarian `is_correct` 590/590) | **590/590 konsisten** |
 | `scripts/verify_ml_readiness.py` | Gate pra-demo: kelengkapan data, model per kelas, scoping guru, integritas klaim & soal kuis, atribusi jawaban kuis ke bagian | **60/60 PASS** |
 
 `test_tahap4.py` dan `test_tahap5_ml.py` adalah suite API end-to-end yang

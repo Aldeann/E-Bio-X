@@ -106,6 +106,37 @@ Pemeriksaan `[10]` di `scripts/verify_ml_readiness.py` menjaga keadaan ini: kala
 skor kelas tetap *tampak* wajar saat itu terjadi — jawaban interaktif 62 siswa sudah melewati
 ambang di level kelas, sehingga kerusakannya tersembunyi di balik angka yang terlihat sehat.
 
+### 2.6 Data demo: soal interaktif diletakkan di bagian yang cocok
+
+Seeder demo juga mengisi **soal interaktif** tiap bagian secara posisional (dua soal pertama ke
+bagian 1, dua berikutnya ke bagian 2), sehingga ada soal yang salah kamar — mis. "Selubung protein
+virus disebut?" (kapsid, jelas tentang struktur) duduk di bagian "Siklus Replikasi Virus". Karena
+jawaban interaktif ikut membentuk skor bagian, soal yang salah kamar membuat skor satu bagian
+dibentuk pertanyaan bagian lain.
+
+`scripts/fix_demo_section_interactive.py` **memindahkan** soal interaktif beserta jawabannya ke
+bagian yang cocok, lewat daftar target eksplisit per bagian:
+
+| Materi | Bagian | Soal interaktif |
+|---|---|---|
+| 115 | 67 Pengenalan Sel | apa yang mengontrol sel; susunan dinding sel |
+| 115 | 68 Organel dan Fungsinya | tempat respirasi; tempat pencernaan |
+| 116 | 69 Ciri dan Struktur Bakteri | pembelahan bakteri; bentuk batang |
+| 116 | 70 Peranan Bakteri | zat antibakteri; bakteri yoghurt |
+| 117 | 71 Struktur Virus | bahan genetik; kapsid; sifat tidak punya sel |
+| 117 | 72 Siklus Replikasi Virus | siklus litik |
+
+Prinsipnya: **tidak ada angka baru dan tidak ada jawaban yang dihapus**. Setiap pasangan
+(soal, jawaban) hanya berpindah bagian — jumlah dan `is_correct`-nya tetap. Perpindahan
+diverifikasi oleh invarian seeder: `is_correct` setiap baris harus sama dengan
+`(selected_answer == correct_answer)` soal yang benar-benar dijawab. Hasil: 590/590 baris
+konsisten, 0 sel ganda, 0 `section_id` yang tidak cocok.
+
+`scripts/repair_demo_interactive_split.py` adalah perbaikan sekali jalan untuk baris yang sempat
+tertumpuk saat script di atas pertama dijalankan (pemindahan berlalu membaca DB yang berubah di
+tengah proses). Versi script utama sekarang mengunci `id` baris lebih dulu, jadi tidak terulang.
+Keduanya idempoten dan default dry-run.
+
 ---
 
 ## 3. Fase 2 — diagnosis penguasaan per bagian
