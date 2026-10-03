@@ -12,16 +12,19 @@
 import os
 import sys
 from collections import Counter
+from sqlalchemy import or_
 
 # Allow running as `python scripts\verify_ml_readiness.py` from anywhere.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src import create_app
+from src.config.database import db
 from src.models.user import User
 from src.models.material import Material
 from src.models.quiz import Quiz
 from src.models.submission import Submission
 from src.models.answer import Answer
+from src.models.question import Question
 from src.models.recommendation import Recommendation
 from src.models.ml_model import MlModel
 from src.ml import ml_config as cfg
@@ -359,6 +362,65 @@ def main():
               not demo_no_q,
               f'tanpa soal: {demo_no_q}' if demo_no_q
               else 'semua kuis demo punya soal')
+
+        # ---- 10. atribusi jawaban kuis -------------------------
+        print("\n[10] ATRIBUSI JAWABAN KUIS KE BAGIAN (Fase 1 tagging)")
+        # If a material's quiz questions were never linked to a section, those
+        # answers belong to no section: they silently vanish from the
+        # comprehension map. The section scores can still look healthy because
+        # the interactive source alone clears the threshold at class level, so
+        # this check looks at the quiz source specifically. That is the failure
+        # mode that would otherwise hide.
+        rows = []
+        for mid, in db.session.query(Quiz.material_id).join(
+                Submission, Submission.quiz_id == Quiz.id
+        ).filter(Submission.status == 'submitted').distinct().all():
+            if mid is None:
+                continue
+            mat = Material.query.get(int(mid))
+            if mat is None:
+                continue
+            base = db.session.query(Answer.id).join(
+                Submission, Submission.id == Answer.submission_id
+            ).join(Quiz, Quiz.id == Submission.quiz_id
+            ).join(Question, Question.id == Answer.question_id).filter(
+                Quiz.material_id == int(mid),
+                Submission.status == 'submitted')
+            total = base.count()
+            attributed = base.filter(or_(
+                Question.section_id.isnot(None),
+                Quiz.section_id.isnot(None))).count()
+            students_answered = len({r[0] for r in db.session.query(
+                Answer.student_id).join(
+                    Submission, Submission.id == Answer.submission_id
+                ).join(Quiz, Quiz.id == Submission.quiz_id).filter(
+                    Quiz.material_id == int(mid),
+                    Submission.status == 'submitted').distinct().all()})
+            summary = an.section_mastery_class(int(mid), mat.teacher_id)
+            scored = [r['score'] for r in summary['sections']
+                      if r.get('score') is not None]
+            rows.append((int(mid), students_answered, total, attributed,
+                         len(scored), len(summary['sections']),
+                         min(scored) if scored else None,
+                         max(scored) if scored else None))
+        # Only materials with enough answering students are held to the bar:
+        # a material answered by one student is honestly thin, not broken.
+        held = [r for r in rows if r[1] >= an.MIN_SECTION_SAMPLE and r[2] > 0]
+        blind = [r[0] for r in held if r[3] == 0]
+        low = [r[0] for r in held if r[2] and r[3] / r[2] < 0.5]
+        check('jawaban kuis materi demo teratribusi ke bagian',
+              not blind and not low,
+              (f'tanpa atribusi: {blind} | atribusi <50%: {low}'
+               if (blind or low) else f'{len(held)} materi diperiksa'))
+        for mid, stu, total, attr, ns, nsec, lo, hi in sorted(rows):
+            if stu >= an.MIN_SECTION_SAMPLE:
+                pct = (attr / total * 100) if total else 0
+                print(f'      materi {mid}: {attr}/{total} jawaban kuis '
+                      f'teratribusi ({pct:.0f}%); {ns}/{nsec} bagian berskor '
+                      f'(rentang {lo}..{hi})')
+            else:
+                print(f'      materi {mid}: lewati: hanya {stu} siswa menjawab '
+                      f'(< {an.MIN_SECTION_SAMPLE})')
 
         # ---- ringkasan ----------------------------------------
         print("\n" + "=" * 66)

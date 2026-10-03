@@ -68,6 +68,44 @@ jujur dan bisa diperbaiki guru; data salah menipu guru dan siswa.
 
 `test_section_tagging.py` — **24/24 PASS**.
 
+### 2.5 Data demo: menautkan soal kuis demo ke bagian
+
+Kuis demo 89/90/91 (materi 115/116/117) punya **1880 jawaban siswa** yang sudah terkumpul,
+tetapi `questions.section_id`-nya semua `NULL`. Akibatnya seluruh jawaban itu tidak dihitung
+di diagnosis per bagian. Sisa bukti cuma jawaban interaktif, tepat **2 per siswa per bagian**,
+sedangkan ambangnya 3 — jadi dari 295 sel (siswa × bagian) yang punya jawaban, **0** yang bisa
+mendapat skor.
+
+`scripts/tag_demo_quiz_sections.py` menutup celah itu: 26 soal ditautkan ke bagian yang benar
+dengan **daftar eksplisit + alasan per soal** (tidak ada pencocokan teks otomatis). Setelah
+tagging, **376 dari 376 sel** (siswa × bagian) di materi 115/116/117 layak diberi skor, dengan
+sebaran yang nyata: 26 sel < 40, 47 di 40–60, 86 di 60–75, 117 di 75–90, 100 di 90–100.
+
+Pembagian soal per bagian:
+
+| Materi | Bagian | Soal kuis |
+|---|---|---|
+| 115 Sel dan Organel | 67 Pengenalan Sel | 171, 173, 176, 178 |
+| 115 Sel dan Organel | 68 Organel dan Fungsinya | 172, 174, 175, 177, 179, 180 |
+| 116 Bakteri dan Peranannya | 69 Ciri dan Struktur Bakteri | 181, 182, 185, 187, 189 |
+| 116 Bakteri dan Peranannya | 70 Peranan Bakteri | 183, 184, 186, 188, 190 |
+| 117 Virus dan Replikasinya | 71 Struktur Virus | 192, 193, 195 |
+| 117 Virus dan Replikasinya | 72 Siklus Replikasi Virus | 191, 197, 200 |
+
+Empat soal **sengaja dibiarkan `NULL`** karena tidak benar-benar milik salah satu bagian dan
+tidak dipaksa: 194 (kenapa virus bukan organisme), 196 (virus yang menyerang bakteri),
+198 (HIV penyebab AIDS), 199 (cara kerja vaksin). Ini konsisten dengan aturan §2.2 — bagian yang
+tidak bisa dibuktikan lebih baik kosong. Materi 117 karena itu hanya 60% jawabannya teratribusi;
+115 dan 116 100%.
+
+Script idempoten dan default dry-run. `quizzes.section_id` **sengaja tidak diisi**: satu kuis
+menyentuh dua bagian, jadi yang dipakai tag per soal.
+
+Pemeriksaan `[10]` di `scripts/verify_ml_readiness.py` menjaga keadaan ini: kalau tag hilang
+(mis. DB direset), jawaban kuis jadi tidak punya bagian dan gerbang **gagal**. Ini penting karena
+skor kelas tetap *tampak* wajar saat itu terjadi — jawaban interaktif 62 siswa sudah melewati
+ambang di level kelas, sehingga kerusakannya tersembunyi di balik angka yang terlihat sehat.
+
 ---
 
 ## 3. Fase 2 — diagnosis penguasaan per bagian
@@ -444,21 +482,31 @@ Data demo sudah punya 2 draf AI yang menunggu review pada bagian "Bagaimana Stru
 Empat bagian lain sudah punya soal latihan yang disetujui, jadi langkah 6 bisa langsung
 ditunjukkan juga.
 
+**Sebelum demo, jalankan `scripts/verify_ml_readiness.py`** dan pastikan pemeriksaan `[10]`
+lolos: artinya jawaban kuis materi demo sudah punya bagian, sehingga peta pemahaman tidak kosong.
+
+Soal kuis demo 89/90/91 sudah ditandai lebih dulu lewat
+`scripts/tag_demo_quiz_sections.py --apply` (§2.5), jadi langkah 1–4 bisa langsung menunjukkan
+skor per bagian yang benar-benar berisi. Kalau ingin tetap memperagakan penandaan langsung,
+lakukan pada kuis yang **tidak** dipakai peta (Quiz 88 "Quiz Repro", yang kosong), supaya data demo
+yang sudah bersih tidak berubah di tengah presentasi.
+
 ---
 
 ## 7. Batasan yang perlu diketahui
 
-- **Data demo belum bertag bagian.** Semua soal yang ada sekarang masih `section_id = NULL`,
-  jadi di data demo diagnosis siswa akan didominasi `INSUFFICIENT_DATA` sampai guru menandai
-  bagian (langkah 1 di atas). Ringkasan kelas sudah punya angka dari jawaban soal interaktif,
-  karena `StudentAnswer.section_id` memang terisi.
+- **Data demo sudah bertag bagian.** Soal kuis demo 89/90/91 ditautkan ke bagian lewat
+  `scripts/tag_demo_quiz_sections.py` (§2.5), jadi diagnosis per bagian di materi 115/116/117
+  sudah berisi (376/376 sel berskor, sebaran nyata). Empat soal yang tidak jelas sengaja
+  dibiarkan `NULL`. Kalau DB direset, gerbang `verify_ml_readiness.py` pemeriksaan `[10]` akan
+  gagal — jalankan ulang script itu sebelum demo.
 - Ambang 3 jawaban dipilih agar angka tidak berubah-ubah karena satu soal. Ini konstanta kode,
   belum bisa diatur guru.
 - Diagnosis baru untuk **materi**; belum ada agregasi lintas materi per bagian.
 - Bobot gabungan kuis + interaktif + latihan dihitung pada tingkat jawaban (bukan rata-rata
   persentase), sehingga kuis dengan 10 soal memberi bobot lebih besar daripada 1 soal latihan.
   Karena bobot latihan ikut masuk, **soal latihan yang jauh lebih mudah akan menaikkan skor
-  penguasaan** — ini konsekuensi dari memasukkan latihan sebagai sumber, dan_numbers sumbernya
+  penguasaan** — ini konsekuensi dari memasukkan latihan sebagai sumber, dan asal-usul sumbernya
   selalu ditampilkan per baris supaya bisa dinilai.
 - **Bagian dengan isi tipis menghasilkan soal yang tidak berguna.** Contoh di data demo:
   bagian "Siklus Replikasi Virus" hanya berisi satu kalimat ringkasan, sehingga AI tidak
@@ -467,7 +515,7 @@ ditunjukkan juga.
 - **Penyedia AI kadang sibuk (HTTP 503 "high demand").** Sudah ditangani 3 percobaan dengan
   jeda pendek, tapi kalau gagal tetap gagal dengan pesan jujur — tidak ada soal karangan.
   Untuk demo, siapkan draf lebih dulu (sudah tersedia 2 draf) daripada bergantung pada AI live.
-- **Rekomendasi per bagian belum ada.** Yang ada baru latihan per bagian;/engine rekomendasi
+- **Rekomendasi per bagian belum ada.** Yang ada baru latihan per bagian; mesin rekomendasi
   masih per-materi (`Recommendation.material_id` NOT NULL), belum ada gating, dan belum ada
   peta panas siswa × bagian.
 - **Tidak ada batas percobaan latihan.** Siswa boleh mengerjakan berkali-kali (§5.4).
