@@ -14,6 +14,7 @@
 #     diatribusikan (aturan eksplisit, bukan tebakan)
 #   - submission in_progress tidak ikut dihitung
 #   - ringkasan kelas per bagian jujur pada ambang yang sama
+#   - peta (siswa x bagian) untuk guru memakai aturan & ambang yang sama
 #   - akses materi tetap ter-scope (siswa/guru di luar kelas ditolak)
 #
 # Berjalan pada app + database nyata, membuat lalu menghapus fixture
@@ -326,6 +327,36 @@ def main():
                   and ca.get('total_students') == 1)
             check('kelas B: jujur insufficient', cb.get('score') is None
                   and cb.get('status') == 'INSUFFICIENT_DATA')
+
+            # ------------------------------------------- GURU / GRID
+            print('\n[3b] GURU - PETA (SISWA x BAGIAN)')
+            mx = ma.get('section_matrix') or {}
+            check('section_matrix terlaporkan', bool(mx), str(list(ma.keys())))
+            check('grid: 4 bagian + min_sample 3',
+                  len(mx.get('sections', [])) == 4 and mx.get('min_sample') == 3,
+                  f"{len(mx.get('sections', []))}/{mx.get('min_sample')}")
+            check('grid: 1 siswa berbukti dari 1 siswa',
+                  mx.get('students_with_data') == 1
+                  and mx.get('total_students') == 1,
+                  f"{mx.get('students_with_data')}/{mx.get('total_students')}")
+            gs = (mx.get('students') or [{}])[0]
+            check('grid: baris hanya siswa kelas ini',
+                  gs.get('student_id') == created['student'].id,
+                  str(gs.get('student_id')))
+            cells = gs.get('cells') or {}
+            ga = cells.get(str(created['sec_a'].id), {})
+            gb = cells.get(str(created['sec_b'].id), {})
+            gd = cells.get(str(created['sec_d'].id), {})
+            check('grid A: sama dengan per-siswa (READY 75.0)',
+                  ga.get('score') == 75.0 and ga.get('status') == 'READY',
+                  str(ga.get('score')))
+            check('grid B: mentah 1, insufficient',
+                  gb.get('answered') == 1
+                  and gb.get('status') == 'INSUFFICIENT_DATA',
+                  f"{gb.get('answered')}/{gb.get('status')}")
+            check('grid D: tanpa bukti NO_DATA',
+                  gd.get('status') == 'NO_DATA' and gd.get('answered') == 0,
+                  str(gd.get('status')))
 
             # ------------------------------------------- AKSES
             print('\n[4] AKSES TER-SCOPE')

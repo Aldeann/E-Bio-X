@@ -259,14 +259,17 @@ UI untuk menyalakan tombol Latihan dan mematikan tombol dengan alasan bila belum
     yang insufficient.
 - `teacher/analytics/index.vue`
   - pada baris materi yang diklik, tabel baru "Penguasaan per Bagian": bagian, dijawab, benar,
-    penguasaan, cakupan siswa, dengan catatan ambang minimum.
+    penguasaan, cakupan siswa, dengan catatan ambang minimum;
+  - di bawahnya, grid "Peta Penguasaan: Siswa × Bagian" (Fase 5, §6): baris = siswa, kolom =
+    bagian, sel = skor dengan warna label penguasaan.
 
 ### 3.5 Test
 
-`test_section_mastery.py` — **34/34 PASS**, antara lain memverifikasi:
+`test_section_mastery.py` — **41/41 PASS**, antara lain memverifikasi:
 ambang minimum tidak dikarang; jawaban tanpa tag tidak dipetakan; fallback
 `Quiz.section_id` bekerja; submission `in_progress` tidak dihitung; bagian tanpa data tetap
-muncul; ringkasan kelas jujur pada ambang yang sama; siswa/guru di luar cakupan mendapat 403.
+muncul; ringkasan kelas jujur pada ambang yang sama; grid (siswa × bagian) identik dengan baris
+bagian siswa (Fase 5, §6); siswa/guru di luar cakupan mendapat 403.
 
 ---
 
@@ -485,7 +488,62 @@ Hayati" 1. Dua draf AI lain sengaja dibiarkan `DRAFT` untuk peragaan persetujuan
 
 ---
 
-## 6. Cara demo (alur yang bisa ditunjukkan)
+## 6. Fase 5 — peta penguasaan (siswa × bagian)
+
+Ringkasan kelas menjawab "bagian mana yang lemah", tetapi belum menjawab "**siswa mana** yang
+lemah di bagian itu". Guru perlu keduanya. Karena itu halaman **Analytics → Per Materi**
+(di bawah tabel "Penguasaan per Bagian") menampilkan grid: baris = siswa, kolom = bagian,
+sel = skor penguasaan siswa pada bagian itu.
+
+### 6.1 Angka yang sama, bukan definisi kedua
+
+Grid **tidak punya aturan skoring sendiri**. Tiap sel dihitung lewat aturan yang sama dengan
+halaman siswa (`section_mastery_for_student`): kuis + interaktif + latihan, ambang
+`MIN_SECTION_SAMPLE` yang sama. Invariannya diuji langsung: setiap sel harus identik dengan
+baris bagian siswa yang bersangkutan lewat `section_mastery_matrix` di `test_section_mastery.py`.
+Konsekuensinya, guru dan siswa tidak akan pernah melihat dua skor berbeda untuk bagian yang sama.
+
+### 6.2 Tampilan sel
+
+| Sel | Arti |
+|---|---|
+| berwarna + angka | `READY`; angka = skor 0–100, warna = label penguasaan (Baik Sekali/Baik/Cukup/Kurang) |
+| abu-abu + angka kecil | `INSUFFICIENT_DATA`; angka = jumlah jawaban mentah (< 3), skor sengaja tidak dikarang |
+| abu-abu kosong | `NO_DATA`; siswa belum menjawab bagian itu sama sekali |
+
+Hanya siswa yang **sudah punya jawaban** pada materi itu yang ditampilkan; siswa tanpa jejak
+tidak menambah baris kosong. Header menyebut berapa dari berapa siswa yang tampil.
+
+### 6.3 Endpoint
+
+`GET /api/teacher/analytics/materials/<id>` menambah satu kunci `section_matrix`:
+
+```json
+{
+  "min_sample": 3,
+  "total_students": 76,
+  "students_with_data": 63,
+  "sections": [{"section_id": 71, "title": "Struktur Virus", "position": 0}],
+  "students": [
+    {"student_id": 3, "name": "…",
+     "cells": {"71": {"answered": 6, "correct": 5, "status": "READY",
+                       "score": 83.3, "mastery": {"label": "Baik"},
+                       "sources": ["kuis", "interaktif"]}}}
+  ]
+}
+```
+
+Tidak ada tabel atau kolom baru — murni turunan dari data yang sudah ada.
+
+### 6.4 Test
+
+`test_section_mastery.py` — **41/41 PASS**, termasuk memverifikasi bahwa sel grid identik
+dengan baris bagian siswa, sel di bawah ambang tetap jujur, dan sel tanpa bukti berstatus
+`NO_DATA`.
+
+---
+
+## 7. Cara demo (alur yang bisa ditunjukkan)
 
 1. Login sebagai guru, buka sebuah kuis, isi kolom "Bagian Materi" pada kuis, tekan
    **Terapkan bagian ke semua soal**. Lencana bagian langsung muncul di tiap soal.
@@ -496,6 +554,8 @@ Hayati" 1. Dua draf AI lain sengaja dibiarkan `DRAFT` untuk peragaan persetujuan
    tampil "belum cukup data" — itu disengaja, bukan bug.
 4. Login sebagai guru, buka **Analytics → Per Materi**, klik baris materi: tabel
    "Penguasaan per Bagian" menampilkan akurasi per bagian dan berapa siswa yang menjawabnya.
+   Di bawahnya, **Peta Penguasaan: Siswa × Bagian** (Fase 5) menunjukkan siswa mana yang lemah
+   di bagian mana; sel abu-abu berarti bukti belum cukup, bukan nilai nol.
 5. (Fase 3a–3c) Login sebagai guru, buka menu **Latihan Bagian**:
    - di tab "Bagian Materi" tekan **Buat draf** pada sebuah bagian → masuk tab "Antrean
      Review" → periksa isi soalnya → **Setujui**. Bagian itu kini punya soal latihan yang
@@ -524,7 +584,7 @@ yang sudah bersih tidak berubah di tengah presentasi.
 
 ---
 
-## 7. Batasan yang perlu diketahui
+## 8. Batasan yang perlu diketahui
 
 - **Data demo sudah bertag bagian.** Soal kuis demo 89/90/91 ditautkan ke bagian lewat
   `scripts/tag_demo_quiz_sections.py` (§2.5), jadi diagnosis per bagian di materi 115/116/117

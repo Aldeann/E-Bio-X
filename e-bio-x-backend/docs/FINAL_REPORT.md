@@ -170,7 +170,7 @@ Dijalankan di lingkungan dev (server `http://127.0.0.1:5000`, MySQL `e_bio`):
 | `test_ml_scope.py` | Scoping model per kelas, versi, akses materi antar kelas | **95/95 PASS** |
 | **Total komponen ML** | | **286/286 PASS** |
 | `test_section_tagging.py` | Fase 1 — penandaan bagian pada soal (`questions.section_id`) | **24/24 PASS** |
-| `test_section_mastery.py` | Fase 2 — diagnosis penguasaan per bagian (ambang minimum, fallback kuis-section, scoping) | **34/34 PASS** |
+| `test_section_mastery.py` | Fase 2 & 5 — diagnosis penguasaan per bagian + peta siswa × bagian (ambang minimum, fallback kuis-section, invarian sel grid, scoping) | **41/41 PASS** |
 | `test_practice_drafts.py` | Fase 3a–3c — soal latihan per bagian (tautan bagian, draf AI, persetujuan guru, tanpa fallback karangan) | **80/80 PASS** |
 | `test_student_practice.py` | Fase 3d — latihan siswa (hanya soal APPROVED, kunci tidak bocor, penilaian di server, sumber terpisah di diagnosis) | **73/73 PASS** |
 | `scripts/tag_demo_quiz_sections.py` | Data demo — menautkan 26 soal kuis demo ke bagian materi (eksplisit, 4 soal ambigu dibiarkan `NULL`, idempoten) | **26 soal, 0 masalah** |

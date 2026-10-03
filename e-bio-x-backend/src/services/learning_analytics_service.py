@@ -582,6 +582,133 @@ def section_mastery_class(material_id, teacher_id, student_ids=None):
     return result
 
 
+def section_mastery_matrix(material_id, teacher_id, student_ids=None):
+    """Peta penguasaan (siswa x bagian) untuk halaman guru "Per Materi".
+
+    Tiap sel memakai aturan yang sama dengan `section_mastery_for_student`
+    (kuis + interaktif + latihan) dan ambang `MIN_SECTION_SAMPLE` yang sama,
+    supaya angka di grid tidak bisa berbeda dari angka yang dilihat siswa.
+    Sel di bawah ambang tetap menyimpan hitungan mentahnya berstatus
+    INSUFFICIENT_DATA; sel tanpa bukti sama sekali berstatus NO_DATA.
+
+    Siswa tanpa bukti apa pun tidak ikut: barisnya akan kosong semua dan
+    hanya menambah tinggi grid tanpa memberi informasi.
+    """
+    if student_ids is None:
+        student_ids = teacher_student_ids(teacher_id)
+    sections = MaterialSection.query.filter_by(
+        material_id=material_id).order_by(MaterialSection.position).all()
+    result = {
+        'material_id': material_id,
+        'min_sample': MIN_SECTION_SAMPLE,
+        'total_students': len(student_ids),
+        'sections': [{'section_id': s.id, 'title': s.title, 'position': s.position}
+                     for s in sections],
+        'students': [],
+        'students_with_data': 0,
+    }
+    if not student_ids or not sections:
+        return result
+
+    # (student_id, section_id) -> hitungan mentah per sumber
+    cells = {}
+
+    def _cell(stid, sid):
+        return cells.setdefault((int(stid), int(sid)), {
+            'quiz_answered': 0, 'quiz_correct': 0,
+            'interactive_total': 0, 'interactive_correct': 0,
+            'practice_answered': 0, 'practice_correct': 0,
+        })
+
+    q_rows = db.session.query(
+        Question.section_id, Quiz.section_id, Answer.student_id,
+        Answer.is_correct,
+    ).join(Question, Question.id == Answer.question_id
+    ).join(Submission, Submission.id == Answer.submission_id
+    ).join(Quiz, Quiz.id == Submission.quiz_id
+    ).filter(
+        Answer.student_id.in_(student_ids),
+        Submission.status == 'submitted',
+        Quiz.material_id == material_id,
+        Answer.is_correct.isnot(None),
+        or_(Question.section_id.isnot(None), Quiz.section_id.isnot(None)),
+    ).all()
+    for q_sid, quiz_sid, stid, ok in q_rows:
+        sid = q_sid if q_sid is not None else quiz_sid
+        if sid is None:
+            continue
+        c = _cell(stid, sid)
+        c['quiz_answered'] += 1
+        if ok:
+            c['quiz_correct'] += 1
+
+    ia_rows = db.session.query(
+        StudentAnswer.section_id, StudentAnswer.student_id,
+        StudentAnswer.is_correct,
+    ).filter(
+        StudentAnswer.material_id == material_id,
+        StudentAnswer.student_id.in_(student_ids),
+    ).all()
+    for sid, stid, ok in ia_rows:
+        if sid is None:
+            continue
+        c = _cell(stid, sid)
+        c['interactive_total'] += 1
+        if ok:
+            c['interactive_correct'] += 1
+
+    for sid, stid, _bqid, ok, _attempts in latest_attempts(material_id, student_ids):
+        c = _cell(stid, sid)
+        c['practice_answered'] += 1
+        if ok:
+            c['practice_correct'] += 1
+
+    by_student = {}
+    for (stid, sid), c in cells.items():
+        by_student.setdefault(stid, {})[sid] = c
+
+    names = {u.id: u.name for u in User.query.filter(
+        User.id.in_(list(by_student))).all()}
+
+    rows = []
+    for stid in sorted(by_student, key=lambda i: (names.get(i) or '').lower()):
+        raw = by_student[stid]
+        row_cells = {}
+        for sec in sections:
+            c = raw.get(sec.id)
+            if not c:
+                row_cells[str(sec.id)] = {
+                    'answered': 0, 'correct': 0, 'status': 'NO_DATA',
+                    'score': None, 'mastery': None, 'sources': [],
+                }
+                continue
+            answered = (c['quiz_answered'] + c['interactive_total']
+                        + c['practice_answered'])
+            correct = (c['quiz_correct'] + c['interactive_correct']
+                       + c['practice_correct'])
+            base = _section_mastery_row(sec, answered, correct)
+            row_cells[str(sec.id)] = {
+                'answered': answered,
+                'correct': correct,
+                'status': base['status'],
+                'score': base['score'],
+                'mastery': base['mastery'],
+                'sources': [name for name, count in (
+                    ('kuis', c['quiz_answered']),
+                    ('interaktif', c['interactive_total']),
+                    ('latihan', c['practice_answered']),
+                ) if count],
+            }
+        rows.append({
+            'student_id': stid,
+            'name': names.get(stid) or f'Siswa #{stid}',
+            'cells': row_cells,
+        })
+    result['students'] = rows
+    result['students_with_data'] = len(rows)
+    return result
+
+
 def normalize_difficulty(value):
     """Map any stored difficulty label onto 'easy' | 'medium' | 'hard'.
 
@@ -1007,6 +1134,7 @@ def material_analytics(material, teacher_id):
 
     difficulty = difficulty_analytics(material.id, teacher_id, quiz_ids=quiz_ids, student_ids=student_ids)
     section_mastery = section_mastery_class(material.id, teacher_id, student_ids=student_ids)
+    section_matrix = section_mastery_matrix(material.id, teacher_id, student_ids=student_ids)
 
     return {
         'empty': False,
@@ -1024,6 +1152,7 @@ def material_analytics(material, teacher_id):
         'quiz': quiz_totals,
         'section_completion': section_completion,
         'section_mastery': section_mastery,
+        'section_matrix': section_matrix,
         'per_student': sorted(per_student, key=lambda p: p['learning_seconds'], reverse=True),
         'mastery_distribution': mastery_dist,
         'status_distribution': status_dist,

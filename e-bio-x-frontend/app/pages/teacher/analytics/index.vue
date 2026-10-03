@@ -241,6 +241,63 @@
                       </table>
                     </div>
                   </div>
+
+                  <div v-if="sectionMatrix && sectionMatrix.sections.length" class="mt-5">
+                    <p class="text-xs font-semibold text-gray-500 mb-2">
+                      Peta Penguasaan: Siswa × Bagian
+                      <span class="font-normal text-gray-400">
+                        · skor per bagian dari kuis + interaktif + latihan · minimal {{ sectionMatrix.min_sample }} jawaban
+                      </span>
+                    </p>
+                    <p class="text-[11px] text-gray-400 mb-2">
+                      Menampilkan {{ sectionMatrix.students_with_data }} dari {{ sectionMatrix.total_students }} siswa
+                      yang sudah menjawab pada materi ini.
+                    </p>
+                    <div v-if="sectionMatrix.students.length" class="overflow-x-auto">
+                      <table class="w-full text-xs border-separate border-spacing-1">
+                        <thead>
+                          <tr>
+                            <th class="text-left font-medium text-gray-400 py-1 pr-2 sticky left-0 bg-white dark:bg-gray-900">Siswa</th>
+                            <th
+                              v-for="s in sectionMatrix.sections"
+                              :key="s.section_id"
+                              class="font-medium text-gray-400 py-1 px-1 max-w-[8rem] truncate"
+                              :title="s.title"
+                            >
+                              {{ s.title }}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="st in sectionMatrix.students" :key="st.student_id">
+                            <td
+                              class="py-1 pr-2 whitespace-nowrap max-w-[10rem] truncate sticky left-0 bg-white dark:bg-gray-900"
+                              :title="st.name"
+                            >
+                              {{ st.name }}
+                            </td>
+                            <td
+                              v-for="s in sectionMatrix.sections"
+                              :key="s.section_id"
+                              class="py-1 px-1 text-center rounded font-semibold"
+                              :class="heatClass(st.cells[s.section_id])"
+                              :title="heatTitle(st, s, st.cells[s.section_id])"
+                            >
+                              {{ heatText(st.cells[s.section_id]) }}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <p v-else class="text-xs text-gray-400">Belum ada jawaban pada materi ini.</p>
+                    <div class="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-gray-500">
+                      <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-green-600"></span> Baik Sekali</span>
+                      <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-emerald-500"></span> Baik</span>
+                      <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-amber-400"></span> Cukup</span>
+                      <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-red-500"></span> Kurang</span>
+                      <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600"></span> data belum cukup / kosong</span>
+                    </div>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -318,6 +375,7 @@ const students = ref({ students: [], page: 1, total_pages: 1, total: 0 });
 const page = ref(1);
 const expandedMaterial = ref(null);
 const materialDetail = ref(null);
+const sectionMatrix = computed(() => materialDetail.value?.section_matrix || null);
 
 const filters = ref({
   course_id: "", phase: "", topic: "", material_id: "", search: "",
@@ -376,6 +434,41 @@ const masteryColor = (label) => {
 const barColor = (label) => {
   const map = { "Baik Sekali": "bg-green-600", Baik: "bg-emerald-500", Cukup: "bg-amber-500", Kurang: "bg-red-500" };
   return map[label] || "bg-gray-400";
+};
+
+// Peta siswa x bagian. Warna mengikuti label penguasaan; sel di bawah ambang
+// hanya menampilkan hitungan mentah, sel kosong dibiarkan abu-abu.
+const heatClass = (cell) => {
+  if (!cell || cell.status !== "READY" || !cell.mastery) {
+    if (cell && cell.answered > 0) return "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-300";
+    return "bg-gray-100 dark:bg-gray-800 text-gray-300 dark:text-gray-600";
+  }
+  const map = {
+    "Baik Sekali": "bg-green-600 text-white",
+    "Baik": "bg-emerald-500 text-white",
+    "Cukup": "bg-amber-400 text-gray-900",
+    "Kurang": "bg-red-500 text-white",
+  };
+  return map[cell.mastery.label] || "bg-gray-400 text-white";
+};
+const heatText = (cell) => {
+  if (!cell) return "–";
+  if (cell.status === "READY") return cell.score;
+  if (cell.answered > 0) return cell.answered; // bukti masih tipis
+  return "–";
+};
+const heatTitle = (student, section, cell) => {
+  const parts = [`${student.name} · ${section.title}`];
+  if (!cell || cell.status === "NO_DATA") {
+    parts.push("belum ada jawaban");
+    return parts.join(" — ");
+  }
+  parts.push(`${cell.correct}/${cell.answered} benar`);
+  if (cell.sources && cell.sources.length) parts.push(`sumber: ${cell.sources.join(", ")}`);
+  if (cell.status !== "READY") {
+    parts.push(`butuh minimal ${sectionMatrix.value?.min_sample ?? 3} jawaban`);
+  }
+  return parts.join(" — ");
 };
 
 const loadAll = async () => {
