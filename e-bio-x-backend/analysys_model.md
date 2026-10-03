@@ -87,24 +87,31 @@ Act 2     0     0    18
 
 ## **📊 K-Means Clustering Analysis**
 
-### **Kualitas Clustering:**
-- **Silhouette Score (0.4195)**: Menunjukkan struktur clustering yang **moderat**. Nilai ini berada di antara 0.3-0.5, yang berarti siswa terbagi dengan cukup baik ke dalam 3 cluster, namun masih ada beberapa overlap.
+> ### ⚠️ Angka di blok output di atas berasal dari pipeline GLOBAL versi lama
+>
+> Nomor cluster (0/1/2) dan isinya di atas **bukan lagi acuan**. Pelatihan
+> sekarang dilakukan **per kelas (per guru)**, jadi tiap kelas punya model
+> K-Means sendiri dengan jumlah dan isi cluster yang bisa berbeda. Nomor
+> cluster juga **selalu berubah** antar-run, sehingga tidak pernah dipakai
+> untuk menamai kelompok.
+>
+> Nama cluster tidak diambil dari nomor, melainkan dari **data centroid**
+> dengan yardstick yang sama seperti label produk: `High Achievement`,
+> `Active Learner`, `Moderate Learner`, `Needs Support`, `Low Activity`
+> (`src/ml/cluster_interpreter.py`).
 
-- **Calinski-Harabasz Score (75.27)**: Menunjukkan **separasi cluster yang moderat**. Cluster tidak terlalu terpisah jauh, namun masih dapat dibedakan.
+### **Cara kerja sekarang:**
+- Feature subset khusus clustering (`KMEANS_FEATURES`), di-`StandardScaler`.
+- `K` dipilih dari rentang 2–5 lewat **Silhouette Score**; bila tidak tegas,
+  dipakai default `K=3` yang didokumentasikan (`src/ml/kmeans.py`).
+- Jumlah siswa terlalu sedikit (`MIN_SAMPLES_KMEANS`) → `INSUFFICIENT_DATA`,
+  bukan cluster karangan.
+- Nama cluster dibaca dari penguasaan komposit + aktivitas, **bukan** nomor
+  cluster dan **bukan** label Decision Tree. Karena keduanya berasal dari tiga
+  fitur yang sama, nama cluster dan label DT **bukan bukti independen** dan
+  tidak boleh dibaca sebagai saling menguatkan.
 
-- **Davies-Bouldin Score (0.86)**: Menunjukkan **kompaktasi cluster yang baik**. Nilai < 1.0 menandakan cluster cukup kompak dan tidak terlalu tersebar.
-
-### **Distribusi Siswa:**
-- **Cluster 0**: 16 siswa (cluster sedang)
-- **Cluster 1**: 15 siswa (cluster tinggi) 
-- **Cluster 2**: 18 siswa (cluster rendah)
-
-Distribusi cukup seimbang dengan standar deviasi 1.25.
-
-### **Karakteristik Cluster:**
-- **Cluster 0**: Skor rata-rata, waktu kerja agak lambat
-- **Cluster 1**: Skor tinggi, waktu kerja cepat (**siswa berprestasi**)
-- **Cluster 2**: Skor rendah, waktu kerja cepat (**siswa yang kesulitan**)
+Interpretasi teknis lengkap ada di `docs/ML_DOCUMENTATION.md` §4 dan §8.3.
 
 ## **🌳 Decision Tree Analysis**
 

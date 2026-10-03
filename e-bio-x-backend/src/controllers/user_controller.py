@@ -1,4 +1,4 @@
-from flask import jsonify, request, jsonify
+from flask import jsonify, request
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from google.auth.transport import requests
 from google.oauth2 import id_token
@@ -21,34 +21,41 @@ def _require_admin():
 
 
 def google_login():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     token = data.get("token")
-    
+
     if not token:
         return jsonify({"error": "Token is required"}), 400
 
-    user_data = id_token.verify_oauth2_token(
-        token, 
-        requests.Request(), 
-        os.getenv("GOOGLE_CLIENT_ID"), 
-        clock_skew_in_seconds=10
-    )
-    
-    if not user_data:
-        return jsonify({"error": "Invalid token"}), 400
+    try:
+        user_data = id_token.verify_oauth2_token(
+            token,
+            requests.Request(),
+            os.getenv("GOOGLE_CLIENT_ID"),
+            clock_skew_in_seconds=10,
+        )
+    except Exception:
+        # Token kedaluwarsa, audience salah, atau tanda tangan tidak valid.
+        # Dulu exception ini lolos keluar sebagai 500; sekarang 401 yang jelas.
+        return jsonify({"error": "Invalid Google token"}), 401
 
     email = user_data.get("email")
-    name = user_data.get("name")
+    if not email:
+        return jsonify({"error": "Google token tidak memuat email"}), 401
+
+    name = user_data.get("name") or email.split("@")[0]
 
     user = User.query.filter_by(email=email).first()
     if not user:
         user = User(
             name=name,
-            email=email, 
+            email=email,
         )
+        # Set peran sebelum commit supaya tersimpan eksplisit, tidak
+        # mengandalkan default kolom.
+        user.role = "student"
         db.session.add(user)
         db.session.commit()
-        user.role = "student"
 
     access_token = create_access_token(identity=str(user.id))
     
