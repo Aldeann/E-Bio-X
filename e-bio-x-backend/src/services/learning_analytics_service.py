@@ -350,6 +350,10 @@ def interactive_stats(student_id, material_id):
 
 MIN_SECTION_SAMPLE = 3
 
+# Ambang "tuntas" untuk saran prasyarat antar-bagian (Fase 4, sifatnya
+# advisory/tidak memblokir). Selaras dengan label penguasaan: >= 75 = "Baik".
+PREREQUISITE_PASS_SCORE = 75
+
 
 def _section_quiz_stats(student_id, material_id):
     """Hitungan jawaban kuis per bagian untuk satu siswa.
@@ -446,6 +450,31 @@ def _section_mastery_row(section, answered, correct):
     return row
 
 
+def _prerequisite_advisory(prev_row):
+    """(met, advisory) untuk sebuah bagian berdasarkan bagian sebelumnya.
+
+    Dipakai Fase 4 (advisory, TIDAK memblokir): bagian lanjutan hanya
+    diberi saran, siswa tetap bisa membukanya. Mengembalikan:
+
+    - ``(True, None)``  bagian sebelumnya sudah READY dan skornya >= ambang;
+    - ``(False, saran)`` bagian sebelumnya READY tetapi di bawah ambang;
+    - ``(None, None)``  bagian sebelumnya belum berskor (data belum cukup)
+      - saat data tipis jangan menegur, karena penilaiannya memang belum bisa.
+    - ``(True, None)``  untuk bagian pertama (tidak punya prasyarat).
+    """
+    if prev_row is None:
+        return True, None
+    if prev_row.get('status') != 'READY':
+        return None, None
+    score = prev_row.get('score')
+    if score is not None and score >= PREREQUISITE_PASS_SCORE:
+        return True, None
+    return False, (
+        f'Bagian "{prev_row.get("title")}" belum tuntas ({score}); '
+        f'pelajari dulu bagian itu.'
+    )
+
+
 def section_mastery_for_student(student_id, material_id):
     """Diagnosis penguasaan per bagian untuk satu siswa pada satu materi.
 
@@ -484,12 +513,29 @@ def section_mastery_for_student(student_id, material_id):
             ) if count],
         })
         rows.append(row)
+
+    # Fase 4 (advisory, TIDAK memblokir): bagian lanjutan diberi saran bila
+    # bagian sebelumnya belum tuntas. Aturannya eksplisit dan bukan tebakan:
+    # prasyarat sebuah bagian adalah bagian tepat sebelumnya dalam urutan materi.
+    for idx, row in enumerate(rows):
+        prev = rows[idx - 1] if idx > 0 else None
+        met, advisory = _prerequisite_advisory(prev)
+        row.update({
+            'prerequisite_section_id': prev['section_id'] if prev else None,
+            'prerequisite_title': prev['title'] if prev else None,
+            'prerequisite_met': met,
+            'advisory': advisory,
+        })
+
     return {
         'material_id': material_id,
         'min_sample': MIN_SECTION_SAMPLE,
+        'prerequisite_rule': 'bagian sebelumnya dalam urutan materi',
+        'prerequisite_pass_score': PREREQUISITE_PASS_SCORE,
         'sections': rows,
         'sections_with_data': sum(1 for r in rows if r['status'] == 'READY'),
         'sections_insufficient': sum(1 for r in rows if r['status'] != 'READY'),
+        'advisory_count': sum(1 for r in rows if r['advisory']),
     }
 
 

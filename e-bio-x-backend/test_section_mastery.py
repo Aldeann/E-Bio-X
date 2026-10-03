@@ -15,6 +15,7 @@
 #   - submission in_progress tidak ikut dihitung
 #   - ringkasan kelas per bagian jujur pada ambang yang sama
 #   - peta (siswa x bagian) untuk guru memakai aturan & ambang yang sama
+#   - saran prasyarat (Fase 4) memakai aturan eksplisit & tidak memblokir
 #   - akses materi tetap ter-scope (siswa/guru di luar kelas ditolak)
 #
 # Berjalan pada app + database nyata, membuat lalu menghapus fixture
@@ -27,6 +28,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src import create_app  # noqa: E402
 from src.config.database import db  # noqa: E402
+from src.services.learning_analytics_service import (  # noqa: E402
+    _prerequisite_advisory as advisory_rule,
+    PREREQUISITE_PASS_SCORE,
+)
 from src.models.user import User  # noqa: E402
 from src.models.course import Course  # noqa: E402
 from src.models.enrollment import Enrollment  # noqa: E402
@@ -282,6 +287,35 @@ def main():
             check('jawaban tanpa tag TIDAK dipetakan (total 6, bukan 7)',
                   total_answered == 6, str(total_answered))
 
+            # ------------------------------------------- SARAN PRASYARAT
+            print('\n[1b] SARAN PRASYARAT (advisory, tidak memblokir)')
+            check('aturan prasyarat terlaporkan',
+                  bool(d.get('prerequisite_rule'))
+                  and d.get('prerequisite_pass_score') == PREREQUISITE_PASS_SCORE,
+                  f"{d.get('prerequisite_rule')}/{d.get('prerequisite_pass_score')}")
+            check('aturan: bagian pertama tanpa prasyarat & tanpa saran',
+                  a.get('prerequisite_section_id') is None
+                  and a.get('prerequisite_met') is True
+                  and a.get('advisory') is None)
+            check('aturan: prasyarat tuntas (A 75 >= 75) -> tanpa saran',
+                  b.get('prerequisite_section_id') == created['sec_a'].id
+                  and b.get('prerequisite_met') is True
+                  and b.get('advisory') is None)
+            check('aturan: prasyarat belum berskor -> tidak menegur',
+                  c.get('prerequisite_met') is None and c.get('advisory') is None)
+            check('aturan: advisory_count 0 pada fixture ini',
+                  d.get('advisory_count') == 0, str(d.get('advisory_count')))
+            met, adv = advisory_rule({'status': 'READY', 'score': 50.0, 'title': 'X'})
+            check('aturan: READY < ambang -> met False + saran',
+                  met is False and bool(adv) and 'X' in adv, f'{met}/{adv}')
+            met, adv = advisory_rule({'status': 'INSUFFICIENT_DATA', 'score': None,
+                                      'title': 'X'})
+            check('aturan: INSUFFICIENT_DATA -> None + tanpa saran',
+                  met is None and adv is None, f'{met}/{adv}')
+            met, adv = advisory_rule(None)
+            check('aturan: tanpa bagian sebelumnya -> True + tanpa saran',
+                  met is True and adv is None, f'{met}/{adv}')
+
             # ------------------------------------------- DETAIL PROGRES
             print('\n[2] SISWA - DETAIL PROGRES IKUT JUJUR')
             r = client.get(f'/api/student/progress/{material.id}', headers=h_s)
@@ -308,6 +342,11 @@ def main():
             check('detail: baris bagian punya hitungan kuis',
                   sec_row_a.get('quiz_answered') == 3
                   and sec_row_a.get('interactive_total') == 1)
+            sec_row_b = next((m for m in det.get('sections', [])
+                              if m.get('title') == 'Bagian B'), {})
+            check('detail: baris bagian membawa kunci advisory',
+                  'advisory' in sec_row_b and sec_row_b.get('advisory') is None,
+                  str(sec_row_b.get('advisory')))
 
             # ------------------------------------------- GURU / KELAS
             print('\n[3] GURU - RINGKASAN KELAS PER BAGIAN')

@@ -126,6 +126,11 @@ def _enrich_material_detail(user, material):
             'mastery_status': sm.get('status', 'INSUFFICIENT_DATA'),
             'mastery_score': sm.get('score'),
             'mastery': sm.get('mastery'),
+            # Fase 4 (advisory): saran prasyarat, tidak memblokir akses.
+            'prerequisite_section_id': sm.get('prerequisite_section_id'),
+            'prerequisite_title': sm.get('prerequisite_title'),
+            'prerequisite_met': sm.get('prerequisite_met'),
+            'advisory': sm.get('advisory'),
         })
         mastery_rows.append({
             'source': 'section', 'section_id': sid, 'title': sec.title,

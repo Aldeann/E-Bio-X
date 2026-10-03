@@ -93,6 +93,10 @@
                       · {{ s.practice_answered }} soal latihan
                     </template>
                   </p>
+                  <p v-if="s.advisory" class="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-start gap-1">
+                    <Icon name="material-symbols:info" class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <span>{{ s.advisory }}</span>
+                  </p>
                 </div>
                 <button
                   class="text-xs px-2.5 py-1 rounded-lg shrink-0 transition border"
@@ -125,7 +129,8 @@
             </div>
             <p class="text-xs text-gray-400 mt-2">
               Angka penguasaan di bawah adalah gabungan jawaban kuis, soal interaktif, dan latihan;
-              rincian per sumber ada di tiap bagian.
+              rincian per sumber ada di tiap bagian. Penanda kuning hanya saran urutan belajar —
+              bagian tetap bisa dibuka.
             </p>
           </div>
 
