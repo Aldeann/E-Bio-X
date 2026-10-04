@@ -12,7 +12,7 @@
 import os
 import sys
 from collections import Counter
-from sqlalchemy import or_
+from sqlalchemy import or_, text
 
 # Allow running as `python scripts\verify_ml_readiness.py` from anywhere.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -433,6 +433,27 @@ def main():
         print("\n[11] REKOMENDASI PER BAGIAN (Fase 3e)")
         check('kolom recommendations.section_id ada',
               Recommendation.section_id is not None)
+        # A section_id column alone buys nothing. It was added by a raw
+        # ALTER TABLE, which does not bring a REFERENCES clause, so for a
+        # long time these columns referenced sections with no referential
+        # integrity: deleting a section silently left rows pointing at
+        # nothing. Check the CONSTRAINT, not the column.
+        for tbl, col in (('questions', 'section_id'),
+                         ('question_bank', 'section_id'),
+                         ('recommendations', 'section_id')):
+            has_fk = db.session.execute(text(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE "
+                "WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = :t "
+                "AND COLUMN_NAME = :c "
+                "AND REFERENCED_TABLE_NAME = 'material_sections'"),
+                {'t': tbl, 'c': col}).scalar()
+            dangling = db.session.execute(text(
+                f"SELECT COUNT(*) FROM `{tbl}` c "
+                f"LEFT JOIN material_sections s ON s.id = c.`{col}` "
+                f"WHERE c.`{col}` IS NOT NULL AND s.id IS NULL")).scalar()
+            check(f'{tbl}.{col} punya FK ke material_sections dan tanpa baris yatim',
+                  has_fk and not dangling,
+                  f'fk={"ada" if has_fk else "TIDAK ADA"} yatim={dangling}')
         sec_rows = Recommendation.query.filter(
             Recommendation.section_id.isnot(None)).all()
         sec_ids = {r.section_id for r in sec_rows}

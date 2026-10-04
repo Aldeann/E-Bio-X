@@ -1,7 +1,7 @@
 # Fitur "Bagian Materi" — dari jawaban salah ke bagian materi, bukan hanya materi
 
-Dokumen ini menjelaskan fitur yang sedang dibangun dalam lima fase. **Fase 1, Fase 2, dan
-Fase 3a–3c sudah selesai.** Sisa Fase 3 (pelajar berjalan), Fase 4, dan Fase 5 masih rencana.
+Dokumen ini menjelaskan fitur yang dibangun dalam lima fase, plus perpanjangan Fase 3 (3d dan 3e).
+**Semua fase sudah selesai** — 1, 2, 3a–3e, 4, dan 5.
 
 **Tujuan akhir:** ketika seorang siswa salah menjawab soal tentang *Struktur Tubuh Virus*,
 sistem harus bisa menunjuk bagian materi itu — bukan sekadar "materi VIRUS saja belum dikuasai" —
@@ -15,8 +15,10 @@ Fase yang sudah selesai:
 | 1 | Penandaan bagian pada soal (`questions.section_id`) | Selesai |
 | 2 | Diagnosis penguasaan per bagian (siswa & kelas) | Selesai |
 | 3 | Latihan per bagian: soal bank bertag + draf AI + persetujuan guru | 3a–3c selesai |
-| 4 | Gating adaptif (kunci/khint bagian berikutnya) | Rencana |
-| 5 | Peta pemahaman siswa × bagian untuk guru | Rencana |
+| 4 | Saran prasyarat antar-bagian (**advisory**, tidak memblokir) | Selesai |
+| 5 | Peta pemahaman siswa × bagian untuk guru | Selesai |
+| 3d | Latihan siswa dari soal yang sudah disetujui | Selesai |
+| 3e | Rekomendasi per bagian (bukan hanya per materi) | Selesai |
 
 ---
 
@@ -607,6 +609,26 @@ selalu diketahui. Melonggarkannya hanya membuang informasi yang tidak pernah hil
 `top_recommendations`. Kolom baru diterapkan idempoten lewat `_COMPAT_COLUMNS`
 (`src/config/database.py`), jadi DB lama dan checkout baru converge ke skema yang sama.
 
+**`section_id` punya foreign key, bukan cuma kolom.** `ALTER TABLE ... ADD COLUMN section_id
+INT NULL` tidak membawa klausa `REFERENCES` — jadi ketiga kolom yang ditambahkan setelah
+rilis pertama (`questions`, `question_bank`, `recommendations`) lama-kala menunjuk bagian
+**tanpa integritas referensial sama sekali**: menghapus bagian meninggalkan baris yang
+menunjuk bagian yang sudah tidak ada, dan tidak ada yang protes. Untuk `recommendations` itu
+berarti saran tersimpan ke bagian yang tidak bisa lagi dibuka siswa.
+
+Modelnya sendiri sudah benar sejak awal (`db.ForeignKey('material_sections.id')`), jadi
+instalasi baru yang lewat `create_all()` selalu dapat constraint-nya — yang tertinggal hanya
+database yang sudah ada. теперь jalurnya ikut diperbaiki.
+
+Koreksinya ada di `_COMPAT_FOREIGN_KEYS` (`src/config/database.py`), diperiksa terpisah dari
+`_COMPAT_COLUMNS` karena saat dicek kolomnya **sudah ada** — yang hilang adalah
+`CONSTRAINT`-nya. Kalau ada baris yatim, constraint **tidak** ditambah dan dilaporkan sebagai
+gagal: membuang isi tabel adalah keputusan orang, bukan keputusan fungsi yang jalan tiap boot.
+
+Sengaja **tanpa `ON DELETE`**: kalau suatu saat bagian dihapus sementara baris masih
+menunjuknya, MySQL menolak penghapusan alih-alih diam-diam menghapus catatan bahwa siswa
+s pernah diarahkan ke bagian itu.
+
 ### 8.2 Aturan peringkat (basis aturan, bukan model)
 
 ```
@@ -787,9 +809,16 @@ yang sudah bersih tidak berubah di tengah presentasi.
   percobaan, jadi mengulang-ulang tidak membuat angka terlihat naik.
 - **Guru masih harus menandai bagian soal kuis sendiri** supaya diagnosis Fase 2 punya
   sumber jawaban; tidak ada tebakan otomatis.
-- **Menghapus bagian yang sudah punya data bisa gagal.** `DELETE /api/sections/<id>` belum
-  membersihkan baris yang menunjuk bagian itu, dan itu bukan hal baru dari Fase 3e: pola yang
-  sama berlaku untuk `questions`, `question_bank`, `student_answers`, `practice_answers`,
-  `bookmarks`, `notes`, `forums`, `quizzes`, dan kini juga `recommendations`. Perbaikannya
-  menyentuh banyak tabel sekaligus sehingga sengaja belum ikut di Fase 3e - hapus bagian lebih
-  aman dilakukan bersama bagian turunannya.
+- **Menghapus bagian yang sudah punya data masih gagal** (`DELETE /api/sections/<id>` →
+  HTTP 500 dari `IntegrityError` yang tidak tertangani). Endpoint itu tidak membersihkan baris
+  turunan. Sekarang bagian yang punya baris di `questions` / `question_bank` /
+  `recommendations` **ditolak database** oleh `fk_*_section` (§8.1) — jadi kegagalan sekarang
+  berarti "ada data di sini", bukan "ketinggalan baris yatim". Sepuluh tabel lain
+  (`student_answers`, `practice_answers`, `quizzes`, `material_contents`, `material_progress`,
+  `material_student_state`, `material_bookmarks`, `student_notes`, `forums`,
+  `learning_activities`) sudah punya FK sejak awal dan juga menolak penghapusan.
+
+  Yang **belum** ada keputusan produk: apakah menghapus bagian boleh ikut menghapus jawaban
+  siswa (`student_answers`) — penghapusan data nyata — atau sebaiknya ditolak dengan pesan
+  yang jelas. Karena itu perbaikan endpointnya belum dikerjakan: memilih opsi salah berarti
+  menghapus data siswa tanpa persetujuan. Demo tidak memakai endpoint ini.

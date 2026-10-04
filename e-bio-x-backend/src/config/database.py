@@ -50,6 +50,50 @@ _COMPAT_COLUMNS = [
     ('recommendations', 'section_id', 'ALTER TABLE recommendations ADD COLUMN section_id INT NULL'),
 ]
 
+# Foreign keys for the columns added above. `ADD COLUMN section_id INT NULL`
+# does NOT bring a REFERENCES clause with it, so every column added after
+# the first release was referencing sections with no referential integrity
+# at all: deleting a section left rows pointing at a section that no longer
+# existed, and nothing complained. For `recommendations` that meant a
+# persisted suggestion to a section the student could not open any more.
+#
+# The models already declared `db.ForeignKey('material_sections.id')` from
+# the start, so a fresh `create_all()` got the constraint and only existing
+# databases were left without it. The gap was in the migration path alone.
+#
+# These are checked separately from _COMPAT_COLUMNS because by the time
+# this runs the column is already there - what is missing is the
+# CONSTRAINT.
+#
+# No ON DELETE clause on purpose. If a section is ever deleted with rows
+# still attached, MySQL refuses the delete instead of quietly erasing the
+# record that a student was pointed at that section. Losing that history
+# silently would be worse than a delete that needs a decision first.
+_COMPAT_FOREIGN_KEYS = [
+    ('questions', 'section_id', 'material_sections', 'fk_questions_section'),
+    ('question_bank', 'section_id', 'material_sections',
+     'fk_question_bank_section'),
+    ('recommendations', 'section_id', 'material_sections',
+     'fk_recommendations_section'),
+]
+
+
+def _has_foreign_key(table, column, ref_table):
+    from sqlalchemy import text
+    return bool(db.session.execute(text(
+        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE "
+        "WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = :t "
+        "AND COLUMN_NAME = :c AND REFERENCED_TABLE_NAME = :r"),
+        {'t': table, 'c': column, 'r': ref_table}).scalar())
+
+
+def _orphan_count(table, column, ref_table):
+    from sqlalchemy import text
+    return db.session.execute(text(
+        f"SELECT COUNT(*) FROM `{table}` c "
+        f"LEFT JOIN `{ref_table}` r ON r.id = c.`{column}` "
+        f"WHERE c.`{column}` IS NOT NULL AND r.id IS NULL")).scalar()
+
 
 def ensure_schema_compat():
     """Apply idempotent ALTERs for columns added after the first release."""
@@ -76,4 +120,33 @@ def ensure_schema_compat():
         except Exception:
             db.session.rollback()
             failed.append(f'{table}.{column}')
-    return {'applied': applied, 'already_present': skipped, 'failed': failed}
+
+    fk_applied, fk_skipped, fk_failed = [], [], []
+    for table, column, ref_table, name in _COMPAT_FOREIGN_KEYS:
+        label = f'{table}.{column} -> {ref_table}'
+        try:
+            if _has_foreign_key(table, column, ref_table):
+                fk_skipped.append(label)
+                continue
+            orphans = _orphan_count(table, column, ref_table)
+            if orphans:
+                # Reported, NOT deleted. A row pointing at a section that
+                # no longer exists is garbage, but throwing away a table's
+                # data is a decision for a person - not for a function that
+                # runs on every boot.
+                fk_failed.append(f'{label} ({orphans} baris yatim belum '
+                                 f'dibersihkan manual)')
+                continue
+            db.session.execute(text(
+                f'ALTER TABLE `{table}` ADD CONSTRAINT `{name}` '
+                f'FOREIGN KEY (`{column}`) REFERENCES `{ref_table}` (`id`)'))
+            db.session.commit()
+            fk_applied.append(label)
+        except Exception:
+            db.session.rollback()
+            fk_failed.append(label)
+
+    return {'applied': applied, 'already_present': skipped, 'failed': failed,
+            'foreign_keys_applied': fk_applied,
+            'foreign_keys_already_present': fk_skipped,
+            'foreign_keys_failed': fk_failed}
