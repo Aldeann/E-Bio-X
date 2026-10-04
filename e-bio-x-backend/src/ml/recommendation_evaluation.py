@@ -30,18 +30,27 @@ from src.services import learning_analytics_service as analytics
 # Scoping
 # ------------------------------------------------------------
 def _scoped_rows(teacher):
-    """Recommendation rows visible to `teacher`.
+    """MATERIAL-level recommendation rows visible to `teacher`.
 
     teacher=None means system-wide (admin). Otherwise only students the
     teacher actually teaches, so one teacher never sees another's data.
+
+    Section-level rows (Fase 3e) are deliberately excluded: they are scored
+    by a different rule set on a different unit (one section, not one
+    whole material), so folding them into this funnel would compare scores
+    that were never meant to be compared. They also carry unranked items
+    that are never persisted, so there would be no honest way to calibrate
+    them yet either.
     """
+    material_level = Recommendation.section_id.is_(None)
     if teacher is None:
-        return Recommendation.query.all()
+        return Recommendation.query.filter(material_level).all()
     student_ids = analytics.teacher_student_ids(teacher.id)
     if not student_ids:
         return []
     return Recommendation.query.filter(
-        Recommendation.student_id.in_(student_ids)).all()
+        Recommendation.student_id.in_(student_ids),
+        material_level).all()
 
 
 def _students(rows):
@@ -349,6 +358,7 @@ def evaluate_recommendations(teacher=None):
         return {
             'status': cfg.STATUS_INSUFFICIENT,
             'scope': 'system' if teacher is None else 'teacher',
+            'level': 'material',
             'students_with_recommendations': 0,
             'funnel': {'status': cfg.STATUS_INSUFFICIENT, 'recommended': 0},
             'calibration': {'status': cfg.STATUS_INSUFFICIENT, 'bins': []},
@@ -363,6 +373,7 @@ def evaluate_recommendations(teacher=None):
     return {
         'status': cfg.STATUS_READY,
         'scope': 'system' if teacher is None else 'teacher',
+        'level': 'material',
         'students_with_recommendations': len(_students(rows)),
         'funnel': _funnel(rows),
         'calibration': _calibration(rows),

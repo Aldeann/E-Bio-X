@@ -174,6 +174,96 @@
           </div>
         </div>
         <p v-else class="text-sm text-gray-500">Belum ada rekomendasi materi untuk Anda.</p>
+
+        <!-- Rekomendasi per BAGIAN (Fase 3e) -->
+        <div v-if="sectionRecs.length" class="mt-6">
+          <h5 class="text-sm font-semibold text-green-700 dark:text-green-400 mb-1 flex items-center gap-2">
+            <Icon name="material-symbols:account-tree" class="w-4 h-4" />
+            Bagian yang Perlu Diperkuat
+          </h5>
+          <p class="text-xs text-gray-500 mb-3">
+            Diurutkan dari jawaban Anda sendiri per bagian
+            (kuis, soal interaktif, dan latihan). Peringkatannya aturan transparan,
+            bukan hasil model.
+          </p>
+
+          <div v-if="rankedSectionRecs.length" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div
+              v-for="(s, i) in rankedSectionRecs"
+              :key="`${s.material_id}-${s.section_id}`"
+              class="rounded-xl border border-amber-200 dark:border-amber-800 bg-white dark:bg-gray-900 p-4 flex flex-col"
+            >
+              <div class="flex items-start gap-2">
+                <span class="w-6 h-6 rounded-full bg-amber-500 text-white text-xs flex items-center justify-center shrink-0 mt-0.5">
+                  {{ i + 1 }}
+                </span>
+                <div class="min-w-0">
+                  <p class="font-semibold text-gray-800 dark:text-gray-100 truncate">
+                    {{ s.section_title }}
+                  </p>
+                  <p class="text-xs text-gray-500 truncate">{{ s.material_title }}</p>
+                </div>
+              </div>
+
+              <div v-if="s.mastery_score != null" class="flex items-center gap-2 mt-2">
+                <div class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    class="h-full rounded-full"
+                    :class="masteryBar(s.mastery_score)"
+                    :style="{ width: Math.min(s.mastery_score, 100) + '%' }"
+                  ></div>
+                </div>
+                <span class="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                  Penguasaan {{ Math.round(s.mastery_score) }}%
+                </span>
+              </div>
+
+              <ul v-if="s.reasons && s.reasons.length" class="mt-2 space-y-1 flex-1">
+                <li
+                  v-for="(reason, ri) in s.reasons"
+                  :key="ri"
+                  class="text-xs text-gray-600 dark:text-gray-300 flex items-start gap-1"
+                >
+                  <Icon name="material-symbols:check-circle" class="w-3.5 h-3.5 text-amber-600 mt-0.5 shrink-0" />
+                  {{ reason }}
+                </li>
+              </ul>
+
+              <button
+                @click="openSection(s)"
+                class="mt-3 w-full px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold flex items-center justify-center gap-1"
+              >
+                <Icon name="material-symbols:play-arrow" class="w-4 h-4" />
+                Pelajari Bagian Ini
+              </button>
+            </div>
+          </div>
+
+          <!-- Bagian yang jawabannya belum cukup: sengaja TIDAK diberi skor. -->
+          <div
+            v-if="hintSectionRecs.length"
+            class="mt-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3"
+          >
+            <p class="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+              Belum bisa dinilai
+            </p>
+            <p class="text-xs text-gray-500 mb-2">
+              Bagian berikut dijawab terlalu sedikit untuk dinilai, jadi sengaja
+              tidak diberi peringkat.
+            </p>
+            <ul class="space-y-1">
+              <li
+                v-for="h in hintSectionRecs"
+                :key="`hint-${h.material_id}-${h.section_id}`"
+                class="text-xs text-gray-600 dark:text-gray-300"
+              >
+                {{ h.section_title }}
+                <span class="text-gray-400">· {{ h.material_title }}</span>
+                — {{ h.answered }} jawaban
+              </li>
+            </ul>
+          </div>
+        </div>
       </div>
 
       <!-- Continue learning -->
@@ -271,6 +361,11 @@ const loading = ref(true);
 const profile = ref(null);
 const recommendations = ref([]);
 const recommendationsLoaded = ref(false);
+// Rekomendasi per bagian (Fase 3e). `ranked: true` = ada skor nyata;
+// `ranked: false` = datanya belum cukup, jadi TIDAK diberi skor sama sekali.
+const sectionRecs = ref([]);
+const rankedSectionRecs = computed(() => sectionRecs.value.filter((s) => s.ranked));
+const hintSectionRecs = computed(() => sectionRecs.value.filter((s) => !s.ranked));
 
 const clusterLabelMap = {
   "High Achievement": "Pencapaian Tinggi",
@@ -352,12 +447,14 @@ const loadRecs = async () => {
       }).catch(() => null),
       $fetch(`${config.public.backend}/api/student/recommendations`, {
         headers: { Authorization: `Bearer ${token}` },
-      }).catch(() => ({ recommendations: [] })),
+      }).catch(() => ({ recommendations: [], section_recommendations: [] })),
     ]);
     profile.value = prof;
     recommendations.value = recs.recommendations || [];
+    sectionRecs.value = recs.section_recommendations || [];
   } catch (e) {
     recommendations.value = [];
+    sectionRecs.value = [];
   } finally {
     recommendationsLoaded.value = true;
   }
@@ -372,6 +469,20 @@ const openMaterial = async (r) => {
     });
   } finally {
     navigateTo(`/student/materials/${r.material_id}`);
+  }
+};
+
+// Klik saran bagian: kirim section_id supaya yang tercatat adalah baris
+// bagian, bukan baris materi, lalu buka tepat bagiannya.
+const openSection = async (s) => {
+  try {
+    await $fetch(`${config.public.backend}/api/student/recommendations/click`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: { material_id: s.material_id, section_id: s.section_id },
+    });
+  } finally {
+    navigateTo(`/student/materials/${s.material_id}?section=${s.section_id}`);
   }
 };
 

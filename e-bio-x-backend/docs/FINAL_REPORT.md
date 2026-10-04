@@ -173,9 +173,10 @@ Dijalankan di lingkungan dev (server `http://127.0.0.1:5000`, MySQL `e_bio`):
 | `test_section_mastery.py` | Fase 2, 4 & 5 — diagnosis penguasaan per bagian + saran prasyarat (advisory) + peta siswa × bagian (ambang minimum, fallback kuis-section, invarian sel grid, scoping) | **50/50 PASS** |
 | `test_practice_drafts.py` | Fase 3a–3c — soal latihan per bagian (tautan bagian, draf AI, persetujuan guru, tanpa fallback karangan) | **80/80 PASS** |
 | `test_student_practice.py` | Fase 3d — latihan siswa (hanya soal APPROVED, kunci tidak bocor, penilaian di server, sumber terpisah di diagnosis) | **73/73 PASS** |
+| `test_section_recommendations.py` | Fase 3e — rekomendasi per bagian (hanya bagian berskor yang diberi peringkat, "belum bisa dinilai" tanpa skor dan tanpa baris database, isolasi level materi↔bagian, klik ter-scope, evaluasi guru tetap level-materi) | **51/51 PASS** |
 | `scripts/tag_demo_quiz_sections.py` | Data demo — menautkan 26 soal kuis demo ke bagian materi (eksplisit, 4 soal ambigu dibiarkan `NULL`, idempoten) | **26 soal, 0 masalah** |
 | `scripts/fix_demo_section_interactive.py` | Data demo — memindahkan soal interaktif + jawabannya ke bagian yang cocok (tanpa angka baru, invarian `is_correct` 590/590) | **590/590 konsisten** |
-| `scripts/verify_ml_readiness.py` | Gate pra-demo: kelengkapan data, model per kelas, scoping guru, integritas klaim & soal kuis, atribusi jawaban kuis ke bagian | **60/60 PASS** |
+| `scripts/verify_ml_readiness.py` | Gate pra-demo: kelengkapan data, model per kelas, scoping guru, integritas klaim & soal kuis, atribusi jawaban kuis ke bagian, integritas baris saran bagian | **66/66 PASS** |
 
 `test_tahap4.py` dan `test_tahap5_ml.py` adalah suite API end-to-end yang
 memerlukan server hidup; regresi Tahap 1–4 juga dicakup ulang oleh
@@ -232,9 +233,14 @@ guru non-owner terhadap materi/kuis/analisis → 403.
   ikut pada respons pemuatan dan penilaiannya dilakukan di server. Jawaban latihan
   masuk ke diagnosis sebagai **sumber terpisah** (`practice_answered`/`practice_correct`,
   beserta `score_sources` yang terbuka), dihitung dari jawaban **terakhir** per soal
-  supaya mengulang tidak menggelembungkan angka. Rekomendasi per bagian, gating adaptif,
-  dan peta panas siswa × bagian untuk guru belum dikerjakan (lihat
-  `docs/FEATURE_BAGIAN_MASTERY.md`).
+  supaya mengulang tidak menggelembungkan angka. Rekomendasi **per bagian** (Fase 3e)
+  sudah ada: urutannya dihitung dari diagnosis Fase 2 dengan bobot yang ditulis manusia
+  (`REC_SECTION_WEIGHTS`), tetap bertipe `rule` dan tanpa versi model. Bagian dengan
+  jawaban < ambang **tidak diberi peringkat sama sekali** - dilaporkan sebagai "belum
+  bisa dinilai" dengan `score: null` dan tidak pernah ditulis ke database, agar tidak ada
+  angka yang menyamar sebagai prioritas. Gating adaptif dan analisis isi prasyarat belum
+  dikerjakan; peta panas siswa x bagian untuk guru sudah ada (Fase 5). Detail aturan,
+  tes, dan batasannya ada di `docs/FEATURE_BAGIAN_MASTERY.md` bagian 8.
   Konsekuensi yang perlu diketahui: karena bobot latihan ikut masuk, soal latihan yang
   jauh lebih mudah akan menaikkan skor penguasaan; rincian per sumber selalu ditampilkan
   supaya angka itu bisa dinilai.

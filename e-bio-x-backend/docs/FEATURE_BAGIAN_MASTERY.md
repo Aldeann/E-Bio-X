@@ -586,7 +586,116 @@ jujur, dan sel tanpa bukti berstatus `NO_DATA`.
 
 ---
 
-## 8. Cara demo (alur yang bisa ditunjukkan)
+## 8. Fase 3e — rekomendasi per bagian
+
+Siswa tidak hanya diberi tahu materi mana yang perlu dibuka, tapi **bagian mana** di dalam
+materi itu yang paling perlu diperkuat. Sumbernya diagnosis Fase 2 — jadi angkanya persis
+angka yang sudah tampil di halaman progres, bukan perhitungan kedua.
+
+### 8.1 Skema
+
+Satu tabel `recommendations` dipakai untuk dua level, dibedakan `section_id`:
+
+| `section_id` | makna |
+|---|---|
+| `NULL` | rekomendasi **level materi** (perilaku lama, tidak berubah) |
+| terisi | rekomendasi **level bagian** (Fase 3e) |
+
+`material_id` **sengaja tetap `NOT NULL`**: bagian selalu punya materi, jadi foreign key ini
+selalu diketahui. Melonggarkannya hanya membuang informasi yang tidak pernah hilang — sementara
+`material_id` tetap dipakai filter guru, cascade hapus materi, dan pengelompokan
+`top_recommendations`. Kolom baru diterapkan idempoten lewat `_COMPAT_COLUMNS`
+(`src/config/database.py`), jadi DB lama dan checkout baru converge ke skema yang sama.
+
+### 8.2 Aturan peringkat (basis aturan, bukan model)
+
+```
+skor = 0.60 * (1 - penguasaan/100) + 0.40 * (jawaban salah / jawaban)
+```
+
+Bobot ada di `ml_config.REC_SECTION_WEIGHTS` (jumlahnya 1.0). Tidak ada model yang dipakai,
+jadi `recommendation_type` tetap `'rule'` dan `model_version` tetap `NULL` — sama seperti
+peringkat level materi. `recommendation_type='ml'` tidak akan pernah muncul di tabel ini.
+
+Skor yang **hilang** (`None`) menyumbang 0 ke term penguasaan, bukan dibaca sebagai 0%.
+Membaca "tidak diketahui" sebagai "tahu 0%" akan memberi prioritas tertinggi justru pada bagian
+yang paling sedikit buktinya. Term error berbeda: itu berasal dari jawaban yang benar-benar
+ada, jadi tetap dihitung.
+
+### 8.3 Bagian yang tidak bisa dinilai tidak diberi skor
+
+Bagian dengan jawaban < `MIN_SECTION_SAMPLE` (3) tidak dapat diurutkan dengan jujur, jadi
+tidak diberi peringkat. Item-nya tetap dikembalikan dengan bentuk yang berbeda, dan bentuk itu
+tidak boleh tertukar dengan skor:
+
+| | ber-skor | "belum bisa dinilai" |
+|---|---|---|
+| `ranked` | `true` | `false` |
+| `score` | angka 0..1 | `null` |
+| `status` | `READY` | `INSUFFICIENT_DATA` |
+| `mastery_score` | angka 0..100 | `null` |
+| alasan | disusun dari angka nyata | "Baru 2 jawaban - belum cukup untuk dinilai" / "Belum ada jawaban di bagian ini" |
+| ditulis ke DB | ya | **tidak pernah** |
+
+Item "belum bisa dinilai" sengaja **tidak pernah** disimpan: kolom `recommendation_score` tidak
+boleh `NULL`, jadi menyimpannya berarti menulis `0.0` yang menyamar sebagai prioritas. Gerbang
+`verify_ml_readiness.py` memeriksa tepat hal itu (§11, "tidak ada baris bagian berskor 0").
+
+Bagian yang sudah dikuasai (≥ `HIGH_MASTERY_CUTOFF` = 90) tidak direkomendasikan, sama seperti
+aturan di level materi.
+
+### 8.4 Dua level hidup di satu tabel, tapi tidak saling menimpa
+
+Ini titik yang paling rawan: `_persist()` (level materi) dan `_persist_sections()` (level
+bagian) sama-sama menulis ke tabel yang sama, dan keduanya dipanggil pada satu request.
+Kalau salah satunya tidak menjaga tingkatnya, satu level akan menghapus baris level lain.
+Empat tempat ditutup secara eksplisit:
+
+- `_persist()` hanya menyentuh baris `section_id IS NULL`.
+- `_persist_sections()` hanya menyentuh baris `section_id IS NOT NULL`.
+- `mark_clicked()` menerima `section_id` opsional; tanpa itu ia hanya menandai baris materi.
+- `mark_completed()` tetap level materi — menyelesaikan materi bukan berarti menyelesaikan
+  setiap bagiannya.
+
+Konsumen angka yang sudah ada juga dikunci ke level materi, supaya statistiknya tidak bergeser
+tanpa pemberitahuan: `recommendation_evaluation._scoped_rows()` (dan kini melaporkan
+`level: 'material'`), serta `_top_recommendations()` untuk guru.
+
+### 8.5 Endpoint
+
+`GET /api/student/recommendations` mendapat kunci baru `section_recommendations` (dan
+`section_ranking_method`). Kunci ini diisi di **kedua** jalur, baik profil `READY` maupun
+fallback: kebutuhan per bagian berasal dari diagnosis, bukan dari label kelas, jadi siswa yang
+profnya belum matang tetap perlu tahu bagian mana yang bobrok. Kalau perhitungan ini gagal,
+daftarnya dikosongkan — bukan membuat halaman rekomendasi ikut hilang.
+
+`POST /api/student/recommendations/click` sekarang menerima `section_id` opsional. Kalau diisi,
+bagiannya harus benar-benar milik materi tersebut (404 kalau bukan), dan yang ditandai hanya
+baris bagian. Endpoint ini juga ditambahkan cek akses
+(`analytics.student_can_access_material`): siswa tidak bisa mencatat klik untuk materi yang
+even tidak bisa ia buka — aturan yang sama dengan yang menentukan materi mana yang tampil di
+dashboard.
+
+### 8.6 UI
+
+Dashboard siswa, di bawah "Rekomendasi Materi": blok **"Bagian yang Perlu Diperkuat"** —
+kartu amber dengan bar penguasaan, jumlah jawaban, alasan berbasis angka, dan tombol
+**Pelajari Bagian Ini** yang mencatat klik lalu membuka tepat bagiannya lewat
+`?section=<id>`. Di bawahnya ada daftar **"Belum bisa dinilai"** tanpa skor, dengan hitungan
+mentah. Teks di blok itu menyebutkan asal angkanya (kuis, interaktif, latihan) dan bahwa
+peringkatannya aturan transparan, bukan hasil model.
+
+### 8.7 Test
+
+`test_section_recommendations.py` (**51/51**): aturan skor murni (term hilang tidak dianggap
+0%), urutan dan isi daftar, hint tanpa skor, tidak adanya hint di DB, isolasi dua level
+termasuk saat penyegaran, klik ter-scope, evaluasi guru tetap level-materi, dan penolakan
+siswa luar kelas. Gerbang `verify_ml_readiness.py` pemeriksaan `[11]` (**66/66** total)
+menjaga skema, referensi bagian, rentang skor, dan bukti yang cukup untuk setiap baris.
+
+---
+
+## 9. Cara demo (alur yang bisa ditunjukkan)
 
 1. Login sebagai guru, buka sebuah kuis, isi kolom "Bagian Materi" pada kuis, tekan
    **Terapkan bagian ke semua soal**. Lencana bagian langsung muncul di tiap soal.
@@ -611,6 +720,13 @@ jujur, dan sel tanpa bukti berstatus `NO_DATA`.
    menampilkan pembahasan, miskonsepsi, dan alasan tiap opsi.
 7. Muat ulang halaman progres: bagian itu kini menampilkan jumlah soal latihan yang dikerjakan,
    dan angkanya masuk ke lencana penguasaan sebagai sumber tersendiri.
+8. (Fase 3e) Login sebagai siswa, buka **Dashboard**: di bawah "Rekomendasi Materi" ada blok
+   **"Bagian yang Perlu Diperkuat"**. Bandingkan skor di blok ini dengan baris bagian di
+   halaman progres — angkanya sama persis, karena memang dihitung dari diagnosis yang sama.
+   Tekan **Pelajari Bagian Ini**: materi terbuka tepat di bagian yang disarankan, dan kliknya
+   tercatat pada baris bagian, bukan pada baris materi. Blok **"Belum bisa dinilai"** di
+   bawahnya (bagian dengan < 3 jawaban) sengaja tidak punya skor — tunjukkan itu sebagai
+   keputusan jujur, bukan bug.
 
 Data demo sudah punya 2 draf AI yang menunggu review pada bagian "Bagaimana Struktur Virus?"
 (materi `[DEMO] VIRUS`), jadi langkah review bisa langsung ditunjukkan tanpa memanggil AI.
@@ -619,6 +735,8 @@ ditunjukkan juga.
 
 **Sebelum demo, jalankan `scripts/verify_ml_readiness.py`** dan pastikan pemeriksaan `[10]`
 lolos: artinya jawaban kuis materi demo sudah punya bagian, sehingga peta pemahaman tidak kosong.
+Pemeriksaan `[11]` menutupIntegritas baris saran bagian: setiap baris harus menunjuk bagian
+milik materinya sendiri, berskor > 0 dan ≤ 1, dan punya minimal 3 jawaban sebagai buktinya.
 
 Soal kuis demo 89/90/91 sudah ditandai lebih dulu lewat
 `scripts/tag_demo_quiz_sections.py --apply` (§2.5), jadi langkah 1–4 bisa langsung menunjukkan
@@ -650,9 +768,16 @@ yang sudah bersih tidak berubah di tengah presentasi.
 - **Penyedia AI kadang sibuk (HTTP 503 "high demand").** Sudah ditangani 3 percobaan dengan
   jeda pendek, tapi kalau gagal tetap gagal dengan pesan jujur — tidak ada soal karangan.
   Untuk demo, siapkan draf lebih dulu (sudah tersedia 2 draf) daripada bergantung pada AI live.
-- **Rekomendasi per bagian belum ada.** Yang ada baru latihan per bagian; mesin rekomendasi
-  masih per-materi (`Recommendation.material_id` NOT NULL). Fase 4 sudah ada tetapi hanya
-  **saran urutan** (tidak memblokir), dan Fase 5 sudah menambah peta panas siswa × bagian.
+- **Rekomendasi per bagian (Fase 3e) sudah ada, tapi aturannya transparan dan belum
+  dievaluasi.** Peringkatannya dari diagnosis Fase 2 dengan bobot yang ditulis manusia, bukan
+  dari model, dan belum ada panel evaluasi tertutup untuk level bagian: `recommendation_evaluation`
+  sengaja dikunci ke baris `section_id IS NULL` supaya angka lama tidak bergeser tanpa
+  pemberitahuan. Artinya **belum ada bukti** bahwa urutan ini meningkatkan hasil belajar —
+  hanya saja sekarang siswa diarahkan ke bagian yang memang lemah.
+- **Bagian dengan jawaban < 3 tidak diberi peringkat sama sekali.** Ini konsekuensi yang
+  disengaja (§8.3): lebih baik mengatakan "belum bisa dinilai" daripada memberi urutan pada data
+  yang belum bisa dinilai. Siswa yang baru mulai belajar karena itu mungkin melihat blok
+  rekomendasi bagian kosong sementara blok materi tetap terisi.
 - **Saran prasyarat memakai urutan, bukan analisis isi.** Fase 4 menganggap prasyarat sebuah
   bagian adalah bagian tepat sebelumnya dalam `position`; ia tidak membaca isi bagian. Saran
   juga **tidak pernah memblokir** akses. Saat bagian sebelumnya belum berskor
@@ -662,3 +787,9 @@ yang sudah bersih tidak berubah di tengah presentasi.
   percobaan, jadi mengulang-ulang tidak membuat angka terlihat naik.
 - **Guru masih harus menandai bagian soal kuis sendiri** supaya diagnosis Fase 2 punya
   sumber jawaban; tidak ada tebakan otomatis.
+- **Menghapus bagian yang sudah punya data bisa gagal.** `DELETE /api/sections/<id>` belum
+  membersihkan baris yang menunjuk bagian itu, dan itu bukan hal baru dari Fase 3e: pola yang
+  sama berlaku untuk `questions`, `question_bank`, `student_answers`, `practice_answers`,
+  `bookmarks`, `notes`, `forums`, `quizzes`, dan kini juga `recommendations`. Perbaikannya
+  menyentuh banyak tabel sekaligus sehingga sengaja belum ikut di Fase 3e - hapus bagian lebih
+  aman dilakukan bersama bagian turunannya.

@@ -131,6 +131,10 @@ const fetchDetail = async () => {
     }
 
     const listed = [];
+    // ?section= dipakai rekomendasi per bagian (Fase 3e): bagian yang
+    // disarankan harus langsung terbuka, bukan hanya materinya.
+    const wanted = route.query.section ? Number(route.query.section) : null;
+    if (wanted && detail.sections.some((s) => s.id === wanted)) listed.push(wanted);
     const last = studentState.value?.last_section_id;
     if (last && detail.sections.some((s) => s.id === last)) listed.push(last);
     const first = detail.sections.length > 0 ? detail.sections[0].id : null;

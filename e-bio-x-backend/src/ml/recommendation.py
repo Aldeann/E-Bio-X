@@ -151,6 +151,124 @@ def _material_metrics(student, material, student_row):
     }
 
 
+# ------------------------------------------------------------
+# Per-SECTION recommendation (Fase 3e). Same rule-based spirit as
+# the material level above: transparent weights, no trained model.
+# ------------------------------------------------------------
+def score_section(s, weights=None):
+    """Priority score 0..1 for one section (unit-testable, no database).
+
+    `s` is a row from analytics.section_mastery_for_student(). Only
+    sections with status == 'READY' are meant to reach this function:
+    without a real mastery score there is nothing honest to rank on, and
+    inventing one is exactly what the rest of this codebase refuses to do.
+
+    A MISSING score (None) contributes 0 to the mastery term instead of
+    being read as 0%. That distinction matters: treating "unknown" as
+    "knows nothing" would hand top priority to exactly the sections we
+    know least about. The error-rate term is different - it comes from
+    answers that really exist, so it stays.
+    """
+    w = weights or dict(cfg.REC_SECTION_WEIGHTS)
+    score = s.get('score')
+    mastery_gap = 0.0 if score is None else max(0.0, 1.0 - score / 100.0)
+    answered = s.get('answered') or 0
+    wrong = max(0, answered - (s.get('correct') or 0))
+    error = (wrong / answered) if answered else 0.0
+    return round(mastery_gap * w['section_mastery_gap']
+                 + error * w['section_error'], 4)
+
+
+def _section_reasons(s):
+    """Reasons for a RANKED section. Every number here is real data."""
+    reasons = []
+    score = s.get('score')
+    if score is not None and score < cfg.REC_PASS_SCORE:
+        reasons.append(f'Penguasaan bagian ini baru {score:.0f}%')
+    answered = s.get('answered') or 0
+    wrong = max(0, answered - (s.get('correct') or 0))
+    if wrong:
+        reasons.append(f'Masih {wrong} jawaban salah dari {answered}')
+    sources = s.get('score_sources') or []
+    if sources:
+        reasons.append('Bukti: ' + ', '.join(sources))
+    if not reasons:
+        reasons.append('Bagian ini sudah dikuasai dengan baik')
+    return reasons[:4]
+
+
+def _section_hint_reasons(s):
+    """Reasons for an UNRANKED section. No score is claimed at all."""
+    answered = s.get('answered') or 0
+    if answered == 0:
+        return ['Belum ada jawaban di bagian ini']
+    return [f'Baru {answered} jawaban - belum cukup untuk dinilai']
+
+
+def recommend_sections_for_student(student):
+    """Sections this student most needs to work on, weakest first (Fase 3e).
+
+    Returns two kinds of item in one list, and the difference is explicit
+    rather than smoothed over:
+
+    - **ranked** (`ranked: true`, numeric `score`): sections whose mastery
+      is genuinely READY, ordered by need. These are what get persisted.
+    - **hints** (`ranked: false`, `score: null`): sections whose answers are
+      still too few to judge. Their raw counts are reported, but they are
+      deliberately NOT ranked - ordering them would invent a priority the
+      data cannot support. Hints are never persisted, so no 0.0 is ever
+      written to the database pretending to be a priority.
+
+    Sections already mastered (>= HIGH_MASTERY_CUTOFF) are dropped, the
+    same way the material ranking drops mastered materials.
+    """
+    ranked, hints = [], []
+    for material in analytics.student_accessible_materials(student):
+        data = analytics.section_mastery_for_student(student.id, material.id)
+        for row in data['sections']:
+            item = {
+                'material_id': material.id,
+                'section_id': row['section_id'],
+                'material_title': material.title,
+                'section_title': row['title'],
+                'position': row['position'],
+                'status': row['status'],
+                'answered': row['answered'],
+                'correct': row['correct'],
+                'wrong': row['wrong'],
+                'mastery_score': row['score'],
+                'mastery_label': (row.get('mastery') or {}).get('label'),
+                'sources': row.get('score_sources') or [],
+            }
+            if row['status'] != 'READY':
+                # Below MIN_SECTION_SAMPLE: report counts, claim no score.
+                item['ranked'] = False
+                item['score'] = None
+                item['reasons'] = _section_hint_reasons(row)
+                hints.append(item)
+                continue
+            if (row['score'] or 0) >= cfg.HIGH_MASTERY_CUTOFF:
+                continue
+            item['ranked'] = True
+            item['score'] = score_section(row)
+            item['reasons'] = _section_reasons(row)
+            ranked.append(item)
+
+    ranked.sort(key=lambda x: (-x['score'], x['material_id'], x['position']))
+    ranked = ranked[:cfg.REC_SECTION_MAX_RESULTS]
+    # Hints are NOT ranked - they carry no score. They are only ordered so
+    # the list reads sensibly: sections that already have some answers come
+    # first ("hampir cukup bukti"), never-touched sections come last.
+    hints.sort(key=lambda x: (-x['answered'], x['material_id'], x['position']))
+    hints = hints[:cfg.REC_SECTION_HINTS]
+
+    results = ranked + hints
+    # Only ranked sections are persisted: a hint has no score, and the
+    # column is NOT NULL, so storing 0.0 for it would fabricate a priority.
+    _persist_sections(student.id, ranked)
+    return results
+
+
 def recommend_for_student(student, student_row=None, model_version=None, fallback_reason=None):
     """Rank a student's materials by transparent rules (REC_WEIGHTS).
 
@@ -230,15 +348,21 @@ def _persist(student_id, results, rec_type, model_version):
     # materials that dropped out of the top-N, so the student sees stale
     # advice and the closed-loop evaluation counts clicks for
     # recommendations that are no longer on screen.
+    #
+    # `section_id IS NULL` is load-bearing: without it this would delete
+    # every SECTION-level row (Fase 3e) on each material refresh, because
+    # their material_id may well not be in `keep`.
     stale = Recommendation.query.filter(
         Recommendation.student_id == student_id,
+        Recommendation.section_id.is_(None),
         Recommendation.material_id.notin_(keep) if keep else True).all()
     for s in stale:
         db.session.delete(s)
 
     for item in results:
         record = Recommendation.query.filter_by(
-            student_id=student_id, material_id=item['material_id']).first()
+            student_id=student_id, material_id=item['material_id'],
+            section_id=None).first()
         if record is None:
             record = Recommendation(student_id=student_id, material_id=item['material_id'])
             db.session.add(record)
@@ -253,9 +377,52 @@ def _persist(student_id, results, rec_type, model_version):
         db.session.rollback()
 
 
-def mark_clicked(student_id, material_id):
+def _persist_sections(student_id, ranked_sections):
+    """Persist RANKED section rows without touching material-level rows.
+
+    Only ranked items arrive here; hints are display-only and never stored,
+    so no 0.0 is written to a NOT NULL column pretending to be a priority.
+    """
+    keep = {(i['material_id'], i['section_id']) for i in ranked_sections}
+
+    stale = Recommendation.query.filter(
+        Recommendation.student_id == student_id,
+        Recommendation.section_id.isnot(None)).all()
+    for r in stale:
+        if (r.material_id, r.section_id) not in keep:
+            db.session.delete(r)
+
+    for item in ranked_sections:
+        record = Recommendation.query.filter_by(
+            student_id=student_id, material_id=item['material_id'],
+            section_id=item['section_id']).first()
+        if record is None:
+            record = Recommendation(student_id=student_id,
+                                   material_id=item['material_id'],
+                                   section_id=item['section_id'])
+            db.session.add(record)
+        record.recommendation_score = float(item.get('score') or 0.0)
+        record.reason_json = item.get('reasons') or []
+        # Rule-based, exactly like the material level: no trained model is
+        # consulted for the ordering, so it is never labelled 'ml' and
+        # model_version stays NULL.
+        record.recommendation_type = 'rule'
+        record.model_version = None
+        record.created_at = datetime.utcnow()
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
+def mark_clicked(student_id, material_id, section_id=None):
     from src.services.learning_analytics_service import log_activity
-    records = Recommendation.query.filter_by(student_id=student_id, material_id=material_id).all()
+    q = Recommendation.query.filter_by(student_id=student_id, material_id=material_id)
+    # A section click must touch the SECTION row only, never the
+    # material-level one, and vice versa.
+    q = q.filter_by(section_id=int(section_id)) if section_id else q.filter(
+        Recommendation.section_id.is_(None))
+    records = q.all()
     now = datetime.utcnow()
     for r in records:
         if r.clicked_at is None:
@@ -266,7 +433,13 @@ def mark_clicked(student_id, material_id):
 
 
 def mark_completed(student_id, material_id):
-    records = Recommendation.query.filter_by(student_id=student_id, material_id=material_id).all()
+    # Material-level only: finishing a material is not the same event as
+    # finishing one section, and conflating them would make section rows
+    # look completed when the student only got to the end of the material.
+    records = Recommendation.query.filter(
+        Recommendation.student_id == student_id,
+        Recommendation.material_id == material_id,
+        Recommendation.section_id.is_(None)).all()
     if not records:
         return False
     now = datetime.utcnow()
@@ -278,7 +451,12 @@ def mark_completed(student_id, material_id):
 
 
 def existing_recommendations(student_id):
-    rows = Recommendation.query.filter_by(student_id=student_id).order_by(
+    # Material-level rows only. Section rows (Fase 3e) live in the same
+    # table, and mixing the two levels in one ranked list would compare
+    # scores that were never meant to be compared.
+    rows = Recommendation.query.filter(
+        Recommendation.student_id == student_id,
+        Recommendation.section_id.is_(None)).order_by(
         Recommendation.recommendation_score.desc()).limit(cfg.REC_MAX_RESULTS).all()
     return [{
         'material_id': r.material_id,

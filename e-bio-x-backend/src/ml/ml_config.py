@@ -138,6 +138,25 @@ REC_MIN_SCORE = 0.10
 HIGH_MASTERY_CUTOFF = 90        # materials above this are considered mastered
 FALLBACK_RESULTS = 5
 
+# Ambang "cukup baik" untuk BAHASA alasan saja, bukan ambang peringkat.
+REC_PASS_SCORE = 75
+
+# --- Recommendation per SECTION (Fase 3e) --------------------------
+# Same spirit as REC_WEIGHTS: hand-set, transparent, and NOT learned.
+#
+# Only sections whose mastery is genuinely READY (>= MIN_SECTION_SAMPLE
+# answers) get ranked. A section below that threshold cannot be ordered
+# honestly - we do not know the student's level there - so it is reported
+# with its raw counts and score=None instead of being handed a made-up
+# priority. `section_unstarted` is deliberately absent: every ranked
+# section has answers by construction, so such a term would always be 0.
+REC_SECTION_WEIGHTS = {
+    'section_mastery_gap': 0.60,
+    'section_error': 0.40,
+}
+REC_SECTION_MAX_RESULTS = 4      # ranked sections surfaced to the student
+REC_SECTION_HINTS = 2            # unranked sections reported as "belum cukup bukti"
+
 # --- Recommendation closed-loop evaluation -----------------------
 # The recommendation events (clicked_at / completed_at) are already
 # recorded by recommendation.mark_clicked / mark_completed. These

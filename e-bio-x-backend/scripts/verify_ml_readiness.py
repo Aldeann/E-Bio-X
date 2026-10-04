@@ -26,6 +26,7 @@ from src.models.submission import Submission
 from src.models.answer import Answer
 from src.models.question import Question
 from src.models.recommendation import Recommendation
+from src.models.material_section import MaterialSection
 from src.models.ml_model import MlModel
 from src.ml import ml_config as cfg
 from src.ml import decision_tree as dt
@@ -421,6 +422,66 @@ def main():
             else:
                 print(f'      materi {mid}: lewati: hanya {stu} siswa menjawab '
                       f'(< {an.MIN_SECTION_SAMPLE})')
+
+        # ---- 11. rekomendasi per bagian (Fase 3e) --------------
+        # Section-level rows live in the same `recommendations` table as
+        # material-level ones, so the failure mode to guard against is a
+        # row that CLAIMS a section without any evidence behind it. The
+        # rule the feature runs on: a section is only ranked when its
+        # diagnosis is READY, and anything below that is shown with no
+        # score at all and never written to the database.
+        print("\n[11] REKOMENDASI PER BAGIAN (Fase 3e)")
+        check('kolom recommendations.section_id ada',
+              Recommendation.section_id is not None)
+        sec_rows = Recommendation.query.filter(
+            Recommendation.section_id.isnot(None)).all()
+        sec_ids = {r.section_id for r in sec_rows}
+        sections = {s.id: s for s in MaterialSection.query.filter(
+            MaterialSection.id.in_(sec_ids)).all()} if sec_ids else {}
+        orphans = [r.id for r in sec_rows
+                   if sections.get(r.section_id) is None
+                   or sections[r.section_id].material_id != r.material_id]
+        check('baris saran bagian menunjuk bagian milik materinya sendiri',
+              not orphans,
+              f'{len(orphans)} baris meleset' if orphans
+              else f'{len(sec_rows)} baris, {len(sections)} bagian')
+        # A scored-but-zero row is the fingerprint of an unranked ("belum
+        # bisa dinilai") item that leaked into the database.
+        zeros = [r.id for r in sec_rows if (r.recommendation_score or 0) <= 0.0]
+        check('tidak ada baris bagian berskor 0 (indikasi hint bocor ke DB)',
+              not zeros,
+              f'{len(zeros)} baris 0.0' if zeros
+              else f'{len(sec_rows)} baris, semua > 0')
+        out_of_range = [r.id for r in sec_rows
+                        if not 0.0 < (r.recommendation_score or 0.0) <= 1.0]
+        check('skor saran bagian selalu di rentang 0..1',
+              not out_of_range, f'{len(out_of_range)} di luar rentang')
+        stamped_sec = [r.id for r in sec_rows if r.model_version]
+        check('saran bagian tetap tanpa model_version (basis aturan)',
+              not stamped_sec,
+              f'{len(stamped_sec)} baris distempel' if stamped_sec
+              else 'tidak ada yang diklaim berasal dari model')
+        # Recompute the diagnosis for the sections we have rows for and
+        # make sure each one still has enough evidence to be scored. A
+        # row for a section below the threshold would mean something
+        # ranked data the honest path refuses to rank. Evidence is
+        # per student, so each row is re-checked against its own student.
+        thin = []
+        for stu_id, mid, sid in sorted({(r.student_id, r.material_id,
+                                        r.section_id) for r in sec_rows}):
+            rows_ = an.section_mastery_for_student(stu_id, mid)['sections']
+            row = next((x for x in rows_ if x['section_id'] == sid), None)
+            if row is None or (row.get('answered') or 0) < an.MIN_SECTION_SAMPLE:
+                thin.append((stu_id, mid, sid))
+        check('setiap baris saran bagian punya bukti cukup untuk berskor',
+              not thin,
+              f'{len(thin)} di bawah ambang: {thin[:3]}' if thin
+              else f'{len(sec_rows)} baris, ambang '
+                   f'{an.MIN_SECTION_SAMPLE} jawaban terpenuhi')
+        mat_rows = Recommendation.query.filter(
+            Recommendation.section_id.is_(None)).count()
+        print(f'      baris level-materi: {mat_rows} | '
+              f'baris level-bagian: {len(sec_rows)}')
 
         # ---- ringkasan ----------------------------------------
         print("\n" + "=" * 66)

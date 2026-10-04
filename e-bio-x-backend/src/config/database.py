@@ -42,6 +42,12 @@ _COMPAT_COLUMNS = [
     ('question_bank', 'reviewed_at', 'ALTER TABLE question_bank ADD COLUMN reviewed_at DATETIME NULL'),
     ('question_bank', 'misconception', 'ALTER TABLE question_bank ADD COLUMN misconception TEXT NULL'),
     ('question_bank_options', 'feedback', 'ALTER TABLE question_bank_options ADD COLUMN feedback TEXT NULL'),
+    # Per-section recommendation (Fase 3e). section_id IS NULL -> the row is
+    # a material-level recommendation (unchanged behaviour); a value -> the
+    # row recommends that one section. material_id stays NOT NULL on
+    # purpose: a section always belongs to a material, so relaxing it would
+    # only throw away a foreign key we always know.
+    ('recommendations', 'section_id', 'ALTER TABLE recommendations ADD COLUMN section_id INT NULL'),
 ]
 
 

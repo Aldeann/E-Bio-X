@@ -195,6 +195,19 @@ def get_student_recommendations():
     p['model_scope'] = dt_scope
     p['cluster_scope'] = km_scope
 
+    # Rekomendasi per bagian (Fase 3e) tidak bergantung pada profil DT:
+    # kebutuhannya berasal dari diagnosis penguasaan per bagian, bukan dari
+    # label kelas. Jadi bagian ini dihitung di kedua jalur (READY maupun
+    # fallback) supaya siswa yang profilnya belum matang tetap melihat
+    # bagian mana yang perlu dikerjakan.
+    try:
+        sections = rec_service.recommend_sections_for_student(user)
+    except Exception:
+        # Gagal menghitung saran bagian tidak boleh menutupi daftar
+        # rekomendasi materi yang tetap bisa ditampilkan.
+        db.session.rollback()
+        sections = []
+
     if p['status'] == cfg.STATUS_READY and p.get('summary'):
         row = feature_service.aggregate_student_features(user) or {}
         # No model_version is passed: the Decision Tree shaped the profile
@@ -203,14 +216,18 @@ def get_student_recommendations():
         recommended = rec_service.recommend_for_student(user, student_row=row)
         return jsonify({'profile': p, 'status': cfg.STATUS_READY,
                         'recommendations': recommended,
+                        'section_recommendations': sections,
                         'ranking_method': 'rule',
+                        'section_ranking_method': 'rule',
                         'model_scope': dt_scope,
                         'cluster_scope': km_scope}), 200
 
     fallback = rec_service.fallback_recommendations(user)
     return jsonify({'profile': p, 'status': p['status'],
                     'recommendations': fallback,
+                    'section_recommendations': sections,
                     'ranking_method': 'fallback',
+                    'section_ranking_method': 'rule',
                     'mode': 'fallback',
                     'model_scope': dt_scope,
                     'cluster_scope': km_scope}), 200
@@ -227,10 +244,34 @@ def post_recommendation_click():
         return jsonify({'error': 'material_id wajib diisi'}), 400
     from src.models.material import Material
     material = Material.query.get(int(material_id))
-    if not material or material.status != 'published':
+    if not material:
         return jsonify({'error': 'Materi tidak ditemukan atau belum dipublikasikan'}), 404
+    # Siswa tidak boleh mencatat klik untuk materi yang bahkan tidak bisa
+    # dia buka. student_can_access_material adalah aturan yang sama dengan
+    # yang dipakai dashboard untuk menentukan materi mana yang ditampilkan,
+    # jadi rekomendasi yang benar-benar terlihat siswa selalu lolos cek ini.
+    if not analytics.student_can_access_material(user, material):
+        return jsonify({'error': 'Materi tidak ditemukan atau belum dipublikasikan'}), 404
+
+    # section_id opsional (Fase 3e). Kalau diisi, bagiannya harus benar-benar
+    # milik materi tersebut - kalau tidak, klik bisa tercatat pada baris
+    # yang tidak pernah ditampilkan ke siswa.
+    section_id = data.get('section_id')
+    if section_id:
+        try:
+            section_id = int(section_id)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'section_id tidak valid'}), 400
+        from src.models.material_section import MaterialSection
+        section = MaterialSection.query.filter_by(
+            id=section_id, material_id=material.id).first()
+        if not section:
+            return jsonify({'error': 'Bagian tidak ditemukan pada materi ini'}), 404
+    else:
+        section_id = None
+
     try:
-        rec_service.mark_clicked(user.id, material.id)
+        rec_service.mark_clicked(user.id, material.id, section_id=section_id)
     except Exception:
         db.session.rollback()
     return jsonify({'message': 'Klik rekomendasi tercatat'}), 200
@@ -429,7 +470,12 @@ def _top_recommendations(teacher):
     student_ids = analytics.teacher_student_ids(teacher.id)
     if not student_ids:
         return []
-    rows = Recommendation.query.filter(Recommendation.student_id.in_(student_ids)).all()
+    rows = Recommendation.query.filter(
+        Recommendation.student_id.in_(student_ids),
+        # Material-level rows only: section-level rows (Fase 3e) live in
+        # the same table, and counting them here would inflate a material's
+        # "how often recommended" number with per-section advice.
+        Recommendation.section_id.is_(None)).all()
     agg = {}
     for r in rows:
         if not r.material:
