@@ -32,6 +32,7 @@ from src.services import prerequisite_service as ps  # noqa: E402
 from src.services.learning_analytics_service import (  # noqa: E402
     _apply_prerequisites,
 )
+from src.ml.recommendation import score_section  # noqa: E402
 from src.models.user import User  # noqa: E402
 from src.models.course import Course  # noqa: E402
 from src.models.enrollment import Enrollment  # noqa: E402
@@ -254,6 +255,20 @@ def part1_advisory():
     check('1f. saran prasyarat lintas materi menyebut materi asal',
           'MATERI A' in (rows[0]['advisory'] or ''),
           str(rows[0]['advisory']))
+
+    # 1g-1i. pengaruh ke PRIORITAS rekomendasi (score_section).
+    base = {'score': 75.0, 'answered': 4, 'correct': 3}
+    neutral = score_section(dict(base))
+    penalized = score_section(dict(base, prerequisite_met=False))
+    check('1g. prasyarat terbukti belum tuntas -> prioritas TURUN',
+          penalized < neutral and 0.0 <= penalized <= 1.0,
+          f'{penalized} < {neutral}')
+    unknown = score_section(dict(base, prerequisite_met=None))
+    check('1h. prasyarat belum bisa dinilai -> prioritas NETRAL',
+          unknown == neutral, f'{unknown} == {neutral}')
+    met = score_section(dict(base, prerequisite_met=True))
+    check('1i. prasyarat tuntas / info tak ada -> prioritas tidak berubah',
+          met == neutral, f'{met} == {neutral}')
 
 
 # ============================================================

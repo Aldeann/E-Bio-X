@@ -155,6 +155,20 @@ def _material_metrics(student, material, student_row):
 # Per-SECTION recommendation (Fase 3e). Same rule-based spirit as
 # the material level above: transparent weights, no trained model.
 # ------------------------------------------------------------
+def _prerequisite_factor(s):
+    """Faktor prioritas dari status prasyarat (Fase 4e).
+
+    - ``False`` (prasyarat TERBUKTI belum tuntas) -> faktor < 1, supaya
+      bagian dasarnya lebih dulu disarankan;
+    - ``None`` (belum bisa dinilai), ``True``, atau kunci tidak ada ->
+      netral (1.0). Bertindak atas dasar ketidaktahuan akan sama dengan
+      mengarang penilaian.
+    """
+    if s.get('prerequisite_met') is False:
+        return cfg.REC_SECTION_UNMET_PREREQ_FACTOR
+    return 1.0
+
+
 def score_section(s, weights=None):
     """Priority score 0..1 for one section (unit-testable, no database).
 
@@ -168,6 +182,10 @@ def score_section(s, weights=None):
     "knows nothing" would hand top priority to exactly the sections we
     know least about. The error-rate term is different - it comes from
     answers that really exist, so it stays.
+
+    Fase 4e: bila prasyarat bagian ini TERBUKTI belum tuntas, skornya
+    dikalikan faktor penalti supaya dasarnya lebih dulu disarankan. Bila
+    prasyaratnya belum bisa dinilai, skor TIDAK diubah.
     """
     w = weights or dict(cfg.REC_SECTION_WEIGHTS)
     score = s.get('score')
@@ -175,13 +193,20 @@ def score_section(s, weights=None):
     answered = s.get('answered') or 0
     wrong = max(0, answered - (s.get('correct') or 0))
     error = (wrong / answered) if answered else 0.0
-    return round(mastery_gap * w['section_mastery_gap']
-                 + error * w['section_error'], 4)
+    base = (mastery_gap * w['section_mastery_gap']
+            + error * w['section_error'])
+    return round(base * _prerequisite_factor(s), 4)
 
 
 def _section_reasons(s):
     """Reasons for a RANKED section. Every number here is real data."""
     reasons = []
+    if s.get('prerequisite_met') is False:
+        unmet = [p for p in (s.get('prerequisites') or [])
+                 if p.get('met') is False]
+        title = unmet[0].get('prerequisite_title') if unmet else None
+        if title:
+            reasons.append(f'Prasyarat belum tuntas: "{title}"')
     score = s.get('score')
     if score is not None and score < cfg.REC_PASS_SCORE:
         reasons.append(f'Penguasaan bagian ini baru {score:.0f}%')

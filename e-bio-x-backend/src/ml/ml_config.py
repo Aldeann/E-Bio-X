@@ -157,6 +157,17 @@ REC_SECTION_WEIGHTS = {
 REC_SECTION_MAX_RESULTS = 4      # ranked sections surfaced to the student
 REC_SECTION_HINTS = 2            # unranked sections reported as "belum cukup bukti"
 
+# --- Knowledge graph prasyarat (Fase 4e) --------------------------
+# Bagian yang prasyaratnya sudah TERBUKTI belum tuntas diturunkan
+# prioritasnya (faktor < 1) supaya bagian dasarnya lebih dulu muncul di
+# daftar saran. Ini mengubah tampilan hanya ketika ada bukti pasti.
+#
+# Status `prerequisite_met is None` (prasyarat belum bisa dinilai - data
+# kurang atau di luar akses) SENGAJA netral: menurunkan prioritas atas dasar
+# ketidaktahuan sama saja dengan mengarang penilaian, prinsip yang sama
+# dengan `score=None` di atas.
+REC_SECTION_UNMET_PREREQ_FACTOR = 0.5
+
 # --- Recommendation closed-loop evaluation -----------------------
 # The recommendation events (clicked_at / completed_at) are already
 # recorded by recommendation.mark_clicked / mark_completed. These
