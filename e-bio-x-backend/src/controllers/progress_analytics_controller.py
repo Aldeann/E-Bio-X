@@ -16,6 +16,7 @@ from src.controllers.material_controller import _can_student_access, _can_manage
 from src.config.database import db
 from src.services import learning_analytics_service as analytics
 from src.services import student_practice_service as spractice
+from src.services import prerequisite_service as prereq
 
 
 def _user():
@@ -373,6 +374,66 @@ def get_teacher_analytics_material(material_id):
     if not _can_manage(material, teacher):
         return jsonify({'error': 'Anda hanya dapat melihat materi milik sendiri'}), 403
     return jsonify(analytics.material_analytics(material, teacher.id)), 200
+
+
+@jwt_required()
+def get_material_prerequisites(material_id):
+    """Peta prasyarat OTOMATIS untuk bagian-bagian sebuah materi (guru).
+
+    Guru tidak mengisi apa pun. Sistem menurunkan setiap edge dari bukti
+    yang benar-benar ada di konten bagian (rujukan judul persis atau
+    kemiripan isi), dan edge itu SELALU membawa sumber + alasan, jadi guru
+    bisa memeriksa mengapa sebuah bagian dianggap punya prasyarat. Ini
+    bersifat saran (tidak mengunci akses) - sama seperti Fase 4.
+    """
+    teacher, err, code = _teacher()
+    if err:
+        return err, code
+    material = Material.query.get(material_id)
+    if not material:
+        return jsonify({'error': 'Material not found'}), 404
+    if not _can_manage(material, teacher):
+        return jsonify({'error': 'Anda hanya dapat melihat materi milik sendiri'}), 403
+
+    # Graph dibangun hanya dari materi milik pemilik materi ini, supaya
+    # prasyarat tidak pernah menunjuk ke materi guru lain.
+    if material.teacher_id:
+        owned = Material.query.filter_by(teacher_id=material.teacher_id).all()
+    else:
+        owned = [material]
+    graph = prereq.graph_for_materials([m.id for m in owned])
+    meta = graph['sections']
+
+    rows = []
+    for sec in (MaterialSection.query.filter_by(material_id=material.id)
+                .order_by(MaterialSection.position).all()):
+        edges = graph['by_section'].get(sec.id, [])
+        rows.append({
+            'section_id': sec.id,
+            'title': sec.title,
+            'position': sec.position,
+            'prerequisites': [{
+                'section_id': e['prerequisite_section_id'],
+                'title': meta.get(e['prerequisite_section_id'], {}).get('title'),
+                'material_id': meta.get(e['prerequisite_section_id'], {}).get('material_id'),
+                'material_title': meta.get(e['prerequisite_section_id'], {}).get('material_title'),
+                'source': e['source'],
+                'confidence': e['confidence'],
+                'rationale': e['rationale'],
+            } for e in edges],
+        })
+
+    return jsonify({
+        'material_id': material.id,
+        'material_title': material.title,
+        'method': ('otomatis: rujukan judul persis + kemiripan isi (TF-IDF); '
+                   'cadangan: urutan posisi'),
+        'advisory': True,
+        'source_counts': graph['source_counts'],
+        'used_position': graph['used_position'],
+        'dropped_cycles': graph['dropped_cycles'],
+        'sections': rows,
+    }), 200
 
 
 @jwt_required()

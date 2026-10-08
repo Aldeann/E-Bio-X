@@ -18,6 +18,7 @@ from src.models.course import Course
 from src.models.enrollment import Enrollment
 from src.models.user import User
 from src.services.student_practice_service import latest_attempts
+from src.services import prerequisite_service
 from sqlalchemy import func, distinct, case, or_
 
 
@@ -450,36 +451,49 @@ def _section_mastery_row(section, answered, correct):
     return row
 
 
+def _prereq_state(prereq_row):
+    """True/False/None untuk SATU prasyarat.
+
+    - True  : prasyarat punya skor READY dan >= ambang tuntas;
+    - False : READY tetapi di bawah ambang;
+    - None  : belum berskor (data tidak cukup) ATAU barisnya tidak diketahui
+      (mis. bagian di materi yang tidak bisa diakses siswa). Saat ragu, jangan
+      menegur - penilaiannya memang belum bisa.
+    """
+    if prereq_row is None:
+        return None
+    if prereq_row.get('status') != 'READY':
+        return None
+    score = prereq_row.get('score')
+    if score is None:
+        return None
+    return score >= PREREQUISITE_PASS_SCORE
+
+
 def _prerequisite_advisory(prev_row):
     """(met, advisory) untuk sebuah bagian berdasarkan bagian sebelumnya.
 
-    Dipakai Fase 4 (advisory, TIDAK memblokir): bagian lanjutan hanya
-    diberi saran, siswa tetap bisa membukanya. Mengembalikan:
-
-    - ``(True, None)``  bagian sebelumnya sudah READY dan skornya >= ambang;
-    - ``(False, saran)`` bagian sebelumnya READY tetapi di bawah ambang;
-    - ``(None, None)``  bagian sebelumnya belum berskor (data belum cukup)
-      - saat data tipis jangan menegur, karena penilaiannya memang belum bisa.
-    - ``(True, None)``  untuk bagian pertama (tidak punya prasyarat).
+    Aturan satu-prasyarat yang lama, dipertahankan untuk kompatibilitas dan
+    dipakai test. Padanan barunya adalah `_prereq_state` + `_apply_prerequisites`
+    yang mendukung banyak prasyarat sekaligus lintas materi.
     """
     if prev_row is None:
         return True, None
-    if prev_row.get('status') != 'READY':
-        return None, None
-    score = prev_row.get('score')
-    if score is not None and score >= PREREQUISITE_PASS_SCORE:
-        return True, None
-    return False, (
-        f'Bagian "{prev_row.get("title")}" belum tuntas ({score}); '
-        f'pelajari dulu bagian itu.'
-    )
+    state = _prereq_state(prev_row)
+    if state is False:
+        return False, (
+            f'Bagian "{prev_row.get("title")}" belum tuntas '
+            f'({prev_row.get("score")}); pelajari dulu bagian itu.'
+        )
+    return state, None
 
 
-def section_mastery_for_student(student_id, material_id):
-    """Diagnosis penguasaan per bagian untuk satu siswa pada satu materi.
+def _section_rows_core(student_id, material_id):
+    """Baris diagnosis per bagian TANPA informasi prasyarat.
 
-    Mengembalikan SELURUH bagian materi (termasuk yang belum ada
-    jawabannya) agar peta pemahaman tidak menyembunyikan bagian kosong.
+    Dipisah supaya graph prasyarat (yang bisa lintas materi) bisa dibangun
+    sekali di pemanggil lalu dipakai untuk banyak materi, tanpa menghitung
+    ulang statistik jawaban tiap kali.
     """
     sections = MaterialSection.query.filter_by(
         material_id=material_id).order_by(MaterialSection.position).all()
@@ -495,6 +509,7 @@ def section_mastery_for_student(student_id, material_id):
         answered = q['answered'] + i['answered'] + p['answered']
         correct = q['correct'] + i['correct'] + p['correct']
         row = _section_mastery_row(sec, answered, correct)
+        row['material_id'] = material_id
         row.update({
             'quiz_answered': q['answered'],
             'quiz_correct': q['correct'],
@@ -513,25 +528,128 @@ def section_mastery_for_student(student_id, material_id):
             ) if count],
         })
         rows.append(row)
+    return rows
 
-    # Fase 4 (advisory, TIDAK memblokir): bagian lanjutan diberi saran bila
-    # bagian sebelumnya belum tuntas. Aturannya eksplisit dan bukan tebakan:
-    # prasyarat sebuah bagian adalah bagian tepat sebelumnya dalam urutan materi.
-    for idx, row in enumerate(rows):
-        prev = rows[idx - 1] if idx > 0 else None
-        met, advisory = _prerequisite_advisory(prev)
+
+def student_section_context(student):
+    """(graph, mastery_map) untuk SELURUH materi yang bisa diakses siswa.
+
+    Graph prasyarat bisa lintas materi, jadi prasyarat sebuah bagian bisa
+    berada di materi lain. `mastery_map` menyediakan skor bagian dari materi
+    mana pun agar prasyarat lintas materi itu bisa DINILAI, bukan ditebak.
+    """
+    materials = student_accessible_materials(student)
+    graph = prerequisite_service.graph_for_materials([m.id for m in materials])
+    mastery_map = {}
+    for m in materials:
+        for row in _section_rows_core(student.id, m.id):
+            mastery_map[row['section_id']] = dict(row)
+    return graph, mastery_map
+
+
+def _apply_prerequisites(rows, graph, mastery_map):
+    """Isi field prasyarat pada baris diagnosis (Fase 4, advisory).
+
+    Mendukung BANYAK prasyarat sekaligus lintas materi. `prerequisite_met`:
+
+    - True  : semua prasyarat tuntas;
+    - False : minimal satu prasyarat belum tuntas;
+    - None  : tidak ada yang di bawah ambang, tetapi ada yang belum bisa
+      dinilai (data kurang, atau bagian di luar akses siswa).
+
+    `advisory` hanya diisi saat ada prasyarat yang benar-benar belum tuntas,
+    jadi siswa tidak pernah ditegur atas hal yang belum bisa dinilai.
+    """
+    by_section = graph.get('by_section', {})
+    section_meta = graph.get('sections', {})
+    for row in rows:
+        edges = by_section.get(row['section_id'], [])
+        evaluations = []
+        for edge in edges:
+            pid = edge['prerequisite_section_id']
+            meta = section_meta.get(pid, {})
+            evaluations.append({
+                'prerequisite_section_id': pid,
+                'prerequisite_title': meta.get('title'),
+                'prerequisite_material_id': meta.get('material_id'),
+                'prerequisite_material_title': meta.get('material_title'),
+                'met': _prereq_state(mastery_map.get(pid)),
+                'source': edge['source'],
+                'confidence': edge['confidence'],
+                'rationale': edge['rationale'],
+            })
+
+        unmet = [e for e in evaluations if e['met'] is False]
+        if unmet:
+            overall = False
+        elif any(e['met'] is None for e in evaluations):
+            overall = None
+        else:
+            overall = True
+
+        advisory = None
+        if unmet:
+            first = unmet[0]
+            title = first.get('prerequisite_title')
+            score = (mastery_map.get(first['prerequisite_section_id']) or {}).get('score')
+            cross = (first.get('prerequisite_material_id') is not None
+                     and first.get('prerequisite_material_id') != row.get('material_id'))
+            if cross and first.get('prerequisite_material_title'):
+                advisory = (
+                    f'Bagian "{title}" (materi '
+                    f'"{first["prerequisite_material_title"]}") belum tuntas '
+                    f'({score}); pelajari dulu bagian itu.')
+            else:
+                advisory = (f'Bagian "{title}" belum tuntas ({score}); '
+                            f'pelajari dulu bagian itu.')
+
+        # Field lama (satu prasyarat) dipertahankan supaya consumer lama tetap
+        # bekerja; `prerequisites` adalah bentuk barunya (bisa banyak).
+        primary = unmet[0] if unmet else (evaluations[0] if evaluations else None)
         row.update({
-            'prerequisite_section_id': prev['section_id'] if prev else None,
-            'prerequisite_title': prev['title'] if prev else None,
-            'prerequisite_met': met,
+            'prerequisites': evaluations,
+            'prerequisite_section_id': primary['prerequisite_section_id'] if primary else None,
+            'prerequisite_title': primary['prerequisite_title'] if primary else None,
+            'prerequisite_met': overall,
             'advisory': advisory,
         })
+    return rows
+
+
+def section_mastery_for_student(student_id, material_id, context=None):
+    """Diagnosis penguasaan per bagian untuk satu siswa pada satu materi.
+
+    Mengembalikan SELURUH bagian materi (termasuk yang belum ada
+    jawabannya) agar peta pemahaman tidak menyembunyikan bagian kosong.
+
+    `context` opsional = (graph, mastery_map) dari `student_section_context`,
+    diberikan oleh pemanggil yang mengulang banyak materi (mis. rekomendasi)
+    supaya graph dan peta penguasaan tidak dihitung ulang tiap materi.
+    """
+    rows = _section_rows_core(student_id, material_id)
+    if context is None:
+        student = User.query.get(student_id)
+        if student is not None:
+            context = student_section_context(student)
+        else:
+            context = ({'by_section': {}, 'sections': {}, 'source_counts': {}}, {})
+    graph, mastery_map = context
+    _apply_prerequisites(rows, graph, mastery_map)
+
+    sources = graph.get('source_counts', {})
+    if sources.get(prerequisite_service.REFERENCE_SOURCE) or \
+            sources.get(prerequisite_service.SIMILARITY_SOURCE):
+        rule = ('otomatis: rujukan judul & kemiripan isi '
+                '(cadangan: urutan posisi)')
+    else:
+        rule = 'bagian sebelumnya dalam urutan materi'
 
     return {
         'material_id': material_id,
         'min_sample': MIN_SECTION_SAMPLE,
-        'prerequisite_rule': 'bagian sebelumnya dalam urutan materi',
+        'prerequisite_rule': rule,
         'prerequisite_pass_score': PREREQUISITE_PASS_SCORE,
+        'prerequisite_sources': sources,
         'sections': rows,
         'sections_with_data': sum(1 for r in rows if r['status'] == 'READY'),
         'sections_insufficient': sum(1 for r in rows if r['status'] != 'READY'),

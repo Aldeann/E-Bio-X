@@ -95,6 +95,7 @@ def create_app():
         get_teacher_analytics_materials, get_teacher_analytics_material, get_teacher_analytics_quiz,
         get_teacher_analytics_students, get_teacher_analytics_student,
         get_teacher_analytics_topics, get_teacher_analytics_difficulty,
+        get_material_prerequisites,
         post_student_features, get_feature_dataset,
     )
     from src.controllers.ml_controller import (
@@ -254,6 +255,8 @@ def create_app():
     app.add_url_rule('/api/teacher/analytics/options', view_func=get_teacher_analytics_options, methods=['GET'])
     app.add_url_rule('/api/teacher/analytics/materials', view_func=get_teacher_analytics_materials, methods=['GET'])
     app.add_url_rule('/api/teacher/analytics/materials/<material_id>', view_func=get_teacher_analytics_material, methods=['GET'])
+    # Knowledge graph prasyarat (otomatis) untuk bagian-bagian materi ini.
+    app.add_url_rule('/api/teacher/materials/<material_id>/prerequisites', view_func=get_material_prerequisites, methods=['GET'])
     app.add_url_rule('/api/teacher/analytics/quizzes/<quiz_id>', view_func=get_teacher_analytics_quiz, methods=['GET'])
     app.add_url_rule('/api/teacher/analytics/students', view_func=get_teacher_analytics_students, methods=['GET'])
     app.add_url_rule('/api/teacher/analytics/students/<student_id>', view_func=get_teacher_analytics_student, methods=['GET'])

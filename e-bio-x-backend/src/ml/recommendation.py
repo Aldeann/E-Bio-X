@@ -223,8 +223,13 @@ def recommend_sections_for_student(student):
     same way the material ranking drops mastered materials.
     """
     ranked, hints = [], []
+    # Graph prasyarat + peta penguasaan dihitung SEKALI untuk semua materi,
+    # bukan per materi. Graph-nya bisa lintas materi, jadi prasyarat sebuah
+    # bagian bisa berada di materi lain dan tetap bisa dinilai di sini.
+    context = analytics.student_section_context(student)
     for material in analytics.student_accessible_materials(student):
-        data = analytics.section_mastery_for_student(student.id, material.id)
+        data = analytics.section_mastery_for_student(
+            student.id, material.id, context=context)
         for row in data['sections']:
             item = {
                 'material_id': material.id,
@@ -239,6 +244,11 @@ def recommend_sections_for_student(student):
                 'mastery_score': row['score'],
                 'mastery_label': (row.get('mastery') or {}).get('label'),
                 'sources': row.get('score_sources') or [],
+                # Fase 4e (otomatis): apakah prasyarat bagian ini sudah tuntas.
+                # True / False / None (belum bisa dinilai). Dipakai Commit
+                # berikutnya untuk prioritas; di sini disajikan transparan dulu.
+                'prerequisite_met': row.get('prerequisite_met'),
+                'prerequisites': row.get('prerequisites') or [],
             }
             if row['status'] != 'READY':
                 # Below MIN_SECTION_SAMPLE: report counts, claim no score.
