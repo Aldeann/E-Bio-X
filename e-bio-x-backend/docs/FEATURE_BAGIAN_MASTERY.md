@@ -491,45 +491,87 @@ Hayati" 1. Dua draf AI lain sengaja dibiarkan `DRAFT` untuk peragaan persetujuan
 
 ---
 
-## 6. Fase 4 — saran prasyarat antar-bagian (advisory, tidak memblokir)
+## 6. Fase 4 — knowledge graph prasyarat otomatis (advisory, tidak memblokir)
 
-Tujuan: memberi tahu siswa bahwa sebuah bagian lebih mudah dipahami setelah bagian
-sebelumnya tuntas — **tanpa mengunci apa pun**. Ini keputusan yang disengaja: memblokir
-sebagian ditolak karena bagian dengan data tipis (`INSUFFICIENT_DATA`) tidak boleh menjebak
-siswa keluar dari alurnya.
+Tujuan: memberi tahu siswa bahwa sebuah bagian lebih mudah dipahami setelah bagian lain
+tuntas — **tanpa mengunci apa pun** dan **tanpa guru mengisi apa pun**. Memblokir ditolak
+karena bagian dengan data tipis (`INSUFFICIENT_DATA`) tidak boleh menjebak siswa keluar dari
+alurnya.
 
-### 6.1 Aturan prasyarat (eksplisit, bukan tebakan)
+### 6.1 Sumber edge (otomatis, transparan)
 
-Prasyarat sebuah bagian adalah **bagian tepat sebelumnya dalam urutan materi** (`position`).
-Itu aturan urutan yang jelas, bukan klaim tentang keterkaitan isi. Ambang "tuntas" = **75**
-(`PREREQUISITE_PASS_SCORE`), selaras dengan label penguasaan `Baik` ke atas.
+Prasyarat tidak lagi hanya "bagian tepat sebelumnya". Sistem menurunkan edge dari bukti yang
+benar-benar ada di konten bagian, dengan prioritas:
 
-`_prerequisite_advisory()` mengembalikan `(met, advisory)`:
+1. **`reference`** — bagian ini menyebut **judul persis** bagian lain. Bukti literal,
+   `confidence = 0.9`. Bisa **lintas materi**.
+2. **`similarity`** — isi dua bagian (se-materi) mirip menurut TF-IDF cosine ≥ `SIMILARITY_MIN`
+   (0.30). Arah ditentukan posisi (lebih dulu → prasyarat), `confidence` = skor kemiripan.
+3. **`position`** — cadangan: bagian tepat sebelumnya dalam urutan materi. Dipakai hanya bila
+   dua bukti di atas tidak menghasilkan edge, supaya graph kosong tidak menghapus aturan urutan
+   lama.
 
-| Keadaan bagian sebelumnya | `prerequisite_met` | `advisory` |
-|---|---|---|
-| belum ada (bagian pertama) | `True` | `None` |
-| `READY` dan skor ≥ 75 | `True` | `None` |
-| `READY` dan skor < 75 | `False` | "Bagian … belum tuntas (skor …); pelajari dulu bagian itu." |
-| `INSUFFICIENT_DATA` | `None` | `None` — saat belum berskor, sistem sengaja diam |
+Penjaga kejujuran:
 
-Bagian pertama tidak punya prasyarat. Saat bagian sebelumnya belum bisa dinilai, sistem
-tidak menegur karena penilaiannya memang belum bisa dilakukan.
+- **Judul generik diabaikan** sebagai bukti rujukan: judul < 8 huruf, judul sama dengan nama
+  materi, atau judul yang muncul di ≥ 3 bagian dan > 40% bagian (itu nama topik, bukan rujukan).
+- **Rujukan se-materi harus mengarah ke depan**; rujukan mundur bukan prasyarat.
+- **Siklus** (A → B → A) selalu ditolak dan dilaporkan di `dropped_cycles`.
+- Maksimum `MAX_PREREQUISITES_PER_SECTION` (3) prasyarat per bagian.
 
-### 6.2 Data & UI
+Setiap edge membawa `source`, `confidence`, dan `rationale`, jadi tidak pernah dibaca sebagai
+kebenaran mutlak. Graph dihitung saat dibutuhkan, **tidak disimpan**, sehingga tidak bisa basi
+saat konten berubah.
+
+### 6.2 Cara prasyarat dinilai
+
+`_prereq_state()` menilai satu prasyarat, dan `_apply_prerequisites()` menggabungkan **banyak**
+prasyarat (termasuk lintas materi). Ambang "tuntas" = **75** (`PREREQUISITE_PASS_SCORE`).
+
+| Keadaan satu prasyarat | Nilainya |
+|---|---|
+| `READY` dan skor ≥ 75 | `True` |
+| `READY` dan skor < 75 | `False` |
+| `INSUFFICIENT_DATA`, skor hilang, atau baris tidak diketahui | `None` |
+
+Hasil gabungan `prerequisite_met`:
+
+- `True` — semua prasyarat tuntas;
+- `False` — minimal satu prasyarat belum tuntas → `advisory` diisi, menyebut bagian (dan nama
+  materi bila lintas materi) yang harus didahulukan;
+- `None` — tidak ada yang di bawah ambang, tetapi ada yang belum bisa dinilai → sistem diam.
+
+Bagian pertama tidak punya prasyarat. Saat sesuatu belum bisa dinilai, sistem **tidak menegur**,
+karena penilaiannya memang belum bisa dilakukan.
+
+`_prerequisite_advisory(prev_row)` (aturan satu-prasyarat lama) tetap ada untuk kompatibilitas
+dan dipakai test; padanan barunya adalah `_prereq_state` + `_apply_prerequisites`.
+
+### 6.3 Data & UI
 
 `section_mastery_for_student()` menambah tiap baris bagian dengan `prerequisite_section_id`,
-`prerequisite_title`, `prerequisite_met`, dan `advisory`, plus ringkasan `prerequisite_rule`,
-`prerequisite_pass_score`, dan `advisory_count`. `GET /api/student/progress/<id>` meneruskan
-keempat kolom itu ke `sections[]`.
+`prerequisite_title`, `prerequisite_met`, dan `advisory` (bentuk lama), ditambah `prerequisites[]`
+(daftar lengkap: judul, materi, sumber, confidence, rationale). Ringkasan `prerequisite_rule`,
+`prerequisite_sources`, `prerequisite_pass_score`, dan `advisory_count` ikut dikembalikan.
+`GET /api/student/progress/<id>` meneruskan semuanya ke `sections[]`.
 
-Di halaman **Riwayat Belajar → materi**, baris bagian menampilkan catatan kuning kecil bila
-ada saran. **Tidak ada tombol yang dinonaktifkan** — siswa tetap bisa membuka bagian mana pun.
+Di halaman **Riwayat Belajar → materi**, baris bagian menampilkan catatan kuning kecil bila ada
+saran. **Tidak ada tombol yang dinonaktifkan** — siswa tetap bisa membuka bagian mana pun.
 
-### 6.3 Test
+### 6.4 Endpoint guru (baca saja)
 
-`test_section_mastery.py` — **50/50 PASS**, termasuk keempat cabang aturan di atas (diuji
-langsung sebagai fungsi murni) dan `advisory_count` pada fixture.
+`GET /api/teacher/materials/<id>/prerequisites` mengembalikan graph untuk bagian materi itu:
+tiap bagian dengan daftar prasyaratnya beserta `source`, `confidence`, dan `rationale`. Ter-scope
+ke pemilik materi. Guru **tidak mengubah** apa pun di sini — ini hanya agar graph otomatis bisa
+diperiksa, bukan diisi manual.
+
+### 6.5 Test
+
+`test_section_mastery.py` — **50/50 PASS** (termasuk cabang aturan lama).
+`test_prerequisite_graph.py` — **25/25 PASS**: algoritma murni (rujukan, rujukan mundur ditolak,
+judul generik, kemiripan, siklus, cadangan posisi, batas maksimum), semantik advisory (banyak
+prasyarat & lintas materi), pengaruh ke prioritas rekomendasi, dan integrasi endpoint + kontrol
+akses.
 
 ---
 
@@ -643,6 +685,13 @@ Skor yang **hilang** (`None`) menyumbang 0 ke term penguasaan, bukan dibaca seba
 Membaca "tidak diketahui" sebagai "tahu 0%" akan memberi prioritas tertinggi justru pada bagian
 yang paling sedikit buktinya. Term error berbeda: itu berasal dari jawaban yang benar-benar
 ada, jadi tetap dihitung.
+
+**Fase 4e (graph prasyarat):** bila prasyarat bagian ini **terbukti** belum tuntas
+(`prerequisite_met is False`), skornya dikalikan `REC_SECTION_UNMET_PREREQ_FACTOR` (0.5) supaya
+bagian dasarnya lebih dulu disarankan, dan alasannya ikut ditampilkan ("Prasyarat belum tuntas:
+…"). Status `None` (belum bisa dinilai) dan `True` **tidak mengubah** skor — bertindak atas dasar
+ketidaktahuan sama dengan mengarang penilaian. Karena itu, selama prasyarat belum punya cukup
+data (kondisi umum pada data demo), urutan lama tidak bergeser sedikit pun.
 
 ### 8.3 Bagian yang tidak bisa dinilai tidak diberi skor
 
