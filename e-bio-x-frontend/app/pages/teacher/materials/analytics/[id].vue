@@ -7,19 +7,47 @@ const token = useCookie("access_token").value;
 const toast = useToast();
 
 const data = ref(null);
+const prereq = ref(null);
 const loading = ref(true);
 
 const analytics = computed(() => data.value?.analytics || {});
 const students = computed(() => analytics.value.students_list || []);
 
+// Hanya bagian yang benar-benar punya prasyarat yang ditampilkan.
+const prereqRows = computed(() =>
+  (prereq.value?.sections || []).filter((s) => (s.prerequisites || []).length)
+);
+
+const SOURCE_LABELS = {
+  reference: "rujukan judul",
+  similarity: "kemiripan isi",
+  position: "urutan posisi",
+};
+const sourceLabel = (s) => SOURCE_LABELS[s] || s;
+const sourceClass = (s) =>
+  ({
+    reference: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+    similarity: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+    position: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
+  }[s] || "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300");
+
 const fetchData = async () => {
   loading.value = true;
+  const headers = { Authorization: `Bearer ${token}` };
   try {
-    const res = await $fetch(
-      `${config.public.backend}/api/materials/${route.params.id}/analytics`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    const [res, peta] = await Promise.all([
+      $fetch(`${config.public.backend}/api/materials/${route.params.id}/analytics`, {
+        headers,
+      }),
+      // Peta prasyarat otomatis bersifat pelengkap: bila gagal, halaman
+      // analitik tetap tampil (jangan sampai satu panel menjatuhkan semua).
+      $fetch(
+        `${config.public.backend}/api/teacher/materials/${route.params.id}/prerequisites`,
+        { headers }
+      ).catch(() => null),
+    ]);
     data.value = res;
+    prereq.value = peta;
   } catch (e) {
     toast.add({ title: "Gagal memuat analitik.", color: "red" });
   } finally {
@@ -79,6 +107,64 @@ definePageMeta({
             ></div>
           </div>
         </div>
+      </div>
+
+      <div
+        v-if="prereq"
+        class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden mb-6"
+      >
+        <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 class="font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-1.5">
+              <Icon name="material-symbols:hub" class="w-5 h-5 text-green-600" />
+              Peta Prasyarat Otomatis
+            </h3>
+            <p class="text-xs text-gray-500 mt-0.5">{{ prereq.method }}</p>
+            <p class="text-xs text-gray-400 mt-0.5">
+              Diturunkan dari isi bagian — guru tidak mengisi apa pun. Bersifat saran, tidak mengunci akses.
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-1.5 text-xs">
+            <span class="px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300">
+              rujukan judul: {{ prereq.source_counts?.reference || 0 }}
+            </span>
+            <span class="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+              kemiripan isi: {{ prereq.source_counts?.similarity || 0 }}
+            </span>
+            <span class="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+              urutan posisi: {{ prereq.source_counts?.position || 0 }}
+            </span>
+          </div>
+        </div>
+
+        <div v-if="prereqRows.length === 0" class="p-6 text-center text-gray-400 text-sm">
+          Belum ada prasyarat yang bisa diturunkan dari konten materi ini.
+        </div>
+
+        <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
+          <li v-for="s in prereqRows" :key="s.section_id" class="px-4 py-3">
+            <p class="text-sm font-medium text-gray-800 dark:text-gray-100">{{ s.title }}</p>
+            <ul class="mt-1.5 space-y-1">
+              <li
+                v-for="p in s.prerequisites"
+                :key="p.section_id + '-' + p.source"
+                class="flex flex-wrap items-center gap-2 text-xs"
+              >
+                <span class="px-1.5 py-0.5 rounded font-medium" :class="sourceClass(p.source)">
+                  {{ sourceLabel(p.source) }}
+                </span>
+                <span class="text-gray-700 dark:text-gray-200">
+                  {{ p.title }}
+                  <span
+                    v-if="p.material_id && p.material_id !== prereq.material_id"
+                    class="text-gray-400"
+                  >· {{ p.material_title }}</span>
+                </span>
+                <span class="text-gray-400 italic">{{ p.rationale }}</span>
+              </li>
+            </ul>
+          </li>
+        </ul>
       </div>
 
       <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">

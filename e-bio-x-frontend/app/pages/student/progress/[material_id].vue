@@ -129,7 +129,8 @@
             </div>
             <p class="text-xs text-gray-400 mt-2">
               Angka penguasaan di bawah adalah gabungan jawaban kuis, soal interaktif, dan latihan;
-              rincian per sumber ada di tiap bagian. Penanda kuning hanya saran urutan belajar —
+              rincian per sumber ada di tiap bagian. Penanda kuning adalah prasyarat yang dihitung
+              <strong>otomatis</strong> dari isi bagian (bukan diisi guru) — hanya saran urutan belajar,
               bagian tetap bisa dibuka.
             </p>
           </div>
