@@ -148,89 +148,125 @@ check('tetap ada minimal satu alasan (fallback)',
       len(got) >= 1, f'got {got}')
 
 print("\n===== _difficulty_accuracy_material (bug #2) =====")
-# Monkeypatch the query objects so the bucketing logic can be exercised
-# offline. MaterialSection is deliberately NOT stubbed: the old code
-# called MaterialSection.query.get() and would raise here, which is
-# exactly the regression we want to be unable to hide.
+# Kontrak BARU: bucket ditentukan oleh TINGKAT TERUKUR
+# (question_difficulty_service.interactive_batch), BUKAN oleh label di
+# content.data. Default 'medium' untuk konten tanpa label sudah dihapus;
+# soal yang belum cukup bukti masuk `unmeasured`, tidak ditebak tingkatnya.
+from src.services import question_difficulty_service as qds
 
 
-class _FakeQuery:
+class _Rows:
     def __init__(self, rows):
         self._rows = rows
-
-    def filter_by(self, **kw):
-        return self
 
     def all(self):
         return self._rows
 
-    def get(self, pk):
-        return _CONTENTS.get(pk)
+
+class _SAQuery:
+    def __init__(self, mine, all_rows):
+        self._mine = mine
+        self._all = all_rows
+
+    def filter_by(self, **kw):
+        return _Rows(self._mine)
+
+    def filter(self, *a, **kw):
+        return _Rows(self._all)
 
 
-class _FakeAnswer:
-    def __init__(self, content_id, is_correct):
+class _FakeAnswerRow:
+    def __init__(self, section_id, content_id, question_index, is_correct):
+        self.section_id = section_id
         self.content_id = content_id
+        self.question_index = question_index
         self.is_correct = is_correct
+        self.student_id = 1
+        self.answered_at = None
+        self.id = 0
 
 
-class _FakeContent:
-    def __init__(self, data):
-        self.data = data
-
-
-_CONTENTS = {
-    1: _FakeContent({'difficulty': 'easy', 'question': 'q1'}),
-    2: _FakeContent({'difficulty': 'sulit', 'question': 'q2'}),
-    3: _FakeContent({'difficulty': '2', 'question': 'q3'}),
-    4: _FakeContent({'level': 2, 'content': 'Heading 2'}),
-    5: _FakeContent({'level': 3, 'content': 'Heading 3'}),
-    6: _FakeContent({'question': 'tanpa difficulty'}),
-}
-
-_ANSWERS = [
-    _FakeAnswer(1, True),    # easy, benar
-    _FakeAnswer(1, False),   # easy, salah
-    _FakeAnswer(2, False),   # hard, salah
-    _FakeAnswer(3, True),    # numerik 2 -> medium, benar
-    _FakeAnswer(4, True),    # heading 2 -> HARUS bukan bucket '2'
-    _FakeAnswer(5, True),    # heading 3 -> HARUS bukan bucket '3'
-    _FakeAnswer(6, False),   # tanpa field -> default medium
+_MINE = [
+    _FakeAnswerRow(100, 10, 0, True),   # slot terukur easy, benar
+    _FakeAnswerRow(100, 10, 1, False),  # slot terukur easy, salah
+    _FakeAnswerRow(100, 11, 0, False),  # slot terukur hard, salah
+    _FakeAnswerRow(100, 12, 0, True),   # slot belum cukup bukti
 ]
 
-_orig_answers, _orig_contents = an.StudentAnswer, an.MaterialContent
-an.StudentAnswer = type('S', (), {'query': _FakeQuery(_ANSWERS)})()
-an.MaterialContent = type('M', (), {'query': _FakeQuery(_ANSWERS)})()
+# Peta hasil ukur yang seharusnya dipakai fungsi ini.
+_READY_EASY = {'status': 'READY', 'label': 'easy', 'n': 40, 'p': 0.8,
+               'margin': 0.1, 'near_boundary': False}
+_READY_HARD = {'status': 'READY', 'label': 'hard', 'n': 40, 'p': 0.2,
+               'margin': 0.1, 'near_boundary': False}
+_NOT_READY = {'status': 'INSUFFICIENT_DATA', 'label': None, 'n': 3, 'p': None,
+              'margin': None, 'near_boundary': False}
+_FAKE_OBSERVED = {
+    (100, 10, 0): _READY_EASY,
+    (100, 10, 1): _READY_EASY,
+    (100, 11, 0): _READY_HARD,
+    (100, 12, 0): _NOT_READY,
+}
+
+
+def _fake_sa(mine, all_rows):
+    return type('S', (), {'query': _SAQuery(mine, all_rows), 'material_id': None})()
+
+
+_orig_sa = an.StudentAnswer
+_orig_ia = qds.interactive_batch
+an.StudentAnswer = _fake_sa(_MINE, _MINE)
+qds.interactive_batch = lambda rows, exclude_student_id=None: dict(_FAKE_OBSERVED)
 try:
     res = an._difficulty_accuracy_material(1, 1)
 finally:
-    an.StudentAnswer, an.MaterialContent = _orig_answers, _orig_contents
+    an.StudentAnswer = _orig_sa
+    qds.interactive_batch = _orig_ia
 
-check('easy terhitung dan akurasinya benar',
+check('tingkat terukur easy dipakai apa adanya',
       res.get('easy', {}).get('total') == 2
-      and res['easy']['accuracy'] == 50.0, f'got {res.get("easy")}')
-check('sulit dinormalkan ke bucket "hard"',
+      and res['easy']['accuracy'] == 50.0
+      and res['easy']['basis'] == 'terukur',
+      f'got {res.get("easy")}')
+check('tingkat terukur hard dipakai apa adanya',
       res.get('hard', {}).get('total') == 1
       and res['hard']['accuracy'] == 0.0, f'got {res.get("hard")}')
-check('tingkat numerik "2" masuk bucket medium',
-      res.get('medium', {}).get('total') == 4,
-      f'got total={res.get("medium", {}).get("total")} '
-      f'(konten 3 + heading 4,5 + konten 6 tanpa difficulty)')
-check('BUG LAMA: heading level TIDAK lagi jadi bucket tersendiri',
-      '2' not in res and '3' not in res, f'keys={sorted(res)}')
-check('hanya kunci kanonik yang muncul',
-      all(k in ('easy', 'medium', 'hard') for k in res), f'keys={sorted(res)}')
-check('total seluruh bucket = jumlah jawaban',
-      sum(v['total'] for v in res.values()) == len(_ANSWERS),
-      f'{sum(v["total"] for v in res.values())} vs {len(_ANSWERS)}')
+check('soal belum cukup bukti masuk `unmeasured`, bukan medium',
+      res.get('unmeasured', {}).get('total') == 1
+      and res.get('unmeasured', {}).get('basis') == 'belum-cukup-bukti',
+      f'got {res.get("unmeasured")}')
+check('BUG LAMA: tidak ada default "medium" yang dikarang',
+      'medium' not in res, f'keys={sorted(res)}')
+check('hanya kunci kanonik + unmeasured yang muncul',
+      all(k in ('easy', 'medium', 'hard', 'unmeasured') for k in res),
+      f'keys={sorted(res)}')
+check('total seluruh bucket = jumlah jawaban siswa',
+      sum(v['total'] for v in res.values()) == len(_MINE),
+      f'{sum(v["total"] for v in res.values())} vs {len(_MINE)}')
 
-# Empty input must not invent buckets.
-_orig_answers = an.StudentAnswer
-an.StudentAnswer = type('S', (), {'query': _FakeQuery([])})()
+# Semua slot belum cukup bukti -> hanya `unmeasured`, tanpa bucket tingkat.
+_orig_sa = an.StudentAnswer
+_orig_ia = qds.interactive_batch
+an.StudentAnswer = _fake_sa(_MINE, _MINE)
+qds.interactive_batch = lambda rows, exclude_student_id=None: {
+    (100, 10, 0): _NOT_READY, (100, 10, 1): _NOT_READY,
+    (100, 11, 0): _NOT_READY, (100, 12, 0): _NOT_READY}
 try:
-    check('tidak ada jawaban -> hasil kosong', an._difficulty_accuracy_material(1, 1) == {})
+    res_all_unmeasured = an._difficulty_accuracy_material(1, 1)
 finally:
-    an.StudentAnswer = _orig_answers
+    an.StudentAnswer = _orig_sa
+    qds.interactive_batch = _orig_ia
+check('semua belum cukup bukti -> tidak ada bucket tingkat sama sekali',
+      set(res_all_unmeasured) == {'unmeasured'},
+      f'keys={sorted(res_all_unmeasured)}')
+
+# Tidak ada jawaban sama sekali -> hasil kosong (tanpa bucket).
+_orig_sa = an.StudentAnswer
+an.StudentAnswer = _fake_sa([], [])
+try:
+    check('tidak ada jawaban -> hasil kosong',
+          an._difficulty_accuracy_material(1, 1) == {})
+finally:
+    an.StudentAnswer = _orig_sa
 
 print("\n===== metadata *_attempted di feature row =====")
 from src.ml import feature_service as fs

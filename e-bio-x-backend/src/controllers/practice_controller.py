@@ -27,11 +27,20 @@ from datetime import datetime
 from src.config.database import db
 from src.models.material import Material
 from src.models.material_section import MaterialSection
+from src.models.material_content import MaterialContent
 from src.models.question_bank import QuestionBank
 from src.models.question_bank_option import QuestionBankOption
+from src.models.student_answer import StudentAnswer
 from src.services import practice_bank_service as practice
 from src.services import student_practice_service as spractice
-from src.services.learning_analytics_service import student_can_access_material
+from src.services import question_difficulty_service as qds
+from src.ml import ml_config as cfg
+from src.services.learning_analytics_service import (
+    student_can_access_material,
+    teacher_materials,
+    difficulty_label,
+    normalize_difficulty,
+)
 from src.controllers.quiz_controller import (
     _cur_user,
     _is_teacher,
@@ -355,8 +364,9 @@ def get_student_practice_questions(material_id, section_id):
         return err
     material, section = ctx
 
+    entries, session = spractice.session_for_section(material.id, section.id, user)
     items = spractice.approved_for_section(section.id)
-    served = items[:spractice.MAX_SERVED]
+    served = entries[:spractice.MAX_SERVED]
     stats = spractice.practice_stats(user.id, material.id).get(
         section.id, {'answered': 0, 'correct': 0, 'attempts': 0})
 
@@ -368,16 +378,27 @@ def get_student_practice_questions(material_id, section_id):
         message = (f'Bagian ini punya {len(items)} soal latihan; '
                    f'{len(served)} yang ditampilkan sekaligus.')
 
+    questions = [
+        spractice.question_for_student(
+            e['bq'],
+            difficulty=e['label'],
+            difficulty_basis=e['basis'],
+            difficulty_note=e['note'],
+        ) for e in served
+    ]
+
     return jsonify({
         'material_id': material.id,
         'section_id': section.id,
         'section_title': section.title,
-        'questions': [spractice.question_for_student(bq) for bq in served],
+        'questions': questions,
         'total_available': len(items),
         'total_served': len(served),
         'practice_answered': stats['answered'],
         'practice_correct': stats['correct'],
         'message': message,
+        # Sesi adaptif: urutan + rumus pemilihan sasaran selalu ikut dikirim.
+        'session': session,
     }), 200
 
 
@@ -432,3 +453,161 @@ def submit_student_practice_answer(material_id, section_id):
         'practice_correct': stats['correct'],
     })
     return jsonify(payload), 200
+
+
+@jwt_required()
+def get_teacher_difficulty_observed():
+    """Analisis tingkat soal otomatis dari performa (Fase 3f), cakupan guru.
+
+    Mengembalikan dua sumber berdampingan untuk tiap soal dalam cakupan:
+
+    - `declared_*`  : label guru/deklarasi (apa yang ditulis saat soal dibuat)
+    - `observed`    : label terukur dari p-value jawaban siswa lintas kelas,
+                      lengkap dengan n, p, selisih (±), dan `near_boundary`
+
+    Label guru tidak pernah ditimpa oleh label terukur; keduanya dikirim
+    berdampingan supaya pembaca bisa melihat persis sumber mana yang
+    dipakai. Soal dengan n < MIN_DIFFICULTY_SAMPLE berstatus
+    INSUFFICIENT_DATA: tidak ada label yang diklaim.
+
+    Dua jenis soal yang dianalisis: soal bank (question_bank) dan soal
+    interaktif (student_answers per content + question_index). Keduanya
+    diukur dari data yang benar-benar ada, bukan dari teks soalnya.
+    """
+    user = _cur_user()
+    if not _is_teacher(user):
+        return jsonify({'error': 'Akses khusus guru'}), 403
+
+    filters = {}
+    raw_material = request.args.get('material_id')
+    if raw_material:
+        try:
+            filters['material_id'] = int(raw_material)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'material_id tidak valid'}), 400
+
+    materials = teacher_materials(filters, teacher_id=user.id)
+    material_ids = [m.id for m in materials]
+    material_by_id = {m.id: m for m in materials}
+    if not material_ids:
+        return jsonify({
+            'items': [],
+            'counts': {'total': 0, 'observed_ready': 0, 'observed_insufficient': 0},
+            'rules': _difficulty_rules(),
+            'message': 'Belum ada materi dalam cakupan.',
+        }), 200
+
+    sections = MaterialSection.query.filter(
+        MaterialSection.material_id.in_(material_ids)).all()
+    section_ids = [s.id for s in sections]
+    section_by_id = {s.id: s for s in sections}
+    if not section_ids:
+        return jsonify({
+            'items': [],
+            'counts': {'total': 0, 'observed_ready': 0, 'observed_insufficient': 0},
+            'rules': _difficulty_rules(),
+            'message': 'Materi belum punya bagian.',
+        }), 200
+
+    items = []
+
+    # --- 1. soal bank (practice), semua status ---
+    bank_rows = QuestionBank.query.filter(
+        QuestionBank.section_id.in_(section_ids)).order_by(QuestionBank.id).all()
+    bank_observed = qds.observed_bank_batch([b.id for b in bank_rows])
+    for bq in bank_rows:
+        section = section_by_id.get(bq.section_id)
+        material = material_by_id.get(section.material_id) if section else None
+        obs = bank_observed.get(bq.id) or qds.empty_observed(bq.id)
+        declared_canon = normalize_difficulty(bq.difficulty)
+        items.append({
+            'kind': 'bank',
+            'question_id': bq.id,
+            'status': bq.status,
+            'question_text': bq.question_text,
+            'section_id': bq.section_id,
+            'section_title': section.title if section else None,
+            'material_id': material.id if material else None,
+            'material_title': material.title if material else None,
+            'declared_difficulty': bq.difficulty,
+            'declared_label': difficulty_label(declared_canon) if declared_canon else '',
+            'observed': obs,
+            'observed_note': qds.observed_note(obs),
+        })
+
+    # --- 2. soal interaktif (student_answers per content + question_index) ---
+    ia_rows = StudentAnswer.query.filter(
+        StudentAnswer.section_id.in_(section_ids)).all()
+    if ia_rows:
+        ia_observed = qds.interactive_batch(ia_rows)
+        content_ids = {r.content_id for r in ia_rows}
+        contents = {c.id: c for c in MaterialContent.query.filter(
+            MaterialContent.id.in_(content_ids)).all()}
+        counts_by_slot = {}
+        for r in ia_rows:
+            slot = qds.interactive_slot_key(r)
+            counts_by_slot.setdefault(slot, 0)
+            counts_by_slot[slot] += 1
+        for slot, obs in ia_observed.items():
+            section_id, content_id, q_index = slot
+            section = section_by_id.get(section_id)
+            material = material_by_id.get(section.material_id) if section else None
+            content = contents.get(content_id)
+            data = content.data if content and isinstance(content.data, dict) else {}
+            declared_canon = normalize_difficulty(data.get('difficulty'))
+            preview = (data.get('question') or data.get('text') or data.get('prompt')
+                       or (content.type if content else None) or '')
+            items.append({
+                'kind': 'interactive',
+                'content_id': content_id,
+                'question_index': q_index,
+                'status': 'ANSWERED',
+                'question_text': str(preview)[:200],
+                'section_id': section_id,
+                'section_title': section.title if section else None,
+                'material_id': material.id if material else None,
+                'material_title': material.title if material else None,
+                'declared_difficulty': (data.get('difficulty')
+                                        if isinstance(data, dict) else None),
+                'declared_label': difficulty_label(declared_canon) if declared_canon else '',
+                'observed': obs,
+                'observed_note': qds.observed_note(obs),
+                'answered_rows': counts_by_slot.get(slot, 0),
+            })
+
+    items.sort(key=lambda it: (
+        it.get('material_id') or 0, it.get('section_id') or 0,
+        0 if it['kind'] == 'bank' else 1, it.get('question_id') or 0))
+
+    ready = sum(1 for it in items if it['observed'].get('status') == 'READY')
+    insufficient = len(items) - ready
+
+    return jsonify({
+        'items': items,
+        'counts': {
+            'total': len(items),
+            'observed_ready': ready,
+            'observed_insufficient': insufficient,
+            'bank': sum(1 for it in items if it['kind'] == 'bank'),
+            'interactive': sum(1 for it in items if it['kind'] == 'interactive'),
+        },
+        'rules': _difficulty_rules(),
+    }), 200
+
+
+def _difficulty_rules():
+    """Aturan hitung yang dipakai endpoint ini, ikut dikirim biar bisa ditelusuri."""
+    return {
+        'method': ('p-value: fraksi benar dari siswa BERBEDA yang mengerjakan '
+                   '(jawaban pertama per siswa), dihitung global lintas kelas.'),
+        'p_easy': cfg.DIFFICULTY_P_EASY,
+        'p_hard': cfg.DIFFICULTY_P_HARD,
+        'min_sample': cfg.MIN_DIFFICULTY_SAMPLE,
+        'margin_z': cfg.DIFFICULTY_MARGIN_Z,
+        'near_boundary': ('Rentang p ± margin memotong garis 0.40/0.70 → ditandai '
+                          '"dekat batas", bukan dianggap pasti.'),
+        'leave_one_out': ('Saat menilai satu siswa (sesi latihan), jawaban siswa '
+                          'itu sendiri dikeluarkan dari hitungan.'),
+        'declared_note': ('Label guru tidak pernah ditimpa; label terukur hidup '
+                          'bersamanya dengan sumbernya masing-masing.'),
+    }

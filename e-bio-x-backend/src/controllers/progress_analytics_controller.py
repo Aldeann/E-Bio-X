@@ -551,10 +551,11 @@ def get_teacher_analytics_difficulty():
     filters = _filters_from_args()
     materials = analytics.teacher_materials(filters, teacher_id=teacher.id)
     student_ids = analytics.teacher_student_ids(teacher.id)
-    agg = {'interactive': {}, 'quiz': {}}
+    agg = {'interactive': {}, 'quiz': {}, 'unclassified_interactive': 0}
     for m in materials:
         quiz_ids = [q.id for q in analytics.material_quizzes(m.id)]
         diff = analytics.difficulty_analytics(m.id, teacher.id, quiz_ids=quiz_ids, student_ids=student_ids)
+        agg['unclassified_interactive'] += diff.get('unclassified_interactive', 0)
         for level, bucket in diff['interactive'].items():
             b = agg['interactive'].setdefault(level, {'total': 0, 'correct': 0})
             b['total'] += bucket['total']

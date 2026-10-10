@@ -177,6 +177,7 @@ const navLinks = computed(() => {
   if (role.value === "teacher") {
     links.push({ to: "/teacher/question-bank", icon: "material-symbols:database", label: "Bank Soal" });
     links.push({ to: "/teacher/practice", icon: "material-symbols:fitness_center", label: "Latihan Bagian" });
+    links.push({ to: "/teacher/difficulty", icon: "material-symbols:bar-chart", label: "Analisis Tingkat" });
   }
   links.push({ to: forumLink.value, icon: "mdi:forum-outline", label: "Forum" });
   if (role.value === "teacher") {

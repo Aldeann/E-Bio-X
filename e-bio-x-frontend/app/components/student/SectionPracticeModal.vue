@@ -34,11 +34,43 @@
           </div>
 
           <template v-else>
+            <!-- banner sesi adaptif -->
+            <div
+              v-if="session && session.basis_text"
+              class="rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 p-3 mb-4"
+            >
+              <p class="text-xs font-semibold text-indigo-700 dark:text-indigo-300 flex items-center gap-1">
+                <Icon name="material-symbols:auto-awesome" class="w-4 h-4" />
+                Sesi latihan adaptif
+              </p>
+              <p class="text-xs text-gray-700 dark:text-gray-300 mt-1">{{ session.basis_text }}</p>
+              <div v-if="session.target_level" class="flex flex-wrap gap-1 mt-2 text-[11px]">
+                <span class="px-1.5 py-0.5 rounded bg-white/70 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
+                  Sasaran: {{ labelId(session.target_level) }}
+                </span>
+                <span class="px-1.5 py-0.5 rounded bg-white/70 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+                  Komposisi: 60% sasaran · 30% di bawah · 10% di atas
+                </span>
+              </div>
+              <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2">{{ session.note }}</p>
+            </div>
+
             <!-- question -->
             <div v-if="current">
               <div class="flex items-center gap-2 mb-2 text-xs text-gray-500">
                 <span>Soal {{ index + 1 }} dari {{ questions.length }}</span>
-                <span class="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 capitalize">{{ current.difficulty }}</span>
+                <span
+                  class="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800"
+                  :title="current.difficulty_note || ''"
+                >
+                  {{ labelId(current.difficulty) }}<span
+                    v-if="current.difficulty_basis === 'observed'"
+                    class="text-green-600 dark:text-green-400"
+                  > · terukur</span><span
+                    v-else-if="current.difficulty_basis === 'declared'"
+                    class="text-gray-400"
+                  > · label guru</span>
+                </span>
                 <span class="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800">{{ current.points }} poin</span>
               </div>
               <p class="text-sm font-medium text-gray-800 dark:text-gray-100 mb-3">
@@ -163,6 +195,7 @@ const token = useCookie("access_token").value;
 const toast = useToast();
 
 const questions = ref([]);
+const session = ref(null);
 const emptyMessage = ref("Belum ada soal latihan yang disetujui guru untuk bagian ini.");
 const index = ref(0);
 const selected = ref(null);
@@ -174,6 +207,10 @@ const error = ref("");
 const summary = ref({ answered: 0, correct: 0 });
 
 const current = computed(() => questions.value[index.value] || null);
+
+// Kunci kanonik dari backend -> label Indonesia yang dibaca siswa.
+const LABEL_ID = { easy: "mudah", medium: "sedang", hard: "sulit" };
+const labelId = (value) => LABEL_ID[value] || value || "";
 
 const optionClass = (opt) => {
   if (!feedback.value) {
@@ -252,6 +289,7 @@ const load = async () => {
       { headers: { Authorization: `Bearer ${token}` } }
     );
     questions.value = res.questions || [];
+    session.value = res.session || null;
     emptyMessage.value = res.message || emptyMessage.value;
     summary.value = {
       answered: res.practice_answered || 0,
@@ -260,6 +298,7 @@ const load = async () => {
     if (res.message && questions.value.length) toast.add({ title: res.message, color: "amber" });
   } catch (e) {
     questions.value = [];
+    session.value = null;
     loadError.value = (e && e.data && e.data.error) || "Latihan tidak dapat dimuat.";
   } finally {
     loading.value = false;

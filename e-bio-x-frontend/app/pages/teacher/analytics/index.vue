@@ -119,18 +119,22 @@
             <div>
               <p class="text-xs font-semibold text-gray-500 mb-2">Soal Interaktif</p>
               <div v-for="(v, k) in difficulty.interactive" :key="'i-' + k" class="flex items-center gap-3 mb-1.5">
-                <span class="w-16 text-sm capitalize text-gray-600 dark:text-gray-300">{{ k }}</span>
+                <span class="w-16 text-sm text-gray-600 dark:text-gray-300">{{ diffLabel(k) }}</span>
                 <div class="flex-1 h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                   <div class="h-full rounded-full bg-amber-500" :style="{ width: (v.accuracy || 0) + '%' }"></div>
                 </div>
                 <span class="text-xs font-semibold w-10 text-right">{{ v.accuracy || 0 }}%</span>
               </div>
               <p v-if="Object.keys(difficulty.interactive || {}).length === 0" class="text-xs text-gray-400">Belum ada.</p>
+              <p v-if="difficulty.unclassified_interactive" class="text-[11px] text-gray-400 mt-1">
+                {{ difficulty.unclassified_interactive }} jawaban interaktif tanpa tingkat tidak dihitung —
+                tidak diberi tingkat "sedang" secara diam-diam.
+              </p>
             </div>
             <div>
               <p class="text-xs font-semibold text-gray-500 mb-2">Kuis</p>
               <div v-for="(v, k) in difficulty.quiz" :key="'q-' + k" class="flex items-center gap-3 mb-1.5">
-                <span class="w-16 text-sm capitalize text-gray-600 dark:text-gray-300">{{ k }}</span>
+                <span class="w-16 text-sm text-gray-600 dark:text-gray-300">{{ diffLabel(k) }}</span>
                 <div class="flex-1 h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                   <div class="h-full rounded-full bg-blue-500" :style="{ width: (v.accuracy || 0) + '%' }"></div>
                 </div>
@@ -426,6 +430,12 @@ const statusClass = (s) => {
     selesai: "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-400",
   };
   return map[s] || map.belum_dimulai;
+};
+// Kunci tingkat datang sebagai kunci kanonik (easy/medium/hard) untuk soal
+// interaktif dan bisa tetap mentah untuk kuis. Tampilkan selalu Indonesia.
+const diffLabel = (k) => {
+  const map = { easy: "Mudah", mudah: "Mudah", medium: "Sedang", sedang: "Sedang", hard: "Sulit", sulit: "Sulit" };
+  return map[String(k).toLowerCase()] || k;
 };
 const masteryColor = (label) => {
   const map = { "Baik Sekali": "text-green-600", Baik: "text-emerald-600", Cukup: "text-amber-500", Kurang: "text-red-500" };

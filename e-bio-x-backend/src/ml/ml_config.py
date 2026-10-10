@@ -168,6 +168,34 @@ REC_SECTION_HINTS = 2            # unranked sections reported as "belum cukup bu
 # dengan `score=None` di atas.
 REC_SECTION_UNMET_PREREQ_FACTOR = 0.5
 
+# --- Analisis tingkat soal otomatis dari performa (Fase 3f) ---------
+# Tingkat kesulitan soal TIDAK ditebak dari teks dan tidak menunggu label
+# guru: diukur dari p-value (fraksi benar) jawaban nyata. Aturannya:
+#   - p >= DIFFICULTY_P_EASY                    -> mudah
+#   - p <  DIFFICULTY_P_HARD                    -> sulit
+#   - selain itu                                -> sedang
+#   - butuh >= MIN_DIFFICULTY_SAMPLE siswa BERBEDA (dihitung sekali per
+#     siswa, memakai jawaban pertama; setelah leave-one-out untuk tampilan
+#     siswa) sebelum berani memberi label; di bawah ambang -> INSUFFICIENT_DATA,
+#     tidak ada label yang diklaim.
+#   - selisih margin (CI 95%, aproksimasi normal) selalu dilaporkan; bila
+#     rentang p +/- margin memotong garis batas, label ditandai "dekat
+#     batas", bukan dianggap pasti.
+DIFFICULTY_P_EASY = 0.70
+DIFFICULTY_P_HARD = 0.40
+MIN_DIFFICULTY_SAMPLE = 20
+DIFFICULTY_MARGIN_Z = 1.96
+
+# --- Sesi latihan adaptif (Fase 3f) ---------------------------------
+# Komposisi satu sesi latihan: 60% tingkat sasaran (terlemah siswa), 30%
+# satu tingkat di bawah sasaran (fondasi), 10% satu tingkat di atas
+# (tantangan). Sifatnya mengatur URUTAN soal yang SUDAH ADA di bagian itu
+# (hanya status APPROVED); tidak ada soal baru yang dibuat di sini.
+SESSION_MIX_TARGET = 0.60
+SESSION_MIX_BELOW = 0.30
+SESSION_MIX_ABOVE = 0.10
+SESSION_LEVEL_ORDER = ['easy', 'medium', 'hard']
+
 # --- Recommendation closed-loop evaluation -----------------------
 # The recommendation events (clicked_at / completed_at) are already
 # recorded by recommendation.mark_clicked / mark_completed. These

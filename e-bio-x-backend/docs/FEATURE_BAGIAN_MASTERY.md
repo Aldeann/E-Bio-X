@@ -766,7 +766,139 @@ menjaga skema, referensi bagian, rentang skor, dan bukti yang cukup untuk setiap
 
 ---
 
-## 9. Cara demo (alur yang bisa ditunjukkan)
+## 9. Fase 3f — analisis tingkat soal otomatis & latihan adaptif
+
+Tujuan: tingkat kesulitan soal ditentukan **dari performa siswa yang benar-benar
+mengerjakan**, bukan dari teks soal dan bukan dengan menunggu label guru; lalu sesi
+latihan menyusun urutan soal memakai tingkat itu. Semua angka menyebut sumbernya, dan
+soal yang belum cukup bukti tidak diberi tingkat apa pun.
+
+### 9.1 Kenapa tidak ditebak dari teks
+
+Menebak tingkat dari kata-kata soal (panjang kalimat, istilah, kata "mudah"/"sulit")
+tidak bisa dipertanggungjawabkan: tidak ada label acuan untuk mengukur tebakan itu, jadi
+hasilnya tidak bisa dibantah maupun dipercaya. Yang dipakai adalah **p-value**: fraksi
+siswa BERBEDA yang menjawab benar satu soal. Soal yang dijawab benar oleh hampir semua
+siswa memang mudah; yang dijawab benar oleh sedikit siswa memang sulit. Ukuran ini berasal
+dari data nyata dan bisa dihitung ulang siapa pun.
+
+Kode: `src/services/question_difficulty_service.py` (murni - tanpa jaringan dan tanpa LLM,
+sehingga bisa diuji unit). Tidak ada satu pun angka di modul ini yang berasal dari teks soal.
+
+### 9.2 Aturan ukur (disepakati)
+
+- Ambang tingkat (`src/ml/ml_config.py`): `p >= 0.70` -> **mudah**, `0.40 <= p < 0.70`
+  -> **sedang**, `p < 0.40` -> **sulit** (kunci kanonik `easy`/`medium`/`hard`).
+- **Sampel minimum 20 siswa berbeda** (`MIN_DIFFICULTY_SAMPLE`). Di bawah itu statusnya
+  `INSUFFICIENT_DATA` dan **tidak ada label yang diklaim** - lebih baik diam daripada
+  menebak dari 1-2 orang. Ambang ini tidak diturunkan demi demo.
+- **Selang kepercayaan 95%** (`DIFFICULTY_MARGIN_Z = 1.96`) selalu ikut ditampilkan. Bila
+  `p +/- margin` memotong garis 0.40/0.70, soal ditandai **"dekat batas"**: pada kelas
+  sekecil 30 siswa label memang bisa bergeser, dan itu ditunjukkan, bukan disembunyikan.
+- **Satu siswa dihitung sekali** memakai jawaban **pertama** per soal. Jawaban ulang sudah
+  dibantu umpan balik, jadi memakai yang terakhir membuat soal tampak lebih mudah daripada
+  kenyataannya.
+- **Leave-one-out (LOO):** saat menilai seorang siswa, jawabannya sendiri dikeluarkan dari
+  hitungan. Kalau tidak, siswa yang salah ikut menurunkan p soal lalu soal itu dipakai
+  menyebut dia lemah - hakim merangkap terdakwa.
+- Label terukur **hidup bersama** label guru dan **tidak pernah menimpanya**; keduanya
+  dikirim berdampingan supaya pembaca tahu label mana yang sedang dipakai.
+
+### 9.3 Dua jenis soal yang diukur
+
+- **Soal bank** (latihan): dibaca dari `practice_answers` per `bank_question_id`.
+- **Soal interaktif**: dibaca dari `student_answers` per slot
+  `(section_id, content_id, question_index)` lewat `interactive_slot_key`.
+
+Keduanya diukur dari jawaban nyata. `MaterialContent.data['difficulty']` **tidak** lagi
+dipakai untuk menentukan bucket; ia hanya dipakai sebagai label deklarasi cadangan bila
+performa belum cukup.
+
+### 9.4 Diagnosis per bagian kini memakai tingkat TERUKUR
+
+`learning_analytics_service._difficulty_accuracy_material` tidak lagi mengelompokkan
+jawaban berdasarkan label di konten. Ia memanggil `interactive_batch` (LOO) lalu memasukkan
+tiap jawaban siswa ke bucket **tingkat terukur**; soal yang belum cukup bukti masuk bucket
+terpisah `unmeasured` dengan basis `belum-cukup-bukti`. Dua hal yang dihapus dari kode lama:
+
+- default `'medium'` yang secara diam-diam memberi tingkat pada konten tanpa label, dan
+- fallback `content.data.get('level')` (level heading) yang sempat menjadi bucket palsu.
+
+Konsekuensi yang perlu diketahui: fitur ML `easy_accuracy`/`medium_accuracy`/`hard_accuracy`
+(atau `*_attempted`) kini berisi angka yang berbeda dari sebelumnya. Skema `FEATURES` tidak
+berubah, jadi artefak model lama tetap terbaca; nilainya baru berubah pada retrain berikutnya.
+
+### 9.5 Endpoint guru
+
+`GET /api/teacher/practice/difficulty` (khusus guru; siswa/non-guru -> 403; filter
+`?material_id=` opsional). Cakupannya materi milik guru yang meminta. Responsnya menyandingkan
+dua sumber untuk tiap soal dalam cakupan: `declared_*` (label guru) dan `observed`
+(status, n, p, margin, `near_boundary`, label) untuk soal bank maupun soal interaktif, plus
+`counts` dan blok `rules` (ambang, sampel minimum, aturan LOO) supaya angka bisa ditelusuri.
+
+### 9.6 Sesi latihan adaptif
+
+`student_practice_service.session_for_section(material_id, section_id, student)`:
+
+- Hanya soal **APPROVED** yang ikut, dan **tidak ada soal baru yang dibuat** - yang
+  diadaptasi hanyalah urutannya.
+- **Diagnosis** dihitung dari seluruh riwayat jawaban siswa (latihan **dan** soal interaktif,
+  lintas materi - sama seperti `recommendation._student_weak_difficulty`). Tiap soal diberi
+  tingkat terukur (LOO) bila cukup data, selain itu deklarasi guru. Tingkat kesulitan tidak
+  terikat topik, jadi "lemah di soal sulit" berlaku umum; yang tetap dibatasi adalah soalnya
+  (hanya soal bagian ini yang disajikan).
+- **Sasaran** = tingkat dengan akurasi terendah yang benar-benar dijawab siswa (seri dipecah
+  ke tingkat yang lebih dasar). Komposisi sesi **60% sasaran, 30% satu tingkat di bawah,
+  10% di atas**; sisa soal ikut di belakang dengan urutan id yang stabil, jadi daftar soal
+  tidak pernah berkurang dan tidak berubah-ubah tanpa sebab.
+- Responsnya menyertakan `session.basis_text` (rumus pilihan sasaran, apa adanya) dan
+  `session.basis` = `observed` | `declared` | `sequential` | `empty`. Bila siswa belum
+  punya jawaban apa pun, sasarannya `None` dan soal disajikan berurutan - sistem tidak
+  mengarang sasaran.
+- Tiap soal yang disajikan membawa `difficulty` (terukur bila ada), `declared_difficulty`
+  (label guru, selalu ikut), `difficulty_basis`, dan `difficulty_note` (kalimat sumber).
+
+### 9.7 UI
+
+- Siswa (`SectionPracticeModal.vue`): banner "Sesi latihan adaptif" berisi `basis_text`,
+  sasaran, komposisi 60/30/10, dan catatan; tiap soal menampilkan lencana tingkat dengan
+  penanda **"terukur"** atau **"label guru"** dan `difficulty_note` sebagai tooltip.
+- Guru (`pages/teacher/difficulty.vue`, tautan nav "Analisis Tingkat"): kartu aturan,
+  ringkasan `counts`, filter "Siap diukur"/"Belum cukup data", dan daftar soal dengan
+  label guru vs label terukur berdampingan (n, p, margin, "dekat batas").
+
+### 9.8 Test
+
+`test_question_difficulty.py` (**59/59**): unit murni (batas 0.70/0.40 persis, ambang
+19/20/21 siswa, margin + dekat batas, satu-siswa-sekali/jawaban-pertama, LOO mengubah
+label) dan integrasi (endpoint guru 403/200 + dua sumber berdampingan, soal ber-n<20 ->
+`INSUFFICIENT_DATA` bukan "sedang", payload soal siswa tidak menimpa label guru, urutan sesi
+menaruh soal sasaran lebih dulu untuk basis `observed` maupun `declared`, dan sesi berurutan
+tanpa riwayat jawaban). Bagian "bug #2" di `test_ml_difficulty.py` (total **67/67**) sudah
+disesuaikan ke kontrak baru: bucket dari tingkat terukur + bucket `unmeasured`, tanpa default
+"medium".
+
+### 9.9 Data demo (jujur)
+
+Dari cakupan guru demo (`guru1@ebiox.com`): **21 soal** dianalisis = 9 soal bank + 12 soal
+interaktif.
+
+- **Interaktif (12 soal):** semuanya cukup data (n 35-63, jauh di atas ambang 20). Hasil
+  ukurnya **11 mudah + 1 sedang**, sementara label guru tertulis **4 mudah, 4 sedang, 4
+  sulit** - jadi dua sumber ini memang berbeda, dan itu yang ditampilkan. Contoh kontras
+  paling tajam: bagian "Struktur Virus" ditulis guru `sulit`, tetapi terukur `mudah`
+  (p=0.778 n=63; p=0.919 n=37; p=0.838 n=37). Delapan dari 12 soal ditandai "dekat batas".
+- **Bank (9 soal):** semua berlabel guru `sedang`, tetapi **belum cukup data** (n=0) karena
+  `practice_answers` di demo masih kosong. Artinya sesi pada bagian soal bank akan
+  disajikan **berurutan** sampai ada siswa benar-benar mengerjakannya - bukan bug, memang
+  belum ada buktinya.
+- **Sesi siswa:** siswa yang sudah mengerjakan soal interaktif langsung punya sasaran
+  terukur. Contoh nyata di demo: siswa yang menjawab 12 soal interaktif dengan hasil baik
+  mendapat sasaran **mudah** dengan kalimat sumber yang menyebut n dan p soal terkait.
+
+---
+
+## 10. Cara demo (alur yang bisa ditunjukkan)
 
 1. Login sebagai guru, buka sebuah kuis, isi kolom "Bagian Materi" pada kuis, tekan
    **Terapkan bagian ke semua soal**. Lencana bagian langsung muncul di tiap soal.
@@ -798,6 +930,17 @@ menjaga skema, referensi bagian, rentang skor, dan bukti yang cukup untuk setiap
    tercatat pada baris bagian, bukan pada baris materi. Blok **"Belum bisa dinilai"** di
    bawahnya (bagian dengan < 3 jawaban) sengaja tidak punya skor — tunjukkan itu sebagai
    keputusan jujur, bukan bug.
+9. (Fase 3f) Login sebagai guru, buka menu **Analisis Tingkat**: tiap soal menampilkan
+   **label guru vs label terukur** berdampingan. Tunjukkan satu kontras nyata (mis. bagian
+   "Struktur Virus" ditulis `sulit`, terukur `mudah` dengan n dan p yang disebutkan), dan
+   perhatikan tanda **"dekat batas"** pada p yang rentangnya menyentuh ambang - itu
+   keterbatasan yang ditampilkan, bukan disembunyikan. Soal bank tanpa jawaban latihan
+   muncul sebagai **"belum cukup data"**, bukan diberi tingkat.
+   Lalu buka **Riwayat Belajar → Latihan** pada bagian yang punya soal disetujui: banner
+   **"Sesi latihan adaptif"** menuliskan sasaran dan rumusnya (`basis_text`), dan tiap soal
+   diberi lencana tingkat dengan penanda **"terukur"** atau **"label guru"**. Guru dengan
+   materi soal bank belum pernah dikerjakan siswa akan melihat sesi disajikan **berurutan** -
+   sebutkan itu sebagai perilaku jujur (belum ada bukti), bukan kegagalan fitur.
 
 Data demo sudah punya 2 draf AI yang menunggu review pada bagian "Bagaimana Struktur Virus?"
 (materi `[DEMO] VIRUS`), jadi langkah review bisa langsung ditunjukkan tanpa memanggil AI.
@@ -817,7 +960,7 @@ yang sudah bersih tidak berubah di tengah presentasi.
 
 ---
 
-## 9. Batasan yang perlu diketahui
+## 11. Batasan yang perlu diketahui
 
 - **Data demo sudah bertag bagian.** Soal kuis demo 89/90/91 ditautkan ke bagian lewat
   `scripts/tag_demo_quiz_sections.py` (§2.5), jadi diagnosis per bagian di materi 115/116/117

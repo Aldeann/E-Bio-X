@@ -901,32 +901,58 @@ def difficulty_label(canonical):
 
 
 def _difficulty_accuracy_material(student_id, material_id):
-    """Accuracy per difficulty for one student on one material.
+    """Akurasi per tingkat dari TINGKAT TERUKUR, bukan label guru.
 
-    Only an explicit `difficulty` field counts. `heading.level` used to be
-    read as a difficulty, which is wrong: it is an HTML heading level
-    (1-6), so headings were bucketed as "difficulty 2"/"difficulty 3"
-    while real questions were never classified at all.
+    Tingkat tiap soal interaktif diukur dari performa SEMUA siswa yang
+    mengerjakannya (p-value), dengan jawaban siswa yang sedang dinilai
+    dikeluarkan dari hitungan (leave-one-out). Jawaban pada soal yang
+    belum cukup bukti (n < MIN_DIFFICULTY_SAMPLE) TIDAK masuk bucket
+    tingkat mana pun - dihitung terpisah di `unmeasured`.
+
+    Tidak ada lagi default 'medium' untuk konten tanpa label: angka ini
+    tidak pernah mengarang tingkat kesulitan.
     """
-    rows = StudentAnswer.query.filter_by(student_id=student_id, material_id=material_id).all()
-    by_diff = {}
-    for r in rows:
-        content = MaterialContent.query.get(r.content_id)
-        diff = None
-        if content and isinstance(content.data, dict):
-            diff = normalize_difficulty(content.data.get('difficulty'))
-        if not diff:
-            diff = 'medium'      # unclassified content defaults to medium
-        bucket = by_diff.setdefault(diff, {'total': 0, 'correct': 0})
-        bucket['total'] += 1
-        if r.is_correct:
-            bucket['correct'] += 1
+    mine = StudentAnswer.query.filter_by(
+        student_id=student_id, material_id=material_id).all()
+    if not mine:
+        return {}
+
+    from src.services import question_difficulty_service as qds
+    all_rows = StudentAnswer.query.filter(
+        StudentAnswer.material_id == material_id).all()
+    observed = qds.interactive_batch(all_rows, exclude_student_id=student_id)
+
+    buckets = {level: {'total': 0, 'correct': 0}
+               for level in ('easy', 'medium', 'hard')}
+    unmeasured = {'total': 0, 'correct': 0}
+    for r in mine:
+        obs = observed.get(qds.interactive_slot_key(r)) or {}
+        label = obs.get('label') if obs.get('status') == 'READY' else None
+        if label in buckets:
+            buckets[label]['total'] += 1
+            if r.is_correct:
+                buckets[label]['correct'] += 1
+        else:
+            unmeasured['total'] += 1
+            if r.is_correct:
+                unmeasured['correct'] += 1
+
     result = {}
-    for diff, bucket in by_diff.items():
-        result[diff] = {
-            'total': bucket['total'],
-            'correct': bucket['correct'],
-            'accuracy': round(bucket['correct'] / bucket['total'] * 100, 1) if bucket['total'] else 0.0,
+    for level in ('easy', 'medium', 'hard'):
+        b = buckets[level]
+        if b['total']:
+            result[level] = {
+                'total': b['total'],
+                'correct': b['correct'],
+                'accuracy': round(b['correct'] / b['total'] * 100, 1),
+                'basis': 'terukur',
+            }
+    if unmeasured['total']:
+        result['unmeasured'] = {
+            'total': unmeasured['total'],
+            'correct': unmeasured['correct'],
+            'accuracy': round(unmeasured['correct'] / unmeasured['total'] * 100, 1),
+            'basis': 'belum-cukup-bukti',
         }
     return result
 
@@ -1336,14 +1362,21 @@ def difficulty_analytics(material_id, teacher_id, quiz_ids=None, student_ids=Non
         return {'interactive': {}, 'quiz': {}}
 
     ia = {}
+    unclassified = 0
     rows = StudentAnswer.query.filter(StudentAnswer.material_id == material_id,
                                       StudentAnswer.student_id.in_(student_ids)).all()
     for r in rows:
         content = MaterialContent.query.get(r.content_id)
         diff = None
         if content and isinstance(content.data, dict):
-            diff = content.data.get('difficulty') or content.data.get('level')
-        diff = diff or 'medium'
+            # Hanya field `difficulty` yang dihitung. `level` TIDAK dipakai:
+            # itu level heading HTML (1-6), bukan tingkat soal (bug lama).
+            diff = normalize_difficulty(content.data.get('difficulty'))
+        if not diff:
+            # Tanpa deklarasi tingkat, jangan mengarang 'medium'. Dihitung
+            # terpisah sebagai tak bertingkat, bukan dimasukkan ke bucket.
+            unclassified += 1
+            continue
         bucket = ia.setdefault(diff, {'total': 0, 'correct': 0, 'accuracy': 0.0})
         bucket['total'] += 1
         if r.is_correct:
@@ -1366,7 +1399,8 @@ def difficulty_analytics(material_id, teacher_id, quiz_ids=None, student_ids=Non
         for b in qd.values():
             b['accuracy'] = round(b['correct'] / b['answered'] * 100, 1) if b.get('answered') else 0.0
 
-    return {'interactive': ia, 'quiz': qd}
+    return {'interactive': ia, 'quiz': qd,
+            'unclassified_interactive': unclassified}
 
 
 def quiz_analysis(quiz, teacher_id):
