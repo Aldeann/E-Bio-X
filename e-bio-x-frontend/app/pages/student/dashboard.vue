@@ -229,13 +229,32 @@
                 </li>
               </ul>
 
-              <button
-                @click="openSection(s)"
-                class="mt-3 w-full px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold flex items-center justify-center gap-1"
-              >
-                <Icon name="material-symbols:play-arrow" class="w-4 h-4" />
-                Pelajari Bagian Ini
-              </button>
+              <div class="mt-3 flex flex-col gap-2">
+                <button
+                  @click="openPractice(s)"
+                  :disabled="s.practice_available === false"
+                  :title="s.practice_available === false
+                    ? 'Belum ada soal latihan yang disetujui guru untuk bagian ini.'
+                    : 'Buka sesi latihan yang menyesuaikan dengan jawabanmu.'"
+                  class="w-full px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold flex items-center justify-center gap-1"
+                >
+                  <Icon name="material-symbols:auto-awesome" class="w-4 h-4" />
+                  Latihan adaptif
+                  <span v-if="s.practice_total" class="text-[11px] font-normal opacity-90">
+                    ({{ s.practice_total }} soal)
+                  </span>
+                </button>
+                <button
+                  @click="openSection(s)"
+                  class="w-full px-3 py-2 rounded-lg border border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-700 dark:text-amber-300 text-sm font-medium flex items-center justify-center gap-1"
+                >
+                  <Icon name="material-symbols:menu-book" class="w-4 h-4" />
+                  Buka materi
+                </button>
+                <p v-if="s.practice_available === false" class="text-[11px] text-gray-500">
+                  Belum ada soal latihan yang disetujui guru untuk bagian ini.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -346,6 +365,15 @@
         </div>
       </div>
     </template>
+
+    <!-- Latihan adaptif langsung dari saran (Tahap 1): tanpa lompat halaman. -->
+    <StudentSectionPracticeModal
+      :open="practiceOpen"
+      :material-id="practiceMaterialId"
+      :section-id="practiceSectionId"
+      :section-title="practiceSectionTitle"
+      @close="closePractice"
+    />
   </div>
 </template>
 
@@ -366,6 +394,13 @@ const recommendationsLoaded = ref(false);
 const sectionRecs = ref([]);
 const rankedSectionRecs = computed(() => sectionRecs.value.filter((s) => s.ranked));
 const hintSectionRecs = computed(() => sectionRecs.value.filter((s) => !s.ranked));
+
+// Tahap 1 rekomendasi adaptif: state modal latihan yang dibuka langsung dari
+// kartu saran (tanpa pindah ke halaman materi lebih dulu).
+const practiceOpen = ref(false);
+const practiceMaterialId = ref(null);
+const practiceSectionId = ref(null);
+const practiceSectionTitle = ref("");
 
 const clusterLabelMap = {
   "High Achievement": "Pencapaian Tinggi",
@@ -484,6 +519,32 @@ const openSection = async (s) => {
   } finally {
     navigateTo(`/student/materials/${s.material_id}?section=${s.section_id}`);
   }
+};
+
+// Buka latihan adaptif langsung dari kartu saran. Klik tetap dicatat supaya
+// evaluasi saran (Fase 3e) tidak kehilangan sinyal, tetapi pencatatan yang
+// gagal tidak boleh menghalangi siswa mulai berlatih.
+const openPractice = async (s) => {
+  try {
+    await $fetch(`${config.public.backend}/api/student/recommendations/click`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: { material_id: s.material_id, section_id: s.section_id },
+    });
+  } catch (e) {
+    // diamkan: membuka latihan tidak boleh gagal karena pencatatan klik
+  }
+  practiceMaterialId.value = s.material_id;
+  practiceSectionId.value = s.section_id;
+  practiceSectionTitle.value = s.section_title;
+  practiceOpen.value = true;
+};
+
+// Setelah latihan ditutup, segarkan saran supaya angka penguasaan dan
+// prioritas ikut memperhitungkan jawaban yang barusan masuk.
+const closePractice = () => {
+  practiceOpen.value = false;
+  loadRecs();
 };
 
 const formatSeconds = (s) => {

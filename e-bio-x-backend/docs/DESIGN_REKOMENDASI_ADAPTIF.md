@@ -1,0 +1,416 @@
+# Desain: Rekomendasi Adaptif untuk Siswa
+
+Status: **sebagian terimplementasi**.
+- Tahap 1: **selesai** (lihat riwayat implementasi di bawah).
+- Tahap 2-4 dan soal jangkar: **draf desain**, belum ada kode.
+Cakupan: rekomendasi bagian (Fase 3e), sesi latihan adaptif (Fase 3f), dan
+perluasan ke fokus miskonsepsi + soal jangkar untuk pengukuran.
+
+Keputusan yang sudah diambil:
+- **Lane pengukuran: B** - jawaban latihan tetap dipakai untuk pengukuran
+  tingkat global untuk sekarang, dengan batasannya dicatat (bagian 9).
+  Soal jangkar / post-test per bagian jadi arah perbaikan.
+- **Cakupan dekat: Tahap 1 saja** - Tahap 2 menunggu keputusan lanjutan.
+
+Riwayat implementasi Tahap 1 (kode):
+- `src/ml/recommendation.py` - `recommend_sections_for_student` menambahkan
+  `practice_available` + `practice_total` ke tiap baris (skor & hint) lewat
+  satu panggilan `student_practice_service.approved_count_map`.
+- `app/pages/student/dashboard.vue` - tombol **Latihan adaptif** membuka
+  `StudentSectionPracticeModal` langsung; tombol **Buka materi** tetap ada;
+  tombol latihan dinonaktifkan dengan penjelasan bila belum ada soal APPROVED.
+- `test_section_recommendations.py` - blok `[1b]`: soal APPROVED membuat
+  latihan tersedia, soal DRAFT tidak dihitung, semua baris membawa info
+  latihan (54/54 lulus).
+
+
+Dokumen ini melengkapi `FEATURE_BAGIAN_MASTERY.md`. Ia tidak menggantinya;
+yang sudah berjalan di sana tetap jadi dasar.
+
+---
+
+## 1. Tujuan
+
+Mengubah rekomendasi dari sekadar *"bagian ini lemah"* menjadi *"sesi yang
+menyerang kelemahan spesifik, lalu menutup lingkaran dengan saran berikutnya"*,
+tanpa mengorbankan kejujuran angka.
+
+Adaptif penuh berarti menyesuaikan empat hal:
+
+1. **Bagian mana** yang perlu dikerjakan.
+2. **Tingkat soal** yang cocok.
+3. **Konsep/miskonsepsi** yang sedang jadi masalah.
+4. **Kapan** harus mengulang.
+
+Yang sudah ada: (1) dan (2). Yang ditambah: (3), lalu (4).
+
+## 2. Prinsip yang dipegang
+
+1. **Tidak mengarang.** Tidak ada data -> katakan belum bisa dinilai; jangan
+   memberi peringkat atau label palsu.
+2. **Hanya soal `APPROVED`** yang pernah disajikan ke siswa.
+3. **Tidak bocor sebelum dijawab.** Kunci jawaban *dan* label miskonsepsi tidak
+   dikirim ke klien sebelum siswa menjawab soal yang bersangkutan.
+4. **Hanya mengurutkan** soal yang sudah ada; tidak pernah membuat soal baru.
+5. **Dua lane terpisah:** lane *pengukuran* (soal sama untuk semua) dan lane
+   *remediasi* (latihan pribadi) tidak boleh saling meracuni.
+
+## 3. Baseline nyata (yang sudah berjalan)
+
+```
+Dashboard siswa
+  GET /api/student/recommendations
+    -> section_recommendations      (recommendation.recommend_sections_for_student, Fase 3e)
+       item: {material_id, section_id, section_title, status, answered, correct,
+              wrong, mastery_score, reasons, ranked, prerequisite_met, prerequisites}
+    klik -> /student/materials/<mid>?section=<sid>
+      SectionPracticeModal.vue
+        GET /api/student/practice/<mid>/sections/<sid>
+          -> session_for_section()  (student_practice_service, Fase 3f)
+             urut 60/30/10 per tingkat; target = _weakest_level()
+        POST .../answer -> grade() + record() -> PracticeAnswer
+```
+
+Data yang sudah tersedia (tanpa tabel baru):
+
+- `PracticeAnswer(student_id, material_id, section_id, bank_question_id,
+  selected_option, is_correct, attempt_no, question_snapshot, answered_at)`
+- `QuestionBank(misconception, topic, difficulty, section_id, status, source)`
+- tingkat soal terukur: `question_difficulty_service.observed_bank_batch`
+  (membaca `PracticeAnswer`; **ini sumber risiko di bagian 9**)
+- konfigurasi `ml_config`: `SESSION_MIX_TARGET/BELOW/ABOVE`,
+  `SESSION_LEVEL_ORDER`, `MIN_DIFFICULTY_SAMPLE`, `DIFFICULTY_P_EASY/HARD`,
+  `HIGH_MASTERY_CUTOFF`, `MIN_SECTION_SAMPLE`, `REC_SECTION_*`
+
+Yang belum dipakai sebagai sinyal: `QuestionBank.misconception` dan
+`PracticeAnswer.answered_at`.
+
+## 4. Alur target
+
+```
+Dashboard (Fase 3e + practice_available)
+   [Latihan adaptif]  <- langsung buka modal, tanpa lompat halaman
+   v
+Sesi (session_for_section)
+   urut 60/30/10 per tingkat
+   DI DALAM tiap tingkat: soal yang cocok miskonsepsi terlemah didahulukan
+   (label dipakai diam-diam; tidak dikirim ke klien)
+   v
+Jawab satu per satu -> umpan balik per soal (misconception muncul di sini)
+   v
+Ringkasan sesi  <- dihitung di klien dari jawaban yang sudah diterima
+   "Kamu masih sering keliru di soal ini: ..."
+   [Latihan lagi] -> sesi baru, urutan lebih fokus
+```
+
+---
+
+## 5. Tahap 1 - Satu alur + tombol langsung
+
+**Tujuan:** hapus lompatan dashboard -> halaman materi -> modal.
+
+**Status: selesai.** Rincian kode ada di riwayat implementasi pada kepala
+dokumen.
+
+### 5.1 Backend
+
+Perluas tiap item `section_recommendations` dengan dua field murah:
+
+| field | isi | sumber |
+|---|---|---|
+| `practice_available` | `bool` | `approved_count_map([...section ids...])` |
+| `practice_total` | jumlah soal APPROVED | idem |
+
+Tidak ada perhitungan berat; satu query untuk semua bagian.
+
+### 5.2 Frontend (`app/pages/student/dashboard.vue`)
+
+- Impor `SectionPracticeModal` ke dashboard.
+- Kartu bagian lemah punya dua aksi:
+  - primer **Latihan adaptif** -> buka modal (`materialId`, `sectionId`, `sectionTitle`)
+  - sekunder **Buka materi** -> `openSection(s)` seperti sekarang
+- Bila `practice_available === false`: tombol latihan `disabled` +
+  penjelasan "belum ada soal disetujui guru".
+
+### 5.3 Risiko
+
+Rendah. Menyambung dua layar yang sudah ada; tidak mengubah perhitungan.
+
+---
+
+## 6. Tahap 2 - Fokus per miskonsepsi (inti)
+
+### 6.1 Sinyal fokus
+
+Untuk pasangan (siswa, bagian), hitung dari **jawaban terakhir per soal**
+(konsisten dengan `latest_attempts`, supaya mengulang tidak menambah bukti).
+
+```python
+def focus_for_student_section(student, section, approved, by_id):
+    last = {}  # bank_question_id -> PracticeAnswer terakhir
+    for r in PracticeAnswer.query.filter_by(
+            student_id=student.id, section_id=section.id
+        ).order_by(PracticeAnswer.answered_at.asc(), PracticeAnswer.id.asc()):
+        last[r.bank_question_id] = r
+
+    agg = {}  # label miskonsepsi -> hitungan
+    for bq_id, r in last.items():
+        bq = by_id.get(bq_id)
+        label = (bq.misconception or '').strip() if bq else ''
+        if not label:                       # label kosong: jangan mengarang
+            continue
+        a = agg.setdefault(label, {'wrong': 0, 'correct': 0, 'total': 0, 'last_at': None})
+        a['total'] += 1
+        a['correct' if r.is_correct else 'wrong'] += 1
+        a['last_at'] = r.answered_at
+
+    candidates = [(lbl, a) for lbl, a in agg.items()
+                  if a['total'] >= cfg.FOCUS_MIN_SAMPLE
+                  and a['wrong'] > a['correct']]
+    candidates.sort(key=lambda kv: (-(kv[1]['wrong'] - kv[1]['correct']),
+                                    kv[1]['last_at']))
+    return candidates[0] if candidates else None
+```
+
+Aturan: satu kali salah bukan pola; tidak ada label -> tidak ada fokus; mirip
+dengan `score_section` yang menolak mengarang saat data kurang.
+
+### 6.2 Pengurutan (`_order_questions`)
+
+Perubahan hanya **di dalam tiap kelompok tingkat**; komposisi 60/30/10 tidak
+diubah dan tidak ada soal yang ditambah/dihapus.
+
+```python
+def _order_questions(approved, effective, target, focus_label=None):
+    ...  # pengelompokan per tingkat seperti sekarang
+    def rank(bq):
+        match = 1 if focus_label and (bq.misconception or '').strip() == focus_label else 0
+        return (-match, bq.id)   # cocok fokus dulu, lalu id stabil
+    for lvl in queues:
+        queues[lvl].sort(key=rank)
+    ...  # pemilihan 60/30/10 apa adanya
+```
+
+Tanpa fokus (`focus_label is None`) -> perilaku identik dengan sekarang, jadi
+tes lama tetap aman.
+
+### 6.3 Privasi label (keputusan penting)
+
+Label miskonsepsi sering **membocorkan konsep benar** (mis. "virus adalah sel
+hidup" -> artinya "bukan sel"). Maka:
+
+- **Menggerakkan urutan:** ya, di server.
+- **Sebelum dijawab:** **tidak dikirim.** Payload sesi hanya memuat agregat
+  netral (`focus_available`, `focus_wrong`, `focus_total`) tanpa teks label.
+- **Umpan balik per soal:** teks miskonsepsi muncul seperti sekarang (setelah
+  dijawab).
+- **Ringkasan sesi:** menampilkan daftar **soal** yang masih salah (teks soal
+  yang sudah dilihat siswa), bukan label mentah.
+
+### 6.4 Ringkasan sesi tanpa endpoint baru
+
+`SectionPracticeModal.vue` sudah menerima tiap respons jawaban (berisi
+`question_text`, `is_correct`, `misconception`). Kumpulkan di state, lalu
+tampilkan di layar "Latihan selesai":
+
+> Kamu masih sering keliru di N soal ini: ...
+> [Latihan lagi] - sesi berikutnya akan lebih fokus ke sana.
+
+Tidak ada endpoint agregat baru -> tidak ada jalur bocor tambahan.
+
+### 6.5 Konfigurasi baru (`ml_config.py`)
+
+```python
+FOCUS_MIN_SAMPLE = 2          # minimal soal terjawab pada satu label
+FOCUS_LABEL_MAXLEN = 160      # potong teks label untuk umpan balik
+```
+
+### 6.6 UI
+
+- Banner pra-sesi: kalimat halus tanpa menyebut label -
+  "Sesi ini menekankan soal yang paling sering kamu lewatkan."
+- Layar selesai: daftar soal yang salah + tombol "Latihan lagi".
+
+---
+
+## 7. Tahap 3 - Adaptif antar-sesi (pengulangan terjadwal)
+
+Memakai `PracticeAnswer.answered_at`.
+
+- Hitung `last_practice_at` per (siswa, bagian) + akurasi terbaru.
+- Aturan transparan:
+  - baru dikerjakan (< `REVIEW_COOLDOWN_HOURS`, mis. 20 jam) dan masih lemah
+    -> tampilkan "ulangi besok", jangan dorong dua kali;
+  - lama tidak disentuh + masih lemah -> naikkan prioritas;
+  - sudah tuntas -> turunkan, arahkan ke bagian terlemah berikutnya.
+- Diterapkan sebagai satu suku `recency_factor` dengan bobot eksplisit di
+  `REC_SECTION_WEIGHTS` (bisa diaudit, bukan model).
+
+Mengubah peringkat Fase 3e -> butuh tes baru dan pembahasan bobot.
+
+## 8. Tahap 4 - Adaptif dalam sesi (ditunda)
+
+Endpoint "soal berikutnya" yang menaik/menurunkan tingkat **setelah tiap
+jawaban** (mirip CAT). Nilai tinggi, tetapi eksposur soal jadi tidak seimbang
+dan risiko umpan-balik (bagian 9) makin tajam. Tunda sampai Tahap 1-3 stabil.
+
+---
+
+## 9. Risiko: umpan-balik ke pengukuran tingkat
+
+`question_difficulty_service.observed_bank_batch` membaca `PracticeAnswer`.
+Artinya jawaban latihan ikut menentukan tingkat soal, sementara pengurutan
+adaptif mengubah soal mana yang dijawab siswa:
+
+```
+soal dianggap "sulit" karena dijawab siswa lemah
+   -> sesi adaptif menyajikan soal itu ke siswa lemah
+      -> p-value makin rendah -> makin dianggap "sulit"
+```
+
+Kecil untuk bagian yang <= 20 soal (semua soal tersaji; `MAX_SERVED = 20`),
+nyata untuk bagian yang lebih besar.
+
+Pilihan:
+
+- **A. Pisahkan lane:** jawaban latihan hanya untuk diagnosis siswa sendiri;
+  tingkat global dari kuis + interaktif (+ post-test). Paling bersih secara
+  metodologis, tetapi mengubah perilaku Fase 3f/g dan tesnya.
+- **B. Pertahankan sekarang, catat batasannya**, siapkan **soal jangkar**
+  (bagian 10) untuk membenahi pengukuran.
+- **C. Abaikan.** Tidak disarankan.
+
+**Saran sekarang: B**, dengan soal jangkar sebagai arah perbaikan.
+
+---
+
+## 10. Soal jangkar (anchor items)
+
+### 10.1 Definisi
+
+Sekumpulan kecil soal yang **selalu dijawab semua siswa**, tidak peduli level
+mereka. Karena tidak ada seleksi "siapa yang dapat soal ini", p-value-nya
+bersih dan bisa dipakai untuk menetapkan tingkat soal.
+
+### 10.2 Membagi tanggung jawab
+
+| Jenis soal | Jawabannya dipakai untuk |
+|---|---|
+| **Soal jangkar** (dijawab semua) | menetapkan tingkat soal (pengukuran) |
+| **Soal kolam adaptif** (dipilih per level) | hanya diagnosis + fokus siswa sendiri |
+
+Dengan pemisahan ini, kolam adaptif bebas diacak tanpa merusak pengukuran.
+
+### 10.3 Dua bentuk penerapan
+
+**Ringan - tanda `is_anchor` di `question_bank`**
+
+- Tambah kolom `is_anchor` (boolean, default `false`) lewat daftar migrasi
+  manual di `src/config/database.py` (seperti `misconception` dulu).
+- Per bagian, pilih 3-5 soal yang selalu disisipkan ke depan sesi **semua**
+  siswa.
+- `observed_bank_batch` hanya membaca jawaban `is_anchor = true` untuk label
+  global.
+- Kelemahan: hanya siswa yang membuka latihan yang menjawab; bias "siapa yang
+  rajin" masih ada, walau jauh lebih kecil.
+
+**Kuat - post-test per bagian (tujuan)**
+
+- Memakai `Quiz.section_id` yang **sudah ada**.
+- Post-test pendek per bagian berisi soal jangkar, sama untuk semua siswa,
+  dikerjakan setelah bagian itu.
+- Jawaban latihan **tidak lagi** dipakai untuk label global.
+- Ini melunasi utang metodologis Fase 3f/g dan menyatukan lane pengukuran.
+
+### 10.4 Cara memilih soal jangkar
+
+- 3-5 per bagian, sebaran kasar 1 mudah / 1-3 sedang / 1 sulit.
+- Pilih yang **membeda-bedakan**, bukan yang terlalu mudah/sulit untuk semua.
+- Jangan sering diedit; bila isi soal berubah, kesulitannya berubah dan
+  pengukuran lamanya tidak berlaku lagi.
+- Bila mau diganti, ganti perlahan dan pertahankan sebagian soal lama sebagai
+  penghubung. Ambang `MIN_DIFFICULTY_SAMPLE = 20` siswa berbeda tetap berlaku.
+
+### 10.5 Konsekuensi jujur
+
+- Soal non-jangkar kehilangan label terukur -> jatuh ke label guru; karena guru
+  sekarang tidak mengisi tingkat (Fase 3g), banyak menjadi "Belum ditentukan".
+- Soal tanpa label tetap ikut sesi (di belakang), tidak ada yang hilang.
+- Peningkatan lanjutan (estimasi soal non-jangkar lewat pencocokan ke jangkar /
+  IRT linking) ditunda.
+
+Pertukarannya: **kepercayaan angka naik, cakupan label turun.** Ini disengaja:
+lebih baik sedikit angka yang bisa dipercaya daripada banyak angka menyesatkan.
+
+### 10.6 Urutan pengerjaan minimal
+
+| Langkah | Isi | Berat |
+|---|---|---|
+| 1 | kolom `is_anchor` + pilih anchor per bagian | kecil |
+| 2 | `observed_bank_batch` hanya baca jawaban anchor untuk label global | kecil |
+| 3 | sisipkan anchor ke depan tiap sesi | kecil |
+| 4 | post-test per bagian (pakai `Quiz.section_id`) | sedang |
+| 5 | hentikan pemakaian jawaban latihan untuk label global | kecil (setelah 4) |
+
+Langkah 1-3 sudah memutus sebagian besar lingkaran; langkah 4 yang membuatnya
+benar-benar bersih.
+
+---
+
+## 11. Kontrak API: sebelum -> sesudah
+
+| Endpoint | Sebelum | Sesudah (usulan) |
+|---|---|---|
+| `GET /api/student/recommendations` | item tanpa info latihan | + `practice_available`, `practice_total` |
+| `GET .../sections/<sid>` | `session{basis, target_level, mix, note}` | + `session.focus_available/focus_wrong/focus_total` (tanpa teks label); `note` halus |
+| `POST .../answer` | tidak berubah | tidak berubah |
+| ringkasan sesi | tidak ada | dihitung klien (tanpa endpoint) |
+
+Tidak ada endpoint atau tabel baru untuk Tahap 1-2. Perubahan
+mundur-kompatibel: konsumen lama mengabaikan field tambahan.
+
+---
+
+## 12. Rencana uji
+
+Extend `test_student_practice.py` (dan `test_section_recommendations.py` untuk
+Tahap 1):
+
+1. Fokus hanya muncul bila `total >= FOCUS_MIN_SAMPLE` dan `wrong > correct`.
+2. Satu kali salah -> bukan fokus.
+3. Label miskonsepsi kosong -> tidak ada fokus; urutan identik dengan sekarang.
+4. Fokus mengubah urutan **di dalam** tingkat; jumlah per tingkat 60/30/10 tetap.
+5. Payload sesi **tidak** memuat teks label miskonsepsi.
+6. `practice_available`/`practice_total` benar (termasuk 0 soal).
+7. Regresi: tanpa data fokus, output `session` identik dengan sebelum perubahan.
+8. Soal jangkar (bila dikerjakan): label global hanya dari jawaban anchor.
+
+---
+
+## 13. Rilis bertahap
+
+| Tahap | Isi | Risiko | Sentuh |
+|---|---|---|---|
+| 1 | tombol langsung + `practice_available` | rendah | 1 controller, 1 vue |
+| 2 | fokus miskonsepsi (urutan + ringkasan klien) | sedang | service sesi, modal |
+| 3 | pengulangan terjadwal | sedang | scoring Fase 3e |
+| 4 | adaptif per-item | tinggi | endpoint baru (tunda) |
+| A | soal jangkar / post-test per bagian | sedang | model, service, alur guru+siswa |
+
+---
+
+## 14. Keputusan yang masih terbuka
+
+Sudah diputuskan:
+
+1. **Lane pengukuran (bagian 9):** **B** - pertahankan sekarang, catat
+   batasannya; soal jangkar / post-test per bagian jadi arah perbaikan.
+2. **Ambil berapa tahap dulu:** **Tahap 1 saja** (selesai).
+
+Masih terbuka:
+
+3. **Ambang fokus** `FOCUS_MIN_SAMPLE = 2` - cukup, atau 3?
+4. **Ringkasan sesi:** cukup daftar soal salah, atau sebut nama konsep juga
+   (dengan risiko bocor konsep benar di sesi berikutnya)?
+5. **Soal jangkar:** kerjakan sekarang (langkah 1-3) atau setelah ada bagian
+   dengan > 20 soal / post-test?

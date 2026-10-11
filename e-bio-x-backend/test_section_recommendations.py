@@ -45,6 +45,7 @@ from src.models.question import Question  # noqa: E402
 from src.models.answer import Answer  # noqa: E402
 from src.models.submission import Submission  # noqa: E402
 from src.models.recommendation import Recommendation  # noqa: E402
+from src.models.question_bank import QuestionBank  # noqa: E402
 from flask_jwt_extended import create_access_token  # noqa: E402
 
 STAMP = 'zzsecrec'
@@ -128,12 +129,26 @@ def make_fixture():
                                   student_id=student.id,
                                   is_correct=i < correct))
             idx += 1
+
+    # Soal latihan untuk menguji ketersediaan latihan (Tahap 1): satu
+    # APPROVED di Bagian B, satu DRAFT di Bagian A. Hanya APPROVED yang
+    # boleh dihitung - soal draf milik guru belum boleh disajikan ke siswa.
+    bank_b = QuestionBank(teacher_id=teacher.id, section_id=secs[1].id,
+                          question_text='Soal latihan Bagian B',
+                          difficulty='medium', status='APPROVED',
+                          source='teacher')
+    bank_draft = QuestionBank(teacher_id=teacher.id, section_id=secs[0].id,
+                              question_text='Draf Bagian A',
+                              difficulty='medium', status='DRAFT',
+                              source='ai')
+    db.session.add_all([bank_b, bank_draft])
     db.session.commit()
 
     created.update(teacher=teacher, outsider=outsider, student=student,
                    course=course, material=material,
                    sec_a=secs[0], sec_b=secs[1], sec_c=secs[2], sec_d=secs[3],
-                   sec_e=secs[4], quiz=quiz, sub=sub)
+                   sec_e=secs[4], quiz=quiz, sub=sub,
+                   bank_b=bank_b, bank_draft=bank_draft)
 
 
 def drop_fixture():
@@ -143,6 +158,10 @@ def drop_fixture():
         Answer.query.filter_by(student_id=student.id).delete()
         Submission.query.filter_by(student_id=student.id).delete()
         db.session.flush()
+    for key in ('bank_b', 'bank_draft'):
+        if created.get(key) is not None:
+            db.session.delete(created[key])
+    db.session.flush()
     for key in ('sec_a', 'sec_b', 'sec_c', 'sec_d', 'sec_e'):
         if created.get(key) is not None:
             db.session.delete(created[key])
@@ -266,6 +285,24 @@ def main():
             check('bagian terkuasai tidak disarankan',
                   by_title(items, 'Bagian E') == {},
                   str(by_title(items, 'Bagian E')))
+
+            print('\n[1b] KETERSEDIAAN SOAL LATIHAN (Tahap 1)')
+            check('Bagian B punya soal APPROVED -> latihan tersedia',
+                  b_item.get('practice_available') is True
+                  and b_item.get('practice_total') == 1,
+                  str((b_item.get('practice_available'),
+                       b_item.get('practice_total'))))
+            a_item = by_title(ranked, 'Bagian A')
+            check('soal DRAFT tidak dihitung sebagai latihan',
+                  a_item.get('practice_available') is False
+                  and a_item.get('practice_total') == 0,
+                  str((a_item.get('practice_available'),
+                       a_item.get('practice_total'))))
+            check('setiap baris (skor & hint) membawa info latihan',
+                  all('practice_available' in i and 'practice_total' in i
+                      for i in items),
+                  str([(i['section_title'], i.get('practice_available'),
+                        i.get('practice_total')) for i in items]))
 
             print('\n[2] BAGIAN YANG BELUM BISA DINILAI')
             check('tepat 2 hint', len(hints) == 2,

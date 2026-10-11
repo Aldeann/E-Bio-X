@@ -298,6 +298,18 @@ def recommend_sections_for_student(student):
     hints = hints[:cfg.REC_SECTION_HINTS]
 
     results = ranked + hints
+    # Rekomendasi adaptif Tahap 1: sertakan ketersediaan soal latihan supaya
+    # UI bisa menawarkan tombol "Latihan adaptif" langsung dari dashboard dan
+    # mematikannya dengan jujur saat guru belum menyetujui soal apa pun untuk
+    # bagian itu. Satu query untuk semua bagian (approved_count_map).
+    from src.services import student_practice_service as spractice
+    counts = spractice.approved_count_map(
+        [item['section_id'] for item in results])
+    for item in results:
+        total = counts.get(int(item['section_id']), 0)
+        item['practice_available'] = total > 0
+        item['practice_total'] = total
+
     # Only ranked sections are persisted: a hint has no score, and the
     # column is NOT NULL, so storing 0.0 for it would fabricate a priority.
     _persist_sections(student.id, ranked)
