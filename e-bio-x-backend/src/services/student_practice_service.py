@@ -67,7 +67,10 @@ def question_for_student(bq, difficulty=None, difficulty_basis=None,
     73% benar (+-11 poin)"). The declared label is ALWAYS included separately
     as `declared_difficulty`, so a measured label never silently replaces it.
     """
-    declared = bq.difficulty or 'medium'
+    # Label guru TIDAK lagi diwajibkan; kosong berarti "belum ditentukan", jadi
+    # jangan mengarang 'medium'. Bila belum ada label terukur maupun deklarasi,
+    # `difficulty` tetap None dan konsumen boleh menampilkan "belum ditentukan".
+    declared = (bq.difficulty or '').strip() or None
     return {
         'id': bq.id,
         'question_text': bq.question_text,

@@ -305,7 +305,7 @@ const statusClass = (s) =>
     : "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-400";
 const typeLabel = (t) => (t === "true_false" ? "Benar/Salah" : "Pilihan Ganda");
 const difficultyLabel = (d) =>
-  d === "easy" ? "Mudah" : d === "hard" ? "Sulit" : "Sedang";
+  d === "easy" ? "Mudah" : d === "hard" ? "Sulit" : d === "medium" ? "Sedang" : "Belum ditentukan";
 
 const openQuestionForm = (q = null) => {
   editingQuestion.value = q;

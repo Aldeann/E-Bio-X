@@ -40,6 +40,10 @@ DIFFICULTY_LABEL = {
     'hard': 'Sulit',
 }
 
+# Model kadang menjawab dengan istilah Indonesia. Dipetakan ke kunci kanonik
+# supaya usulan tingkat tetap terbaca, bukan dibuang karena beda bahasa.
+_DIFFICULTY_ALIASES = {'mudah': 'easy', 'sedang': 'medium', 'sulit': 'hard'}
+
 # Questions about the section itself ("apa isi bagian ini?") are not practice.
 # They show up when a section carries little real text, so they are dropped here
 # and counted for the caller instead of being stored as review fodder.
@@ -74,6 +78,7 @@ SCHEMA_HINT = (
     '{"questions": [\n'
     '  {\n'
     '    "question_text": "pertanyaan",\n'
+    '    "difficulty": "easy|medium|hard",\n'
     '    "options": [\n'
     '      {"option_text": "opsi", "is_correct": true, "feedback": "alasan '
     'singkat"},\n'
@@ -84,7 +89,9 @@ SCHEMA_HINT = (
     '    "misconception": "kesalahpahaman utama yang diuji"\n'
     '  }\n'
     ']}\n'
-    'Use 4 options per question. "feedback" is one short sentence per option.'
+    'Use 4 options per question. "feedback" is one short sentence per option. '
+    '"difficulty" is YOUR provisional estimate (easy/medium/hard); the system '
+    'will correct it later from real student performance.'
 )
 
 
@@ -196,18 +203,29 @@ def section_context(section, material, max_chars=2500):
     return joined[:max_chars]
 
 
-def build_prompt(section, material, count, difficulty):
-    label = DIFFICULTY_LABEL.get(difficulty, DIFFICULTY_LABEL['medium'])
-    lines = [
-        f"Tulis {count} soal latihan pilihan ganda.",
-        f"Tingkat kesulitan: {label}.",
-        section_context(section, material),
-        SCHEMA_HINT,
-    ]
+def build_prompt(section, material, count, difficulty=None):
+    """Prompt for one section. ``difficulty`` is an OPTIONAL legacy hint.
+
+    When it is None (the normal path now), the model is asked to spread the
+    questions across levels and to state its own provisional level per item.
+    The teacher no longer picks the level; the system measures and corrects it.
+    """
+    lines = [f"Tulis {count} soal latihan pilihan ganda."]
+    if difficulty in DIFFICULTY_LABEL:
+        lines.append(f"Tingkat kesulitan: {DIFFICULTY_LABEL[difficulty]}.")
+    else:
+        lines.append(
+            "Sebarkan tingkat kesulitannya: campur mudah, sedang, dan sulit. "
+            "Untuk setiap soal, isi field difficulty dengan perkiraanmu "
+            "(easy/medium/hard). Ini hanya perkiraan awal; sistem akan "
+            "mengoreksinya nanti dari hasil kerja siswa."
+        )
+    lines.append(section_context(section, material))
+    lines.append(SCHEMA_HINT)
     return "\n\n".join(lines)
 
 
-def generate_drafts(section, material, count=DEFAULT_COUNT, difficulty='medium'):
+def generate_drafts(section, material, count=DEFAULT_COUNT, difficulty=None):
     """Return (drafts, dropped) or raise DraftUnavailable/DraftFailed.
 
     ``drafts`` is a list of raw dicts, ``dropped`` counts answers the model
@@ -215,6 +233,10 @@ def generate_drafts(section, material, count=DEFAULT_COUNT, difficulty='medium')
     storable is decided by the caller with the same validator used for
     teacher-written questions, so a malformed AI answer is dropped instead of
     saved.
+
+    ``difficulty`` is an optional hint kept for callers that still want one
+    level. When omitted (the normal path), the model spreads levels itself and
+    proposes one per question.
     """
     if not ai_available():
         raise DraftUnavailable(
@@ -223,8 +245,8 @@ def generate_drafts(section, material, count=DEFAULT_COUNT, difficulty='medium')
         )
 
     count = max(1, min(int(count or DEFAULT_COUNT), MAX_COUNT))
-    if difficulty not in VALID_DIFFICULTIES:
-        difficulty = 'medium'
+    if difficulty not in DIFFICULTY_LABEL:
+        difficulty = None
 
     headers = {
         'Authorization': f'Bearer {os.getenv("AI_API_KEY")}',
@@ -307,9 +329,15 @@ def _draft_items(data):
         if _META_QUESTION_RE.search(text):
             dropped += 1
             continue
+        raw_diff = str(raw.get('difficulty') or '').strip().lower()
+        raw_diff = _DIFFICULTY_ALIASES.get(raw_diff, raw_diff)
+        # Usulan AI yang tidak dikenal disimpan sebagai '' (belum ditentukan),
+        # bukan dipaksa menjadi 'medium'. Tingkat final tetap dari pengukuran.
+        difficulty = raw_diff if raw_diff in VALID_DIFFICULTIES else ''
         items.append({
             'question_text': text,
             'options': options,
+            'difficulty': difficulty,
             'explanation': _strip_html(raw.get('explanation') or '') or None,
             'misconception': _strip_html(raw.get('misconception') or '') or None,
         })

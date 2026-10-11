@@ -271,7 +271,7 @@ def get_student_quiz_performance():
             'quiz_id': q.id,
             'title': q.title,
             'material_title': q.material.title if q.material else None,
-            'difficulty': ', '.join(sorted({(qs.difficulty or 'medium') for qs in q.questions})),
+            'difficulty': ', '.join(sorted({qs.difficulty for qs in q.questions if qs.difficulty})),
             'attempts': len(scores),
             'passed': data['passed'],
             'average': round(sum(scores) / len(scores), 1) if scores else 0.0,

@@ -108,15 +108,6 @@
                   >
                     <option v-for="n in 5" :key="n" :value="n">{{ n }} soal</option>
                   </select>
-                  <select
-                    v-model="difficulties[row.section_id]"
-                    class="dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm"
-                    title="Tingkat kesulitan"
-                  >
-                    <option value="easy">Mudah</option>
-                    <option value="medium">Sedang</option>
-                    <option value="hard">Sulit</option>
-                  </select>
                   <button
                     class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition"
                     :disabled="!aiAvailable || busySection === row.section_id"
@@ -263,7 +254,6 @@ const formOpen = ref(false);
 const editing = ref(null);
 const draftStatus = ref("DRAFT");
 const counts = reactive({});
-const difficulties = reactive({});
 
 const groups = computed(() => {
   const map = new Map();
@@ -296,7 +286,6 @@ const loadSections = async () => {
     aiReason.value = data?.ai_unavailable_reason || "";
     for (const row of sections.value) {
       if (counts[row.section_id] === undefined) counts[row.section_id] = 3;
-      if (difficulties[row.section_id] === undefined) difficulties[row.section_id] = "medium";
     }
   } catch (e) {
     toast.add({ title: e?.data?.error || "Gagal memuat bagian", color: "red" });
@@ -338,7 +327,6 @@ const generate = async (row) => {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           count: counts[row.section_id] || 3,
-          difficulty: difficulties[row.section_id] || "medium",
         }),
       }
     );

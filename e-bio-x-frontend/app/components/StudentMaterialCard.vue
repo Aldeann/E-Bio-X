@@ -106,7 +106,7 @@ const difficultyColor = computed(() =>
           class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full"
           :class="difficultyColor"
         >
-          {{ material.difficulty || "sedang" }}
+          {{ material.difficulty || "Belum ditentukan" }}
         </span>
         <span
           class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition"

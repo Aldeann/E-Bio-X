@@ -637,8 +637,13 @@ def _validate_question_payload(data, bank=False):
     question_text = (data.get('question_text') or '').strip()
     if not question_text:
         return None, 'Pertanyaan wajib diisi'
-    difficulty = (data.get('difficulty') or 'medium')
-    if difficulty not in VALID_DIFFICULTIES:
+    # Tingkat kesulitan TIDAK lagi dipilih guru: sistem mengukurnya dari
+    # performa siswa. Kosong = "belum ditentukan" dan disimpan apa adanya
+    # (konsumen memakai normalize_difficulty yang memetakan '' -> None).
+    # Nilai yang diisi tetapi tidak dikenal tetap ditolak supaya data lama
+    # atau salah ketik tidak masuk diam-diam sebagai tingkat yang seolah sah.
+    difficulty = (data.get('difficulty') or '').strip().lower()
+    if difficulty and difficulty not in VALID_DIFFICULTIES:
         return None, 'Tingkat kesulitan tidak valid'
     try:
         points = int(data.get('points') or 10)
@@ -1308,7 +1313,11 @@ def get_question_bank():
         query = query.filter(QuestionBank.question_text.ilike(f'%{keyword}%'))
     if topic:
         query = query.filter(QuestionBank.topic == topic)
-    if difficulty:
+    if difficulty == 'unclassified':
+        # Soal yang belum punya tingkat (menunggu pengukuran otomatis).
+        query = query.filter(db.or_(QuestionBank.difficulty == '',
+                                    QuestionBank.difficulty.is_(None)))
+    elif difficulty:
         query = query.filter(QuestionBank.difficulty == difficulty)
     if qtype:
         query = query.filter(QuestionBank.question_type == qtype)

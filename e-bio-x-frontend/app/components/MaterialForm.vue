@@ -26,7 +26,6 @@ const form = reactive({
   topic: "",
   learning_objectives: "",
   estimated_time: "",
-  difficulty: "sedang",
   status: "draft",
   thumbnail_url: "",
   course_ids: [],
@@ -34,11 +33,6 @@ const form = reactive({
 
 const phases = ["E", "F"];
 const classes = ["X", "XI", "XII"];
-const difficulties = [
-  { value: "mudah", label: "Mudah", color: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" },
-  { value: "sedang", label: "Sedang", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
-  { value: "sulit", label: "Sulit", color: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
-];
 
 const inputClass =
   "w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition";
@@ -61,7 +55,6 @@ const loadDetail = async () => {
       topic: res.topic || "",
       learning_objectives: res.learning_objectives || "",
       estimated_time: res.estimated_time || "",
-      difficulty: res.difficulty || "sedang",
       status: res.status || "draft",
       thumbnail_url: res.thumbnail_url || "",
       course_ids: res.course_ids || [],
@@ -295,23 +288,10 @@ onMounted(() => {
               <input v-model="form.estimated_time" type="text" :class="inputClass" placeholder="Contoh: 3 JP" />
             </div>
             <div>
-              <label :class="labelClass">Tingkat Kesulitan</label>
-              <div class="flex gap-2">
-                <button
-                  v-for="d in difficulties"
-                  :key="d.value"
-                  type="button"
-                  @click="form.difficulty = d.value"
-                  class="flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition"
-                  :class="
-                    form.difficulty === d.value
-                      ? d.color + ' border-current shadow-sm'
-                      : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                  "
-                >
-                  {{ d.label }}
-                </button>
-              </div>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                Tingkat kesulitan tidak diisi manual. Sistem menilainya otomatis dari
+                hasil latihan siswa setelah cukup data terkumpul.
+              </p>
             </div>
           </div>
         </div>

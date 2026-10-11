@@ -60,6 +60,7 @@
               <div class="flex items-center gap-2 mb-2 text-xs text-gray-500">
                 <span>Soal {{ index + 1 }} dari {{ questions.length }}</span>
                 <span
+                  v-if="current.difficulty"
                   class="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800"
                   :title="current.difficulty_note || ''"
                 >

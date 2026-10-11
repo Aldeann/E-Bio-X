@@ -224,7 +224,7 @@ definePageMeta({
                 class="inline-flex items-center gap-1 px-1 sm:px-1.5 rounded"
                 :class="difficultyColor(m.difficulty)"
               >
-                {{ m.difficulty || "sedang" }}
+                {{ m.difficulty || "Belum ditentukan" }}
               </span>
             </div>
 

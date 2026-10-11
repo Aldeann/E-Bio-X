@@ -47,7 +47,6 @@ from src.controllers.quiz_controller import (
     _teacher_owns_material,
     _validate_question_payload,
     _serialize_bank,
-    VALID_DIFFICULTIES,
 )
 
 
@@ -115,10 +114,9 @@ def generate_section_drafts(section_id):
     if count < 1 or count > practice.MAX_COUNT:
         return jsonify({'error': f'Jumlah soal harus antara 1 dan {practice.MAX_COUNT}'}), 400
 
-    difficulty = (data.get('difficulty') or 'medium').strip()
-    if difficulty not in VALID_DIFFICULTIES:
-        return jsonify({'error': 'Tingkat kesulitan tidak valid'}), 400
-
+    # Tingkat kesulitan TIDAK lagi dipilih guru. Draf disimpan apa adanya dengan
+    # tingkat USULAN AI (bila ada), dan sistem mengoreksinya nanti dari performa
+    # siswa. Parameter 'difficulty' dari klien sengaja diabaikan.
     if not practice.ai_available():
         return jsonify({
             'error': 'AI belum dikonfigurasi (AI_API_KEY). Set di server lalu coba lagi, '
@@ -136,7 +134,7 @@ def generate_section_drafts(section_id):
         }), 400
 
     try:
-        items, dropped = practice.generate_drafts(section, material, count, difficulty)
+        items, dropped = practice.generate_drafts(section, material, count)
     except practice.DraftUnavailable as exc:
         return jsonify({'error': str(exc), 'ai_available': False}), 503
     except practice.DraftFailed as exc:
@@ -148,7 +146,8 @@ def generate_section_drafts(section_id):
         payload = {
             'question_text': item['question_text'],
             'question_type': 'multiple_choice',
-            'difficulty': difficulty,
+            # Usulan tingkat dari AI (boleh kosong = belum ditentukan).
+            'difficulty': item.get('difficulty') or '',
             'points': 10,
             'explanation': item.get('explanation'),
             'options': item['options'],
@@ -168,7 +167,7 @@ def generate_section_drafts(section_id):
             # model's own idea of a topic is ignored on purpose.
             section_id=section.id,
             topic=section.title,
-            difficulty=difficulty,
+            difficulty=validated['difficulty'],
             explanation=validated['explanation'],
             points=validated['points'],
             misconception=item.get('misconception'),

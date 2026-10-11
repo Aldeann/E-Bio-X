@@ -334,7 +334,7 @@ pembahasan AI: status, sumber, model, peninjau, waktu.
 | Method | Path | Fungsi |
 |---|---|---|
 | GET | `/api/teacher/practice/sections` | Semua bagian milik guru + jumlah soal per status + `ai_available` |
-| POST | `/api/teacher/practice/sections/<sid>/drafts` | Minta AI membuat draf untuk satu bagian (`count` 1–10, `difficulty`) |
+| POST | `/api/teacher/practice/sections/<sid>/drafts` | Minta AI membuat draf untuk satu bagian (`count` 1–10). Tingkat kesulitan tidak lagi dipilih guru — AI menyebar levelnya. |
 | GET | `/api/teacher/practice/drafts?status=DRAFT` | Antrean review guru |
 | POST | `/api/teacher/practice/drafts/<bank_id>/approve` | Setujui (satu-satunya jalan DRAFT → APPROVED) |
 | POST | `/api/teacher/practice/drafts/<bank_id>/reject` | Tolak (baris tetap disimpan untuk audit) |
@@ -374,7 +374,7 @@ sibuk — coba lagi beberapa saat lagi)". Tidak ada soal yang tetap dibuat dari 
 - `teacher/practice.vue` (baru, menu **Latihan Bagian**)
   - Tab "Bagian Materi": tiap bagian menampilkan jumlah soal disetujui / menunggu review /
     ditolak, dengan catatan "Bagian ini belum punya soal latihan yang disetujui";
-    kontrol jumlah + tingkat kesulitan + tombol **Buat draf**.
+    kontrol jumlah + tombol **Buat draf** (tingkat diusulkan AI, bukan dipilih guru).
   - Tab "Antrean Review": daftar draf lengkap dengan opsi, feedback tiap pengecoh,
     pembahasan, miskonsepsi, dan nama model. Aksi: **Sunting**, **Setujui**, **Tolak**.
   - Banner kuning jujur kalau `AI_API_KEY` belum ada, dengan jalan keluar (tulis sendiri).
@@ -895,6 +895,30 @@ interaktif.
 - **Sesi siswa:** siswa yang sudah mengerjakan soal interaktif langsung punya sasaran
   terukur. Contoh nyata di demo: siswa yang menjawab 12 soal interaktif dengan hasil baik
   mendapat sasaran **mudah** dengan kalimat sumber yang menyebut n dan p soal terkait.
+
+### 9.10 Tingkat kesulitan tidak lagi diisi guru (usulan AI, bukan pilihan guru)
+
+Guru tidak perlu — dan tidak bisa — memilih tingkat kesulitan. Yang dihapus adalah
+**masukannya**, bukan mesin pengukurannya; semua mekanisme di §9.1–9.9 tetap jalan.
+
+- **Soal tulis guru & soal kuis:** tanpa kolom tingkat. Payload tanpa `difficulty`
+  disimpan sebagai `''` (belum ditentukan), **bukan** dipaksa `'medium'`. Nilai yang
+  diisi tetapi tidak dikenal tetap ditolak 400 supaya salah ketik tidak lolos.
+  Filter Bank Soal punya opsi "Belum ditentukan" (`?difficulty=unclassified`).
+- **Draf AI:** `POST .../drafts` tidak lagi memakai `difficulty` dari klien (diabaikan).
+  Prompt meminta model **menyebar** level (mudah/sedang/sulit) dan mengisi `difficulty`
+  tiap soal sebagai **perkiraan awal** (alias Indonesia dipetakan). Nilai itu disimpan
+  sebagai label sementara dan **digantikan** begitu pengukuran punya cukup bukti.
+- **Sumber kebenaran tetap performa siswa** (§9.2). Label guru/AI hanyalah cadangan
+  cold-start; ia tidak pernah menimpa label terukur diam-diam (`declared_difficulty`
+  selalu ikut di payload siswa).
+- **Analitik jujur:** soal tanpa tingkat tidak lagi masuk bucket `medium` di
+  `difficulty_analytics`/`quiz_analysis`; ia dihitung terpisah (`unclassified_quiz` /
+  `unclassified`). Di daftar materi & bank soal, tingkat kosong tampil
+  "Belum ditentukan", bukan angka karangan.
+
+Test: `test_practice_drafts.py` (**79/79**; termasuk soal tanpa tingkat -> `''`, filter
+`unclassified`, tingkat ngawur -> 400, dan draf memakai usulan AI bukan permintaan guru).
 
 ---
 

@@ -57,7 +57,7 @@ const typeLabel = computed(() =>
   props.question.question_type === "true_false" ? "Benar/Salah" : "Pilihan Ganda"
 );
 const difficultyLabel = computed(() =>
-  props.question.difficulty === "easy" ? "Mudah" : props.question.difficulty === "hard" ? "Sulit" : "Sedang"
+  props.question.difficulty === "easy" ? "Mudah" : props.question.difficulty === "hard" ? "Sulit" : props.question.difficulty === "medium" ? "Sedang" : "Belum ditentukan"
 );
 
 const select = (optId) => {

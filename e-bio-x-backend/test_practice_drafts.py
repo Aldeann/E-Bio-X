@@ -154,13 +154,15 @@ def drop_fixture():
     db.session.commit()
 
 
-def ai_item(text='Draf soal virus', misconception=' virus adalah sel hidup'):
+def ai_item(text='Draf soal virus', misconception=' virus adalah sel hidup',
+            difficulty='medium'):
     return {
         'question_text': text,
         'options': [
             {'option_text': 'Viral', 'is_correct': True, 'feedback': 'Viral correct'},
             {'option_text': 'Sel', 'is_correct': False, 'feedback': 'Virus bukan sel'},
         ],
+        'difficulty': difficulty,
         'explanation': 'Virus hanya bereplikasi di dalam sel inang.',
         'misconception': misconception,
     }
@@ -173,7 +175,7 @@ def patch_ai(items, available=True, fail=None, dropped=0):
     def _available():
         return available
 
-    def _generate(section, material, count=3, difficulty='medium'):
+    def _generate(section, material, count=3, difficulty=None):
         if fail:
             raise fail
         return list(items)[:count], dropped
@@ -261,7 +263,8 @@ def main():
 
             # ------------------------------------------- 4. DRAF AI DISIMPAN
             print('\n[4] DRAF AI: STATUS, SECTION, TOPIK')
-            restore = patch_ai([ai_item('Draf 1'), ai_item('Draf 2')], available=True)
+            restore = patch_ai([ai_item('Draf 1', difficulty='easy'),
+                                ai_item('Draf 2', difficulty='hard')], available=True)
             r = client.post(f'/api/teacher/practice/sections/{sec_a.id}/drafts',
                             headers=h_t, json={'count': 2, 'difficulty': 'hard'})
             check('generate draf -> 201', r.status_code == 201, str(r.status_code))
@@ -280,8 +283,9 @@ def main():
             check('topik mengikuti judul bagian',
                   all(d.topic == 'Siklus Replikasi Virus' for d in drafts),
                   drafts[0].topic if drafts else '')
-            check('kesulitan mengikuti permintaan guru',
-                  all(d.difficulty == 'hard' for d in drafts))
+            check('kesulitan mengikuti usulan AI, bukan pilihan guru',
+                  [d.difficulty for d in drafts] == ['easy', 'hard'],
+                  str([d.difficulty for d in drafts]))
             check('jejak model tercatat',
                   all(d.model_name and d.prompt_version == practice.PROMPT_VERSION
                       for d in drafts))
@@ -345,10 +349,12 @@ def main():
             # ------------------------------------------ 8. VALIDASI INPUT
             print('\n[8] VALIDASI INPUT')
             restore = patch_ai([ai_item()], available=True)
+            # Tingkat kesulitan bukan lagi bagian kontrak endpoint ini: guru tidak
+            # memilih tingkat, jadi nilai apa pun (valid atau tidak) diabaikan.
+            # Validasi yang tersisa hanya soal jumlah soal.
             for bad, label in (({'count': 0}, 'count=0'),
                                ({'count': 99}, 'count=99'),
-                               ({'count': 'abc'}, 'count non-numerik'),
-                               ({'difficulty': 'sangat'}, 'kesulitan ngawur')):
+                               ({'count': 'abc'}, 'count non-numerik')):
                 r = client.post(f'/api/teacher/practice/sections/{sec_a.id}/drafts',
                                 headers=h_t, json=bad)
                 check(f'{label} ditolak 400', r.status_code == 400, str(r.status_code))
@@ -428,6 +434,30 @@ def main():
                   bank.source == 'teacher' and bank.status == 'APPROVED')
             check('soal guru langsung bisa jadi latihan',
                   practice.practice_ready(sec_b.id) is True)
+
+            # Guru tidak lagi memilih tingkat kesulitan. Soal tanpa tingkat harus
+            # diterima apa adanya sebagai '' (belum ditentukan), BUKAN dipaksa
+            # menjadi 'medium'. Sistem mengukurnya nanti dari performa siswa.
+            no_diff = mcq('Soal tanpa tingkat guru', section_id=sec_b.id)
+            no_diff.pop('difficulty')
+            r = client.post('/api/teacher/question-bank', headers=h_t, json=no_diff)
+            check('soal tanpa tingkat -> 201', r.status_code == 201, str(r.status_code))
+            no_diff_id = (r.get_json() or {}).get('question', {}).get('id')
+            nb = QuestionBank.query.get(no_diff_id) if no_diff_id else None
+            created['bank2'] = nb
+            check('tingkat kosong disimpan belum ditentukan, bukan medium',
+                  nb is not None and nb.difficulty == '',
+                  repr(getattr(nb, 'difficulty', None)))
+            r = client.get('/api/teacher/question-bank?difficulty=unclassified',
+                           headers=h_t)
+            ids_none = [b['id'] for b in (r.get_json() or {}).get('data') or []]
+            check('filter unclassified menemukan soal tanpa tingkat',
+                  no_diff_id in ids_none, str(ids_none))
+            r = client.post('/api/teacher/question-bank', headers=h_t,
+                            json=mcq('Soal tingkat ngawur', section_id=sec_b.id,
+                                     difficulty='sangat'))
+            check('tingkat ngawur tetap ditolak 400', r.status_code == 400,
+                  str(r.status_code))
 
             r = client.post('/api/teacher/question-bank', headers=h_t,
                             json=mcq('Soal bagian asing',

@@ -31,6 +31,7 @@
           <option value="easy">Mudah</option>
           <option value="medium">Sedang</option>
           <option value="hard">Sulit</option>
+          <option value="unclassified">Belum ditentukan</option>
         </select>
         <select v-model="filters.status" class="dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm">
           <option value="">Semua status</option>
@@ -195,7 +196,8 @@ const filters = reactive({ q: "", type: "", difficulty: "", status: "" });
 const hasActiveFilter = computed(() => !!(filters.q || filters.type || filters.difficulty || filters.status));
 
 const typeLabel = (t) => (t === "true_false" ? "Benar/Salah" : "Pilihan Ganda");
-const difficultyLabel = (d) => (d === "easy" ? "Mudah" : d === "hard" ? "Sulit" : "Sedang");
+const difficultyLabel = (d) =>
+  d === "easy" ? "Mudah" : d === "hard" ? "Sulit" : d === "medium" ? "Sedang" : "Belum ditentukan";
 const statusLabel = (s) =>
   s === "DRAFT" ? "Menunggu review" : s === "REJECTED" ? "Ditolak" : "Disetujui";
 const statusClass = (s) =>

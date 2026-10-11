@@ -95,7 +95,7 @@ const sortedQuestions = computed(() =>
 );
 
 const typeLabel = (t) => (t === "true_false" ? "Benar/Salah" : "Pilihan Ganda");
-const difficultyLabel = (d) => (d === "easy" ? "Mudah" : d === "hard" ? "Sulit" : "Sedang");
+const difficultyLabel = (d) => (d === "easy" ? "Mudah" : d === "hard" ? "Sulit" : d === "medium" ? "Sedang" : "Belum ditentukan");
 
 const load = async () => {
   loading.value = true;

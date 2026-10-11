@@ -1385,10 +1385,16 @@ def difficulty_analytics(material_id, teacher_id, quiz_ids=None, student_ids=Non
         b['accuracy'] = round(b['correct'] / b['total'] * 100, 1) if b['total'] else 0.0
 
     qd = {}
+    unclassified_quiz = 0
     if quiz_ids:
         qrows = Question.query.filter(Question.quiz_id.in_(quiz_ids)).all()
         for qst in qrows:
-            diff = (qst.difficulty or 'medium').lower()
+            diff = normalize_difficulty(qst.difficulty)
+            if not diff:
+                # Tingkat kosong = "belum ditentukan". Jangan mengarang
+                # 'medium' dan memasukkannya ke bucket yang seolah terukur.
+                unclassified_quiz += 1
+                continue
             bucket = qd.setdefault(diff, {'total': 0, 'answered': 0, 'correct': 0, 'accuracy': 0.0})
             bucket['total'] += 1
             for a in qst.answers if hasattr(qst, 'answers') else []:
@@ -1400,7 +1406,8 @@ def difficulty_analytics(material_id, teacher_id, quiz_ids=None, student_ids=Non
             b['accuracy'] = round(b['correct'] / b['answered'] * 100, 1) if b.get('answered') else 0.0
 
     return {'interactive': ia, 'quiz': qd,
-            'unclassified_interactive': unclassified}
+            'unclassified_interactive': unclassified,
+            'unclassified_quiz': unclassified_quiz}
 
 
 def quiz_analysis(quiz, teacher_id):
@@ -1450,8 +1457,13 @@ def quiz_analysis(quiz, teacher_id):
         'passed': (s.percentage or 0) >= (quiz.passing_grade or 75),
     } for s in subs]
     difficulty = {}
+    unclassified = 0
     for q in questions:
-        diff = (q.difficulty or 'medium').lower()
+        diff = normalize_difficulty(q.difficulty)
+        if not diff:
+            # Tingkat kosong = "belum ditentukan"; jangan dikarang jadi 'medium'.
+            unclassified += 1
+            continue
         bucket = difficulty.setdefault(diff, {'total': 0, 'answered': 0, 'correct': 0})
         bucket['total'] += 1
         answers = Answer.query.filter_by(question_id=q.id).all()
@@ -1462,7 +1474,8 @@ def quiz_analysis(quiz, teacher_id):
     for b in difficulty.values():
         b['accuracy'] = round(b['correct'] / b['answered'] * 100, 1) if b.get('answered') else 0.0
     return {'summary': summary, 'per_question': per_question,
-            'attempts_by_student': attempts_by_student, 'difficulty': difficulty}
+            'attempts_by_student': attempts_by_student, 'difficulty': difficulty,
+            'unclassified': unclassified}
 
 
 def teacher_students_table(teacher_id, filters=None, page=1, per_page=20):

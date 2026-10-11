@@ -123,7 +123,7 @@
           ></textarea>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium mb-1">Tipe Soal</label>
             <select
@@ -133,17 +133,6 @@
             >
               <option value="multiple_choice">Pilihan Ganda</option>
               <option value="true_false">Benar / Salah</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">Kesulitan</label>
-            <select
-              v-model="form.difficulty"
-              class="w-full dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
-            >
-              <option value="easy">Mudah</option>
-              <option value="medium">Sedang</option>
-              <option value="hard">Sulit</option>
             </select>
           </div>
           <div>
@@ -269,7 +258,6 @@ function defaultForm() {
     misconception: "",
     question_type: "multiple_choice",
     question_text: "",
-    difficulty: "medium",
     explanation: "",
     points: 10,
     image_url: "",
@@ -326,7 +314,6 @@ const applyInitial = () => {
     form.value.misconception = props.question.misconception || "";
     form.value.question_type = props.question.question_type || "multiple_choice";
     form.value.question_text = props.question.question_text || "";
-    form.value.difficulty = props.question.difficulty || "medium";
     form.value.explanation = props.question.explanation || "";
     form.value.points = props.question.points ?? 10;
     form.value.image_url = props.question.image_url || "";
@@ -431,7 +418,6 @@ const save = async () => {
     misconception: form.value.misconception,
     question_type: form.value.question_type,
     question_text: form.value.question_text,
-    difficulty: form.value.difficulty,
     explanation: form.value.explanation,
     points: Number(form.value.points) || 0,
     image_url: form.value.image_url,
