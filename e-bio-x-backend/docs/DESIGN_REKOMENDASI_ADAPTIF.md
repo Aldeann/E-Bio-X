@@ -3,7 +3,8 @@
 Status: **sebagian terimplementasi**.
 - Tahap 1: **selesai** (lihat riwayat implementasi di bawah).
 - Tahap 2: **selesai** (lihat riwayat implementasi di bawah).
-- Tahap 3-4 dan soal jangkar: **draf desain**, belum ada kode.
+- Tahap 3: **selesai** (lihat riwayat implementasi di bawah).
+- Tahap 4 dan soal jangkar: **draf desain**, belum ada kode.
 Cakupan: rekomendasi bagian (Fase 3e), sesi latihan adaptif (Fase 3f), dan
 perluasan ke fokus miskonsepsi + soal jangkar untuk pengukuran.
 
@@ -11,8 +12,8 @@ Keputusan yang sudah diambil:
 - **Lane pengukuran: B** - jawaban latihan tetap dipakai untuk pengukuran
   tingkat global untuk sekarang, dengan batasannya dicatat (bagian 9).
   Soal jangkar / post-test per bagian jadi arah perbaikan.
-- **Cakupan dekat: Tahap 1 lalu Tahap 2** - Tahap 3+ menunggu keputusan
-  lanjutan.
+- **Cakupan dekat: Tahap 1, lalu Tahap 2, lalu Tahap 3** - Tahap 4 dan soal
+  jangkar menunggu keputusan lanjutan.
 
 Riwayat implementasi Tahap 1 (kode):
 - `src/ml/recommendation.py` - `recommend_sections_for_student` menambahkan
@@ -49,6 +50,22 @@ Riwayat implementasi Tahap 2 (kode):
 - Kontrak yang disepakati saat implementasi: fokus memengaruhi KUOTA CAMPURAN
   (soal fokus mengisi posisi 60/30/10 lebih dulu); sisa soal di luar kuota
   tetap ikut di belakang dengan urutan id stabil (perilaku lama dipertahankan).
+
+Riwayat implementasi Tahap 3 (kode):
+- `src/ml/ml_config.py` - konstanta `REC_COOLDOWN_HOURS = 20`,
+  `REC_STALE_DAYS = 7`, `REC_COOLDOWN_FACTOR = 0.80`, `REC_STALE_BOOST = 1.05`.
+- `src/ml/recommendation.py` - `_practice_recency_map(student_id)` (satu query
+  berkelompok `MAX(answered_at)` per bagian); `_recency_factor(s)` netral 1.0
+  tanpa data latihan; `score_section` dikali `_recency_factor`; alasan teks
+  "Baru kamu latih - ulangi besok agar lebih efektif" (cooldown) dan
+  "Belum kamu sentuh N hari" (stale); item saran membawa `recently_practiced`
+  (bool) + `days_since_practice` (int|None).
+- `app/pages/student/dashboard.vue` - catatan kecil "Baru kamu latih - ulangi
+  besok agar lebih efektif." di kartu bagian yang sedang dalam cooldown.
+- `test_section_recommendations.py` - blok `[7]`: aturan murni (netral tanpa
+  data, cooldown menurunkan, stale menaikkan), endpoint menandai bagian yang
+  baru dilarin + alasan cooldown jujur + skor < baseline tanpa recency
+  (54+9 = 63/63 lulus).
 
 
 Dokumen ini melengkapi `FEATURE_BAGIAN_MASTERY.md`. Ia tidak menggantinya;
@@ -264,20 +281,35 @@ FOCUS_LABEL_MAXLEN = 160      # potong teks label untuk umpan balik
 
 ---
 
-## 7. Tahap 3 - Adaptif antar-sesi (pengulangan terjadwal)
+## 7. Tahap 3 - Adaptif antar-sesi (pengulangan terjadwal) ✅ selesai
 
-Memakai `PracticeAnswer.answered_at`.
+Memakai `PracticeAnswer.answered_at` (satu query `MAX(answered_at)` per
+bagian via `_practice_recency_map`). Langkah yang dilakukan:
 
-- Hitung `last_practice_at` per (siswa, bagian) + akurasi terbaru.
-- Aturan transparan:
-  - baru dikerjakan (< `REVIEW_COOLDOWN_HOURS`, mis. 20 jam) dan masih lemah
-    -> tampilkan "ulangi besok", jangan dorong dua kali;
-  - lama tidak disentuh + masih lemah -> naikkan prioritas;
-  - sudah tuntas -> turunkan, arahkan ke bagian terlemah berikutnya.
-- Diterapkan sebagai satu suku `recency_factor` dengan bobot eksplisit di
-  `REC_SECTION_WEIGHTS` (bisa diaudit, bukan model).
+- `score_section` dikali `_recency_factor(s)`:
+  - `practice_hours < REC_COOLDOWN_HOURS (20 jam)` dan masih lemah
+    (pasti, karena bagian terkuasai tak pernah sampai ke `score_section`)
+    -> dikali `REC_COOLDOWN_FACTOR = 0.80`: "ulangi besok", jangan didorong
+    dua kali;
+  - `practice_days >= REC_STALE_DAYS (7 hari)` -> dikali
+    `REC_STALE_BOOST = 1.05`: bagian lemah lama tak disentuh naik prioritas;
+  - tanpa data latihan untuk bagian itu -> netral 1.0 (tidak mengarang).
+- Alasan jujur di kartu: **"Baru kamu latih - ulangi besok agar lebih
+  efektif"** (cooldown), **"Belum kamu sentuh N hari"** (stale).
+- Item saran baru: `recently_practiced` (bool) + `days_since_practice`
+  (int | null); UI menampilkan catatan cooldown di kartu.
+- Satu suku `recency_factor` transparan dengan faktor eksplisit di
+  `ml_config.py` (bisa diaudit, bukan model); faktor dipakai sebagai
+  **pengali**, bukan bobot tambahan di `REC_SECTION_WEIGHTS`, supaya bobot
+  lama yang sudah dipakai lapangan tidak berubah maknanya.
+- Mengubah peringkat Fase 3e -> tes `[7]` baru di
+  `test_section_recommendations.py` (9 kasus, semuanya lulus).
 
-Mengubah peringkat Fase 3e -> butuh tes baru dan pembahasan bobot.
+Keputusan saat implementasi: cooldown TIDAK melarang membuka latihan (tombol
+tetap bisa), hanya menurunkan prioritas + memberi tahu jujur bahwa lebih baik
+menunggu; ringkasan "Latihan lagi" di dalam modal sesi tetap ada sebagai
+kelanjutan sesi. "Masih lemah" adalah syarat implisit: hanya bagian di bawah
+`HIGH_MASTERY_CUTOFF` yang sampai ke `score_section`.
 
 ## 8. Tahap 4 - Adaptif dalam sesi (ditunda)
 
@@ -392,7 +424,7 @@ benar-benar bersih.
 
 | Endpoint | Sebelum | Sesudah (usulan) |
 |---|---|---|
-| `GET /api/student/recommendations` | item tanpa info latihan | **+ `practice_available`, `practice_total` (selesai, Tahap 1)** |
+| `GET /api/student/recommendations` | item tanpa info latihan | **+ `practice_available`, `practice_total` (selesai, Tahap 1)**; **+ `recently_practiced`, `days_since_practice` (selesai, Tahap 3)** |
 | `GET .../sections/<sid>` | `session{basis, target_level, mix, note}` | **+ `session.focus_available/focus_wrong/focus_total/focus_text` (selesai, Tahap 2; tanpa teks label)** |
 | `POST .../answer` | tidak berubah | tidak berubah |
 | ringkasan sesi | tidak ada | **dihitung klien dari respons jawaban (selesai, Tahap 2; tanpa endpoint)** |
@@ -417,6 +449,11 @@ Status per item (item 1-7 dari Tahap 2 sudah lulus di blok `[13]`
 7. Regresi: tanpa data fokus, output `session` identik dengan sebelum perubahan. ✅
 8. Soal jangkar (bila dikerjakan): label global hanya dari jawaban anchor.
    (belum ada kode; menunggu Tahap A)
+9. Tahap 3 murni: tanpa data latihan -> netral; baru dilarin (< cooldown) ->
+   skor `* 0.80`; lama tak disentuh (>= 7 hari) -> `* 1.05`; pernah latih tapi
+   wajar -> netral. ✅ (blok `[7]`)
+10. Tahap 3 endpoint: bagian yang baru dilarin ditandai `recently_practiced`,
+    alasan "ulangi besok" muncul, skor < baseline tanpa recency. ✅ (blok `[7]`)
 
 ---
 
@@ -426,7 +463,7 @@ Status per item (item 1-7 dari Tahap 2 sudah lulus di blok `[13]`
 |---|---|---|---|---|
 | 1 | tombol langsung + `practice_available` | rendah | 1 controller, 1 vue | ✅ selesai |
 | 2 | fokus miskonsepsi (urutan + ringkasan klien) | sedang | service sesi, modal | ✅ selesai |
-| 3 | pengulangan terjadwal | sedang | scoring Fase 3e | draf (belum) |
+| 3 | pengulangan terjadwal | sedang | scoring Fase 3e | ✅ selesai |
 | 4 | adaptif per-item | tinggi | endpoint baru | draf (tunda) |
 | A | soal jangkar / post-test per bagian | sedang | model, service, alur guru+siswa | draf (belum) |
 
@@ -438,14 +475,18 @@ Sudah diputuskan:
 
 1. **Lane pengukuran (bagian 9):** **B** - pertahankan sekarang, catat
    batasannya; soal jangkar / post-test per bagian jadi arah perbaikan.
-2. **Tahap yang dikerjakan:** **Tahap 1, lalu Tahap 2** (keduanya selesai).
+2. **Tahap yang dikerjakan:** **Tahap 1, lalu Tahap 2, lalu Tahap 3**
+   (semuanya selesai).
 3. **Ambang fokus `FOCUS_MIN_SAMPLE = 2`:** dipakai di implementasi Tahap 2;
    bisa dinaikkan ke 3 bila lapangan menunjukkan fokus terlalu sering.
 4. **Ringkasan sesi:** daftar soal yang masih salah (diputuskan; tanpa
    menyebut nama konsep agar konsep benar tidak bocor menjelang sesi berikut).
+5. **Tahap 3 (pengulangan terjadwal):** **selesai** - cooldown 20 jam
+   (`REC_COOLDOWN_FACTOR = 0.80`) + boost bagian lama tak disentuh
+   (`REC_STALE_DAYS = 7`, `REC_STALE_BOOST = 1.05`); netral tanpa data.
+   Ambang 20 jam / 7 hari bisa dikalibrasi ulang dari lapangan.
 
 Masih terbuka:
 
-5. **Soal jangkar:** kerjakan sekarang (langkah 1-3) atau setelah ada bagian
+6. **Soal jangkar:** kerjakan sekarang (langkah 1-3) atau setelah ada bagian
    dengan > 20 soal / post-test?
-6. **Tahap 3 (pengulangan terjadwal):** mulai setelah Tahap 2 stabil?

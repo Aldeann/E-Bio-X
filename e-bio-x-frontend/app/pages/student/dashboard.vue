@@ -254,6 +254,9 @@
                 <p v-if="s.practice_available === false" class="text-[11px] text-gray-500">
                   Belum ada soal latihan yang disetujui guru untuk bagian ini.
                 </p>
+                <p v-else-if="s.recently_practiced" class="text-[11px] text-gray-500">
+                  Baru kamu latih - ulangi besok agar lebih efektif.
+                </p>
               </div>
             </div>
           </div>

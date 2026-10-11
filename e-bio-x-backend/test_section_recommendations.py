@@ -46,6 +46,9 @@ from src.models.answer import Answer  # noqa: E402
 from src.models.submission import Submission  # noqa: E402
 from src.models.recommendation import Recommendation  # noqa: E402
 from src.models.question_bank import QuestionBank  # noqa: E402
+from src.models.practice_answer import PracticeAnswer  # noqa: E402
+from src.services import learning_analytics_service as analytics  # noqa: E402
+from datetime import datetime  # noqa: E402
 from flask_jwt_extended import create_access_token  # noqa: E402
 
 STAMP = 'zzsecrec'
@@ -155,6 +158,7 @@ def drop_fixture():
     student = created.get('student')
     if student is not None:
         Recommendation.query.filter_by(student_id=student.id).delete()
+        PracticeAnswer.query.filter_by(student_id=student.id).delete()
         Answer.query.filter_by(student_id=student.id).delete()
         Submission.query.filter_by(student_id=student.id).delete()
         db.session.flush()
@@ -436,6 +440,71 @@ def main():
             check('siswa luar kelas tidak melihat bagian materi orang lain',
                   (out.get('section_recommendations') or []) == [],
                   str(out.get('section_recommendations')))
+
+            # ------------------------------- PENGULANGAN TERJADWAL
+            print('\n[7] PENGULANGAN TERJADWAL / RECENCY (Tahap 3)')
+            # Aturan murni (tanpa DB): faktor pengali hanya muncul bila ada
+            # data latihan; tanpa data -> netral 1.0.
+            s31 = {'score': 25.0, 'answered': 4, 'correct': 1}
+            base31 = score_section(s31)
+            check('pure: tanpa data latihan -> netral',
+                  score_section(s31) == base31, str(score_section(s31)))
+            check('pure: baru dilarin (< cooldown) -> prioritas turun',
+                  score_section({**s31, 'practice_hours': 1})
+                  == round(base31 * cfg.REC_COOLDOWN_FACTOR, 4),
+                  str(score_section({**s31, 'practice_hours': 1})))
+            check('pure: lama tak disentuh (>= stale) -> prioritas naik',
+                  score_section({**s31, 'practice_hours': 400,
+                                 'practice_days': 17})
+                  == round(base31 * cfg.REC_STALE_BOOST, 4),
+                  str(score_section({**s31, 'practice_hours': 400,
+                                     'practice_days': 17})))
+            check('pure: pernah latih tapi wajar -> netral',
+                  score_section({**s31, 'practice_hours': 100,
+                                 'practice_days': 4}) == base31,
+                  str(score_section({**s31, 'practice_hours': 100,
+                                     'practice_days': 4})))
+
+            # Endpoint: siswa baru saja menjawab soal latihan Bagian B
+            # (bank_b), jadi bagian itu berada dalam cooldown.
+            db.session.add(PracticeAnswer(
+                student_id=student.id, material_id=material.id,
+                section_id=created['sec_b'].id,
+                bank_question_id=created['bank_b'].id,
+                selected_option=2, is_correct=False, attempt_no=1,
+                question_snapshot='Soal latihan Bagian B',
+                answered_at=datetime.utcnow()))
+            db.session.commit()
+            r7 = client.get('/api/student/recommendations', headers=h_s)
+            d7 = r7.get_json() or {}
+            items7 = d7.get('section_recommendations') or []
+            b7 = by_title(items7, 'Bagian B')
+            check('bagian baru dilarin -> recently_practiced True, 0 hari',
+                  b7.get('recently_practiced') is True
+                  and b7.get('days_since_practice') == 0,
+                  str((b7.get('recently_practiced'),
+                       b7.get('days_since_practice'))))
+            reasons7 = ' '.join(b7.get('reasons') or []).lower()
+            check('alasan cooldown jujur ("ulangi besok")',
+                  'ulangi besok' in reasons7, reasons7)
+            a7 = by_title(items7, 'Bagian A')
+            check('bagian tanpa latihan -> tidak ditandai baru dilarin',
+                  a7.get('recently_practiced') is False,
+                  str(a7.get('recently_practiced')))
+            check('hint membawa default recency (False/None)',
+                  all(i.get('recently_practiced') is False
+                      and i.get('days_since_practice') is None
+                      for i in items7 if not i['ranked']),
+                  str([(i['section_title'], i.get('recently_practiced'),
+                        i.get('days_since_practice')) for i in items7]))
+            row_b7 = next(rr for rr in analytics.section_mastery_for_student(
+                student.id, material.id)['sections']
+                if rr['section_id'] == created['sec_b'].id)
+            base_b7 = score_section(row_b7)
+            check('cooldown menurunkan skor vs tanpa recency',
+                  b7.get('score') is not None
+                  and b7['score'] < base_b7,
+                  f"{b7.get('score')} < {base_b7}")
         finally:
             drop_fixture()
 

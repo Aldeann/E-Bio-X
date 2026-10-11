@@ -157,6 +157,16 @@ REC_SECTION_WEIGHTS = {
 REC_SECTION_MAX_RESULTS = 4      # ranked sections surfaced to the student
 REC_SECTION_HINTS = 2            # unranked sections reported as "belum cukup bukti"
 
+# --- Pengulangan terjadwal / recency (Tahap 3) ----------------------
+# Mencegah menyuruh mengulang bagian yang BARU saja dilatih (cooldown), dan
+# menaikkan prioritas bagian lemah yang sudah lama tidak disentuh (lupa).
+# Faktor dipakai sebagai PENGALI skor di score_section; netral (1.0) bila
+# tidak ada data latihan untuk bagian itu sama sekali - tidak mengarang.
+REC_COOLDOWN_HOURS = 20          # < sekian jam sejak latihan terakhir -> "ulangi besok"
+REC_STALE_DAYS = 7               # >= sekian hari tanpa latihan -> prioritas naik
+REC_COOLDOWN_FACTOR = 0.80       # bagian baru dilarin dan masih lemah
+REC_STALE_BOOST = 1.05           # bagian lemah lama tak disentuh
+
 # --- Knowledge graph prasyarat (Fase 4e) --------------------------
 # Bagian yang prasyaratnya sudah TERBUKTI belum tuntas diturunkan
 # prioritasnya (faktor < 1) supaya bagian dasarnya lebih dulu muncul di

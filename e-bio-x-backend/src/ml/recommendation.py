@@ -13,6 +13,7 @@ from src.ml import ml_config as cfg
 from src.services import learning_analytics_service as analytics
 from src.models.material import Material
 from src.models.submission import Submission
+from src.models.practice_answer import PracticeAnswer
 
 
 # ------------------------------------------------------------
@@ -186,6 +187,13 @@ def score_section(s, weights=None):
     Fase 4e: bila prasyarat bagian ini TERBUKTI belum tuntas, skornya
     dikalikan faktor penalti supaya dasarnya lebih dulu disarankan. Bila
     prasyaratnya belum bisa dinilai, skor TIDAK diubah.
+
+    Tahap 3: `s` boleh membawa `practice_hours`/`practice_days` (sejak
+    latihan terakhir siswa pada bagian itu). Koefisien pengulangan:
+    - baru saja dilAtih (< REC_COOLDOWN_HOURS) -> dikali REC_COOLDOWN_FACTOR
+      ("ulangi besok", jangan didorong dua kali);
+    - lama tak disentuh (>= REC_STALE_DAYS) -> dikali REC_STALE_BOOST;
+    - tanpa data -> netral 1.0.
     """
     w = weights or dict(cfg.REC_SECTION_WEIGHTS)
     score = s.get('score')
@@ -195,12 +203,53 @@ def score_section(s, weights=None):
     error = (wrong / answered) if answered else 0.0
     base = (mastery_gap * w['section_mastery_gap']
             + error * w['section_error'])
-    return round(base * _prerequisite_factor(s), 4)
+    return round(base * _prerequisite_factor(s) * _recency_factor(s), 4)
+
+
+def _recency_factor(s):
+    """Faktor pengulangan (Tahap 3), netral bila tidak ada data latihan."""
+    hours = s.get('practice_hours')
+    if hours is None:
+        return 1.0
+    if hours < cfg.REC_COOLDOWN_HOURS:
+        return cfg.REC_COOLDOWN_FACTOR
+    days = s.get('practice_days')
+    if days is not None and days >= cfg.REC_STALE_DAYS:
+        return cfg.REC_STALE_BOOST
+    return 1.0
+
+
+def _practice_recency_map(student_id):
+    """section_id -> {'hours', 'days'} sejak latihan terakhir siswa.
+
+    Satu query berkelompok untuk SEMUA bagian (PracticeAnswer.answered_at),
+    bukan query per bagian. Bagian yang tidak pernah dilatih tidak ada di
+    peta ini - dan ketidakhadiran itu sengaja dijaga tetap netral
+    (REC_COOLDOWN/BOST tidak berlaku, tidak mengarang).
+    """
+    rows = db.session.query(
+        PracticeAnswer.section_id,
+        db.func.max(PracticeAnswer.answered_at),
+    ).filter(PracticeAnswer.student_id == student_id).group_by(
+        PracticeAnswer.section_id).all()
+    now = datetime.utcnow()
+    out = {}
+    for section_id, last_at in rows:
+        if last_at is None:
+            continue
+        hours = max(0.0, (now - last_at).total_seconds() / 3600.0)
+        out[int(section_id)] = {'hours': hours, 'days': hours / 24.0}
+    return out
 
 
 def _section_reasons(s):
     """Reasons for a RANKED section. Every number here is real data."""
     reasons = []
+    hours = s.get('practice_hours')
+    if hours is not None and hours < cfg.REC_COOLDOWN_HOURS:
+        reasons.append('Baru kamu latih - ulangi besok agar lebih efektif')
+    elif (s.get('practice_days') or 0) >= cfg.REC_STALE_DAYS:
+        reasons.append(f'Belum kamu sentuh {round(s["practice_days"])} hari')
     if s.get('prerequisite_met') is False:
         unmet = [p for p in (s.get('prerequisites') or [])
                  if p.get('met') is False]
@@ -252,6 +301,9 @@ def recommend_sections_for_student(student):
     # bukan per materi. Graph-nya bisa lintas materi, jadi prasyarat sebuah
     # bagian bisa berada di materi lain dan tetap bisa dinilai di sini.
     context = analytics.student_section_context(student)
+    # Tahap 3: jam/hari sejak latihan terakhir siswa di tiap bagian, satu
+    # query. Dipakai score_section (cooldown + boost) dan alasan teks.
+    recency = _practice_recency_map(student.id)
     for material in analytics.student_accessible_materials(student):
         data = analytics.section_mastery_for_student(
             student.id, material.id, context=context)
@@ -274,6 +326,9 @@ def recommend_sections_for_student(student):
                 # berikutnya untuk prioritas; di sini disajikan transparan dulu.
                 'prerequisite_met': row.get('prerequisite_met'),
                 'prerequisites': row.get('prerequisites') or [],
+                # Tahap 3: default tak disentuh; diisi ulang untuk ranked.
+                'recently_practiced': False,
+                'days_since_practice': None,
             }
             if row['status'] != 'READY':
                 # Below MIN_SECTION_SAMPLE: report counts, claim no score.
@@ -284,9 +339,22 @@ def recommend_sections_for_student(student):
                 continue
             if (row['score'] or 0) >= cfg.HIGH_MASTERY_CUTOFF:
                 continue
+            # Tahap 3: tempel recency ke salinan baris agar score_section dan
+            # alasan teks bisa membacanya. Bila bagian tak pernah dilatih,
+            # `rec` kosong -> kunci practice_hours/days TIDAK dipasang ->
+            # _recency_factor kembali 1.0 (netral, tidak mengarang).
+            rec = recency.get(int(row['section_id']))
+            row_scored = dict(row)
+            if rec:
+                row_scored['practice_hours'] = rec['hours']
+                row_scored['practice_days'] = rec['days']
             item['ranked'] = True
-            item['score'] = score_section(row)
-            item['reasons'] = _section_reasons(row)
+            item['score'] = score_section(row_scored)
+            item['reasons'] = _section_reasons(row_scored)
+            item['recently_practiced'] = bool(
+                rec and rec['hours'] < cfg.REC_COOLDOWN_HOURS)
+            item['days_since_practice'] = (
+                round(rec['days']) if rec else None)
             ranked.append(item)
 
     ranked.sort(key=lambda x: (-x['score'], x['material_id'], x['position']))
