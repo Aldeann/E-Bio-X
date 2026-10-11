@@ -374,8 +374,70 @@ def _weakest_level(per_level):
     return min(attempted, key=key)
 
 
-def _order_questions(approved, effective, target):
-    """Urutkan soal sesuai komposisi 60/30/10 tanpa menghilangkan soal apa pun."""
+def focus_for_student_section(student, approved):
+    """Label miskonsepsi yang paling sering salah untuk (siswa, bagian), atau None.
+
+    Dihitung dari jawaban TERAKHIR per soal, konsisten dengan `latest_attempts`:
+    mengulang satu soal sampai benar tetap terhitung satu soal terjawab, jadi
+    fokus tidak bisa ditimbun lewat percobaan berulang.
+
+    Hanya label dengan minimal ``FOCUS_MIN_SAMPLE`` jawaban yang dipertimbangkan,
+    dan hanya bila salah > benar. Label kosong diabaikan - tidak mengarang.
+    Seri dipecah ke label yang paling baru dijawab (masalah yang masih hangat
+    didahulukan).
+
+    Label dipakai server untuk mengurutkan sesi dan TIDAK pernah dikirim ke
+    klien sebelum soal dijawab (bisa membocorkan konsep benar). Agregat angka
+    saja yang boleh keluar.
+    """
+    if not approved:
+        return None
+    rows = PracticeAnswer.query.filter_by(
+        student_id=student.id, section_id=approved[0].section_id
+    ).order_by(PracticeAnswer.answered_at.asc(), PracticeAnswer.id.asc()).all()
+    if not rows:
+        return None
+
+    latest = {}
+    last_at = {}
+    for r in rows:
+        latest[int(r.bank_question_id)] = bool(r.is_correct)
+        last_at[int(r.bank_question_id)] = r.answered_at
+
+    by_id = {int(bq.id): bq for bq in approved}
+    agg = {}
+    for bq_id, ok in latest.items():
+        bq = by_id.get(bq_id)
+        label = ((bq.misconception or '').strip()[:cfg.FOCUS_LABEL_MAXLEN]
+                 if bq else '')
+        if not label:
+            continue
+        a = agg.setdefault(label, {
+            'label': label, 'wrong': 0, 'correct': 0, 'total': 0, 'last_at': None})
+        a['total'] += 1
+        a['correct' if ok else 'wrong'] += 1
+        a['last_at'] = last_at.get(bq_id)
+
+    candidates = [a for a in agg.values()
+                  if a['total'] >= cfg.FOCUS_MIN_SAMPLE
+                  and a['wrong'] > a['correct']]
+    if not candidates:
+        return None
+    candidates.sort(key=lambda a: (-(a['wrong'] - a['correct']),
+                                   -((a['last_at'] or datetime.min).timestamp())))
+    best = candidates[0]
+    return {'label': best['label'], 'wrong': best['wrong'],
+            'correct': best['correct'], 'total': best['total']}
+
+
+def _order_questions(approved, effective, target, focus_label=None):
+    """Urutkan soal sesuai komposisi 60/30/10 tanpa menghilangkan soal apa pun.
+
+    Bila `focus_label` dikenal (fokus miskonsepsi, Tahap 2), urutan DI DALAM
+    tiap tingkat menaruh soal berlabel fokus lebih dulu; sisanya tetap menurut
+    id yang stabil. Jumlah per tingkat 60/30/10 TIDAK berubah. Tanpa fokus
+    perilaku identik dengan sebelum perubahan (regresi aman).
+    """
     if not target:
         return list(approved)
 
@@ -384,6 +446,15 @@ def _order_questions(approved, effective, target):
         level = (effective.get(int(bq.id)) or {}).get('label')
         if level in queues:
             queues[level].append(bq)
+
+    if focus_label:
+        for lvl in cfg.SESSION_LEVEL_ORDER:
+            queues[lvl].sort(key=lambda bq: (
+                # 0 = cocok fokus -> didahulukan; 1 = bukan fokus. Hanya
+                # menggeser posisi, tidak menambah/membuang soal.
+                0 if (bq.misconception or '').strip()[:cfg.FOCUS_LABEL_MAXLEN] == focus_label else 1,
+                bq.id,
+            ))
 
     total = len(approved)
     n_target = round(total * cfg.SESSION_MIX_TARGET)
@@ -428,8 +499,12 @@ def session_for_section(material_id, section_id, student):
 
     target = _weakest_level(per_level)
 
+    # --- fokus miskonsepsi (Tahap 2): urutan DI DALAM tiap tingkat ---
+    focus = focus_for_student_section(student, approved)
+    focus_label = focus['label'] if focus else None
+
     # --- komposisi 60/30/10 ---
-    ordered = _order_questions(approved, effective, target)
+    ordered = _order_questions(approved, effective, target, focus_label)
     total = len(approved)
     mix = {'target': 0, 'below': 0, 'above': 0}
     if target:
@@ -501,6 +576,14 @@ def session_for_section(material_id, section_id, student):
         'mix': mix,
         'total': total,
         'served': min(total, MAX_SERVED),
+        # Fokus miskonsepsi (Tahap 2): hanya agregat ANGKA yang keluar, teks
+        # label tidak pernah dikirim sebelum dijawab. Urutan sudah memakai
+        # label ini secara diam-diam di server.
+        'focus_available': focus is not None,
+        'focus_wrong': focus['wrong'] if focus else 0,
+        'focus_total': focus['total'] if focus else 0,
+        'focus_text': ('Sesi ini menekankan soal yang paling sering kamu lewatkan.'
+                       if focus else None),
         'note': ('Urutan sesi: 60% sasaran, 30% satu tingkat di bawah, 10% di atas. '
                  'Hanya soal yang disetujui guru; soal baru tidak pernah dibuat.'),
     }

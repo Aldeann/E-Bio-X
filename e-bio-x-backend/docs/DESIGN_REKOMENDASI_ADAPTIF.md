@@ -2,7 +2,8 @@
 
 Status: **sebagian terimplementasi**.
 - Tahap 1: **selesai** (lihat riwayat implementasi di bawah).
-- Tahap 2-4 dan soal jangkar: **draf desain**, belum ada kode.
+- Tahap 2: **selesai** (lihat riwayat implementasi di bawah).
+- Tahap 3-4 dan soal jangkar: **draf desain**, belum ada kode.
 Cakupan: rekomendasi bagian (Fase 3e), sesi latihan adaptif (Fase 3f), dan
 perluasan ke fokus miskonsepsi + soal jangkar untuk pengukuran.
 
@@ -10,7 +11,8 @@ Keputusan yang sudah diambil:
 - **Lane pengukuran: B** - jawaban latihan tetap dipakai untuk pengukuran
   tingkat global untuk sekarang, dengan batasannya dicatat (bagian 9).
   Soal jangkar / post-test per bagian jadi arah perbaikan.
-- **Cakupan dekat: Tahap 1 saja** - Tahap 2 menunggu keputusan lanjutan.
+- **Cakupan dekat: Tahap 1 lalu Tahap 2** - Tahap 3+ menunggu keputusan
+  lanjutan.
 
 Riwayat implementasi Tahap 1 (kode):
 - `src/ml/recommendation.py` - `recommend_sections_for_student` menambahkan
@@ -22,6 +24,31 @@ Riwayat implementasi Tahap 1 (kode):
 - `test_section_recommendations.py` - blok `[1b]`: soal APPROVED membuat
   latihan tersedia, soal DRAFT tidak dihitung, semua baris membawa info
   latihan (54/54 lulus).
+
+Riwayat implementasi Tahap 2 (kode):
+- `src/ml/ml_config.py` - konstanta `FOCUS_MIN_SAMPLE = 2`,
+  `FOCUS_LABEL_MAXLEN = 160`.
+- `src/services/student_practice_service.py` -
+  `focus_for_student_section(student, approved)` menghitung label miskonsepsi
+  terlemah dari jawaban TERAKHIR per soal (konsisten dengan `latest_attempts`),
+  dengan syarat `total >= FOCUS_MIN_SAMPLE` dan `salah > benar`.
+  `_order_questions(..., focus_label=None)` menggeser soal berlabel fokus ke
+  depan DI DALAM tiap tingkat sesi; tanpa fokus perilaku identik dengan
+  sebelumnya. `session_for_section` mengirim agregat angka
+  (`focus_available`/`focus_wrong`/`focus_total` + `focus_text` generik) tanpa
+  teks label.
+- `app/components/student/SectionPracticeModal.vue` - layar **Latihan selesai**
+  menampilkan daftar soal yang masih keliru (dihitung klien dari jawaban yang
+  sudah diterima) + tombol **Latihan lagi** yang memuat ulang sesi (server
+  menghitung fokus ulang sehingga urutan berikutnya lebih terarah); baris fokus
+  netral di banner sesi.
+- `test_student_practice.py` - blok `[13]`: fokus terdeteksi / tidak terdeteksi
+  (benar > salah, 1 soal), label tidak bocor di payload, urutan kuota campuran
+  bergeser ke soal fokus, ekor tetap urut id, `_order_questions` murni
+  (85/85 lulus).
+- Kontrak yang disepakati saat implementasi: fokus memengaruhi KUOTA CAMPURAN
+  (soal fokus mengisi posisi 60/30/10 lebih dulu); sisa soal di luar kuota
+  tetap ikut di belakang dengan urutan id stabil (perilaku lama dipertahankan).
 
 
 Dokumen ini melengkapi `FEATURE_BAGIAN_MASTERY.md`. Ia tidak menggantinya;
@@ -139,6 +166,10 @@ Rendah. Menyambung dua layar yang sudah ada; tidak mengubah perhitungan.
 ---
 
 ## 6. Tahap 2 - Fokus per miskonsepsi (inti)
+
+**Status: selesai.** Rincian kode ada di riwayat implementasi pada kepala
+dokumen. Catatan kontrak: fokus menggeser soal di **dalam kuota campuran**
+(60/30/10); sisa soal di luar kuota tetap urut id stabil (perilaku lama).
 
 ### 6.1 Sinyal fokus
 
@@ -361,10 +392,10 @@ benar-benar bersih.
 
 | Endpoint | Sebelum | Sesudah (usulan) |
 |---|---|---|
-| `GET /api/student/recommendations` | item tanpa info latihan | + `practice_available`, `practice_total` |
-| `GET .../sections/<sid>` | `session{basis, target_level, mix, note}` | + `session.focus_available/focus_wrong/focus_total` (tanpa teks label); `note` halus |
+| `GET /api/student/recommendations` | item tanpa info latihan | **+ `practice_available`, `practice_total` (selesai, Tahap 1)** |
+| `GET .../sections/<sid>` | `session{basis, target_level, mix, note}` | **+ `session.focus_available/focus_wrong/focus_total/focus_text` (selesai, Tahap 2; tanpa teks label)** |
 | `POST .../answer` | tidak berubah | tidak berubah |
-| ringkasan sesi | tidak ada | dihitung klien (tanpa endpoint) |
+| ringkasan sesi | tidak ada | **dihitung klien dari respons jawaban (selesai, Tahap 2; tanpa endpoint)** |
 
 Tidak ada endpoint atau tabel baru untuk Tahap 1-2. Perubahan
 mundur-kompatibel: konsumen lama mengabaikan field tambahan.
@@ -373,29 +404,31 @@ mundur-kompatibel: konsumen lama mengabaikan field tambahan.
 
 ## 12. Rencana uji
 
-Extend `test_student_practice.py` (dan `test_section_recommendations.py` untuk
-Tahap 1):
+Status per item (item 1-7 dari Tahap 2 sudah lulus di blok `[13]`
+`test_student_practice.py`; item 6 sudah lulus di `[1b]`
+`test_section_recommendations.py`):
 
-1. Fokus hanya muncul bila `total >= FOCUS_MIN_SAMPLE` dan `wrong > correct`.
-2. Satu kali salah -> bukan fokus.
-3. Label miskonsepsi kosong -> tidak ada fokus; urutan identik dengan sekarang.
-4. Fokus mengubah urutan **di dalam** tingkat; jumlah per tingkat 60/30/10 tetap.
-5. Payload sesi **tidak** memuat teks label miskonsepsi.
-6. `practice_available`/`practice_total` benar (termasuk 0 soal).
-7. Regresi: tanpa data fokus, output `session` identik dengan sebelum perubahan.
+1. Fokus hanya muncul bila `total >= FOCUS_MIN_SAMPLE` dan `wrong > correct`. ✅
+2. Satu kali salah -> bukan fokus. ✅
+3. Label miskonsepsi kosong -> tidak ada fokus; urutan identik dengan sekarang. ✅
+4. Fokus mengubah urutan **di dalam** tingkat; jumlah per tingkat 60/30/10 tetap. ✅
+5. Payload sesi **tidak** memuat teks label miskonsepsi. ✅
+6. `practice_available`/`practice_total` benar (termasuk 0 soal). ✅
+7. Regresi: tanpa data fokus, output `session` identik dengan sebelum perubahan. ✅
 8. Soal jangkar (bila dikerjakan): label global hanya dari jawaban anchor.
+   (belum ada kode; menunggu Tahap A)
 
 ---
 
 ## 13. Rilis bertahap
 
-| Tahap | Isi | Risiko | Sentuh |
-|---|---|---|---|
-| 1 | tombol langsung + `practice_available` | rendah | 1 controller, 1 vue |
-| 2 | fokus miskonsepsi (urutan + ringkasan klien) | sedang | service sesi, modal |
-| 3 | pengulangan terjadwal | sedang | scoring Fase 3e |
-| 4 | adaptif per-item | tinggi | endpoint baru (tunda) |
-| A | soal jangkar / post-test per bagian | sedang | model, service, alur guru+siswa |
+| Tahap | Isi | Risiko | Sentuh | Status |
+|---|---|---|---|---|
+| 1 | tombol langsung + `practice_available` | rendah | 1 controller, 1 vue | ✅ selesai |
+| 2 | fokus miskonsepsi (urutan + ringkasan klien) | sedang | service sesi, modal | ✅ selesai |
+| 3 | pengulangan terjadwal | sedang | scoring Fase 3e | draf (belum) |
+| 4 | adaptif per-item | tinggi | endpoint baru | draf (tunda) |
+| A | soal jangkar / post-test per bagian | sedang | model, service, alur guru+siswa | draf (belum) |
 
 ---
 
@@ -405,12 +438,14 @@ Sudah diputuskan:
 
 1. **Lane pengukuran (bagian 9):** **B** - pertahankan sekarang, catat
    batasannya; soal jangkar / post-test per bagian jadi arah perbaikan.
-2. **Ambil berapa tahap dulu:** **Tahap 1 saja** (selesai).
+2. **Tahap yang dikerjakan:** **Tahap 1, lalu Tahap 2** (keduanya selesai).
+3. **Ambang fokus `FOCUS_MIN_SAMPLE = 2`:** dipakai di implementasi Tahap 2;
+   bisa dinaikkan ke 3 bila lapangan menunjukkan fokus terlalu sering.
+4. **Ringkasan sesi:** daftar soal yang masih salah (diputuskan; tanpa
+   menyebut nama konsep agar konsep benar tidak bocor menjelang sesi berikut).
 
 Masih terbuka:
 
-3. **Ambang fokus** `FOCUS_MIN_SAMPLE = 2` - cukup, atau 3?
-4. **Ringkasan sesi:** cukup daftar soal salah, atau sebut nama konsep juga
-   (dengan risiko bocor konsep benar di sesi berikutnya)?
 5. **Soal jangkar:** kerjakan sekarang (langkah 1-3) atau setelah ada bagian
    dengan > 20 soal / post-test?
+6. **Tahap 3 (pengulangan terjadwal):** mulai setelah Tahap 2 stabil?

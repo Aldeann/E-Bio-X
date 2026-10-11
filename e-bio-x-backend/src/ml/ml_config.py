@@ -196,6 +196,14 @@ SESSION_MIX_BELOW = 0.30
 SESSION_MIX_ABOVE = 0.10
 SESSION_LEVEL_ORDER = ['easy', 'medium', 'hard']
 
+# --- Fokus miskonsepsi (Tahap 2) ------------------------------------
+# Label miskonsepsi terlemah siswa pada suatu bagian hanya mengubah URUTAN
+# soal DI DALAM tiap tingkat sesi (komposisi 60/30/10 tetap). Label dipakai
+# diam-diam oleh server untuk menyusun sesi; payload sesi TIDAK memuat teks
+# label (bisa membocorkan konsep benar), hanya agregat angka.
+FOCUS_MIN_SAMPLE = 2      # minimal soal terjawab pada satu label
+FOCUS_LABEL_MAXLEN = 160  # pemotongan teks label untuk pencocokan/tampilan
+
 # --- Recommendation closed-loop evaluation -----------------------
 # The recommendation events (clicked_at / completed_at) are already
 # recorded by recommendation.mark_clicked / mark_completed. These

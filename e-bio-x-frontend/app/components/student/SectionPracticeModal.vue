@@ -53,10 +53,17 @@
                 </span>
               </div>
               <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2">{{ session.note }}</p>
+              <p
+                v-if="session.focus_available && session.focus_text"
+                class="text-[11px] text-indigo-600 dark:text-indigo-300 mt-1.5 flex items-start gap-1"
+              >
+                <Icon name="material-symbols:target" class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                {{ session.focus_text }}
+              </p>
             </div>
 
             <!-- question -->
-            <div v-if="current">
+            <div v-if="current && !finished">
               <div class="flex items-center gap-2 mb-2 text-xs text-gray-500">
                 <span>Soal {{ index + 1 }} dari {{ questions.length }}</span>
                 <span
@@ -136,24 +143,47 @@
             </div>
 
             <!-- done -->
-            <div v-else class="text-center py-8">
+            <div v-else-if="finished" class="text-center py-8">
               <Icon name="material-symbols:task-alt" class="w-12 h-12 text-green-600 mx-auto mb-2" />
               <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">Latihan selesai</p>
               <p class="text-xs text-gray-500 mt-1">
                 {{ summary.answered }} soal dijawab, {{ summary.correct }} benar.
               </p>
+              <div
+                v-if="wrongQuestions.length"
+                class="mt-4 text-left rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3"
+              >
+                <p class="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                  Masih keliru di {{ wrongQuestions.length }} soal ini:
+                </p>
+                <ul class="mt-1.5 space-y-1">
+                  <li
+                    v-for="(wq, wi) in wrongQuestions"
+                    :key="wi"
+                    class="text-xs text-gray-600 dark:text-gray-300 flex items-start gap-1"
+                  >
+                    <Icon name="material-symbols:error" class="w-3.5 h-3.5 text-amber-600 mt-0.5 shrink-0" />
+                    {{ wq }}
+                  </li>
+                </ul>
+              </div>
               <p class="text-xs text-gray-400 mt-2">
                 Angka ini masuk ke peta pemahaman bagian ini, terpisah dari kuis dan soal interaktif.
               </p>
-              <button class="mt-4 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm" @click="close">
-                Tutup
-              </button>
+              <div class="mt-4 flex items-center justify-center gap-2">
+                <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm" @click="restart">
+                  Latihan lagi
+                </button>
+                <button class="border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg text-sm" @click="close">
+                  Tutup
+                </button>
+              </div>
             </div>
           </template>
         </div>
 
         <!-- footer nav -->
-        <div v-if="!loading && !loadError && questions.length" class="flex items-center justify-between gap-2 px-5 py-3 border-t border-gray-200 dark:border-gray-700">
+        <div v-if="!loading && !loadError && questions.length && !finished" class="flex items-center justify-between gap-2 px-5 py-3 border-t border-gray-200 dark:border-gray-700">
           <button
             class="border border-gray-300 dark:border-gray-600 px-3 py-2 rounded-lg text-sm disabled:opacity-30"
             :disabled="index === 0 || !!feedback"
@@ -206,6 +236,14 @@ const submitting = ref(false);
 const loadError = ref("");
 const error = ref("");
 const summary = ref({ answered: 0, correct: 0 });
+// Tahap 2: status "selesai sesi" + jejak jawaban sesi ini untuk ringkasan
+// klien (daftar soal yang masih keliru). Dihitung di sisi klien dari respons
+// jawaban yang sudah diterima - tidak ada endpoint agregat baru.
+const finished = ref(false);
+const feedbacks = ref([]);
+const wrongQuestions = computed(() =>
+  feedbacks.value.filter((f) => !f.ok).map((f) => f.text)
+);
 
 const current = computed(() => questions.value[index.value] || null);
 
@@ -251,6 +289,7 @@ const submit = async () => {
       }
     );
     feedback.value = res;
+    feedbacks.value.push({ text: current.value.question_text, ok: res.is_correct });
     emit("answered", res);
   } catch (e) {
     error.value = (e && e.data && e.data.error) || "Jawaban tidak dapat dinilai.";
@@ -266,14 +305,22 @@ const next = () => {
       answered: last ? last.practice_answered : 0,
       correct: last ? last.practice_correct : 0,
     };
-    index.value = 0;
     feedback.value = null;
     selected.value = null;
+    finished.value = true;
     return;
   }
   index.value += 1;
   feedback.value = null;
   selected.value = null;
+};
+
+// Sesi baru: muat ulang dari server. Server menghitung fokus ulang dari
+// jawaban yang barusan masuk, jadi urutan berikutnya lebih terarah.
+const restart = () => {
+  finished.value = false;
+  feedbacks.value = [];
+  load();
 };
 
 const load = async () => {
@@ -284,6 +331,8 @@ const load = async () => {
   index.value = 0;
   selected.value = null;
   feedback.value = null;
+  finished.value = false;
+  feedbacks.value = [];
   try {
     const res = await $fetch(
       `${config.public.backend}/api/student/practice/${props.materialId}/sections/${props.sectionId}`,

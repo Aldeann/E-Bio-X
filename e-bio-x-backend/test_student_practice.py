@@ -37,6 +37,7 @@ from src.models.question_bank import QuestionBank  # noqa: E402
 from src.models.question_bank_option import QuestionBankOption  # noqa: E402
 from src.models.practice_answer import PracticeAnswer  # noqa: E402
 from src.services import learning_analytics_service as analytics  # noqa: E402
+from src.services import student_practice_service as spractice  # noqa: E402
 from flask_jwt_extended import create_access_token  # noqa: E402
 from sqlalchemy import inspect  # noqa: E402
 
@@ -56,7 +57,8 @@ def token_for(user):
     return create_access_token(identity=str(user.id))
 
 
-def add_bank(teacher, section, status, text, feedback=True):
+def add_bank(teacher, section, status, text, feedback=True,
+             misconception='Virus dianggap sel hidup'):
     bq = QuestionBank(
         teacher_id=teacher.id,
         question_text=text,
@@ -66,7 +68,7 @@ def add_bank(teacher, section, status, text, feedback=True):
         difficulty='medium',
         explanation='Penjelasan resmi guru.',
         points=10,
-        misconception='Virus dianggap sel hidup',
+        misconception=misconception,
         source='ai',
         status=status,
     )
@@ -148,7 +150,7 @@ def drop_fixture():
     for bq in rows:
         db.session.delete(bq)
     db.session.flush()
-    for key in ('sec_a', 'sec_b', 'sec_empty', 'sec_other', 'sec_draft'):
+    for key in ('sec_a', 'sec_b', 'sec_empty', 'sec_other', 'sec_draft', 'sec_focus'):
         if created.get(key) is not None:
             db.session.delete(created[key])
     for key in ('material', 'other_material', 'draft_material'):
@@ -482,6 +484,93 @@ def main():
             )).scalar()
             check('soal bank lama utuh', legacy_bank is not None and legacy_bank > 0,
                   f'total={legacy_bank}')
+
+            # --------------------------- 13. FOKUS MISKONSEPSI (Tahap 2)
+            print('\n[13] FOKUS MISKONSEPSI (Tahap 2)')
+            sec_focus = MaterialSection(material_id=material.id,
+                                        title='Bagian Fokus Miskonsepsi', position=4)
+            db.session.add(sec_focus)
+            db.session.flush()
+            # g1 bukan label fokus dan dibuat PERTAMA (id terkecil): kalau fokus
+            # benar menggeser urutan, g2/g3/g4 harus muncul mendahului g1.
+            g1 = add_bank(teacher, sec_focus, 'APPROVED', 'Fokus 1',
+                          misconception='Y keliru')
+            g2 = add_bank(teacher, sec_focus, 'APPROVED', 'Fokus 2',
+                          misconception='X keliru')
+            g3 = add_bank(teacher, sec_focus, 'APPROVED', 'Fokus 3',
+                          misconception='X keliru')
+            g4 = add_bank(teacher, sec_focus, 'APPROVED', 'Fokus 4',
+                          misconception='X keliru')
+            created['banks'] += [g1, g2, g3, g4]
+            created['sec_focus'] = sec_focus
+            db.session.commit()
+
+            # ---- sebelum ada jawaban di bagian ini: fokus belum tersedia
+            r = client.get(f'/api/student/practice/{material.id}/sections/{sec_focus.id}',
+                           headers=h_s)
+            body = r.get_json()
+            sess = body['session']
+            check('belum ada jawaban di bagian ini -> fokus tidak tersedia',
+                  sess['focus_available'] is False and sess['focus_total'] == 0,
+                  str((sess.get('focus_available'), sess.get('focus_total'),
+                       sess.get('focus_wrong'))))
+            check('tanpa fokus urutan id stabil (di dalam tingkat)',
+                  [q['id'] for q in body['questions']] == [g1.id, g2.id, g3.id, g4.id],
+                  str([q['id'] for q in body['questions']]))
+
+            # ---- jawab: X 2x salah + 1x benar -> fokus "X keliru" (2 salah/3)
+            for bq, opt in ((g1, 0), (g2, 1), (g3, 1), (g4, 0)):
+                client.post(
+                    f'/api/student/practice/{material.id}/sections/{sec_focus.id}/answer',
+                    headers=h_s,
+                    json={'bank_question_id': bq.id, 'selected_option': opt})
+
+            r = client.get(f'/api/student/practice/{material.id}/sections/{sec_focus.id}',
+                           headers=h_s)
+            body = r.get_json()
+            sess = body['session']
+            raw = str(body)
+            check('fokus tersedia: label X, 2 salah dari 3',
+                  sess['focus_available'] is True and sess['focus_wrong'] == 2
+                  and sess['focus_total'] == 3,
+                  str((sess.get('focus_available'), sess.get('focus_wrong'),
+                       sess.get('focus_total'))))
+            check('label miskonsepsi TIDAK bocor di payload sesi',
+                  'X keliru' not in raw and 'Y keliru' not in raw)
+            check('fokus menggeser soal label X ke posisi kuota campuran',
+                  [q['id'] for q in body['questions']] == [g2.id, g3.id, g1.id, g4.id],
+                  str([q['id'] for q in body['questions']]))
+            check('teks fokus generik tanpa label',
+                  bool(sess.get('focus_text')) and 'keliru' not in sess['focus_text'],
+                  str(sess.get('focus_text')))
+
+            # ---- fungsi langsung (unit level)
+            res = spractice.focus_for_student_section(student, [g1, g2, g3, g4])
+            check('deteksi langsung: label X, 2 salah 1 benar',
+                  res and res['label'] == 'X keliru' and res['wrong'] == 2
+                  and res['correct'] == 1 and res['total'] == 3, str(res))
+            res = spractice.focus_for_student_section(student, [b1, b2, b3])
+            check('benar > salah bukan fokus', res is None, str(res))
+            res = spractice.focus_for_student_section(student, [approved])
+            check('satu jawaban belum cukup untuk fokus', res is None, str(res))
+
+            # ---- _order_questions murni: fokus vs tanpa fokus vs tanpa sasaran
+            effective_f = {int(bq.id): {'label': 'medium'} for bq in (g1, g2, g3, g4)}
+            plain = spractice._order_questions([g1, g2, g3, g4], effective_f, 'medium')
+            check('tanpa fokus _order_questions tetap urut id',
+                  [b.id for b in plain] == [g1.id, g2.id, g3.id, g4.id],
+                  str([b.id for b in plain]))
+            focused = spractice._order_questions(
+                [g1, g2, g3, g4], effective_f, 'medium', 'X keliru')
+            check('fokus _order_questions: label X mengisi kuota campuran dulu',
+                  [b.id for b in focused][:2] == [g2.id, g3.id]
+                  and [b.id for b in focused] == [g2.id, g3.id, g1.id, g4.id],
+                  str([b.id for b in focused]))
+            ident = spractice._order_questions(
+                [g1, g2, g3, g4], effective_f, None, 'X keliru')
+            check('tanpa sasaran fokus tidak mengubah urutan apa pun',
+                  [b.id for b in ident] == [g1.id, g2.id, g3.id, g4.id],
+                  str([b.id for b in ident]))
 
         finally:
             db.session.rollback()
