@@ -3,10 +3,21 @@
     <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center space-x-3 min-w-0">
         <button
-          v-if="role"
+          v-if="role && role !== 'teacher'"
           class="sm:hidden -ms-1 p-2 rounded-lg hover:bg-white/15 transition"
           aria-label="Buka menu navigasi"
           @click.stop="mobileOpen = !mobileOpen"
+        >
+          <Icon name="material-symbols:menu" class="w-6 h-6" />
+        </button>
+
+        <!-- Fitur guru (9 menu) diringkas jadi hamburger di kiri atas yang
+             membuka kolom menu; bukan baris panjang di atas halaman. -->
+        <button
+          v-if="role === 'teacher'"
+          class="-ms-1 p-2 rounded-lg hover:bg-white/15 transition"
+          aria-label="Buka menu fitur guru"
+          @click.stop="teacherMenuOpen = !teacherMenuOpen"
         >
           <Icon name="material-symbols:menu" class="w-6 h-6" />
         </button>
@@ -20,7 +31,7 @@
         </button>
 
         <nav
-          v-if="role"
+          v-if="role && role !== 'teacher'"
           class="hidden sm:flex items-center gap-1 text-sm font-medium"
         >
           <NuxtLink
@@ -69,6 +80,28 @@
         <ToggleDark />
       </div>
 
+    </div>
+
+    <!-- Kolom menu fitur guru (dibuka dari hamburger di kiri atas) -->
+    <div
+      v-if="teacherMenuOpen && role === 'teacher'"
+      ref="teacherMenu"
+      @click.stop
+      class="absolute left-0 top-full mt-1 w-64 max-w-[85vw] max-h-[80vh] overflow-y-auto bg-white dark:bg-gray-800 text-black dark:text-gray-100 rounded-md shadow-lg py-2 z-50"
+    >
+      <p class="px-4 pb-1 pt-1 text-[11px] uppercase tracking-wide text-gray-400 font-semibold">
+        Fitur Guru
+      </p>
+      <NuxtLink
+        v-for="link in navLinks"
+        :key="link.to"
+        :to="link.to"
+        class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+        @click="teacherMenuOpen = false"
+      >
+        <Icon :name="link.icon" class="w-5 h-5 shrink-0" />
+        {{ link.label }}
+      </NuxtLink>
     </div>
 
     <!-- Mobile drawer navigation -->
@@ -189,6 +222,8 @@ const navLinks = computed(() => {
 const mobileOpen = ref(false);
 const dropdownOpen = ref(false);
 const dropdown = ref(null);
+const teacherMenuOpen = ref(false);
+const teacherMenu = ref(null);
 
 watch(usernameCookie, (newVal) => {
   username.value = newVal;
@@ -199,6 +234,7 @@ watch(
   () => {
     dropdownOpen.value = false;
     mobileOpen.value = false;
+    teacherMenuOpen.value = false;
   }
 );
 
@@ -209,6 +245,9 @@ const toggleDropdown = () => {
 const handleClickOutside = (event) => {
   if (dropdownOpen.value && dropdown.value && !dropdown.value.contains(event.target)) {
     dropdownOpen.value = false;
+  }
+  if (teacherMenuOpen.value && teacherMenu.value && !teacherMenu.value.contains(event.target)) {
+    teacherMenuOpen.value = false;
   }
 };
 
