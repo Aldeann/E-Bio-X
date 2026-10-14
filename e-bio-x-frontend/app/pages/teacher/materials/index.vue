@@ -125,12 +125,16 @@ definePageMeta({
 
     <!-- Skeleton -->
     <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-      <div v-for="i in 6" :key="i" class="rounded-xl border border-gray-200 dark:border-gray-700 animate-pulse bg-white dark:bg-gray-900">
-        <div class="h-20 sm:h-24 bg-green-200 dark:bg-green-900" />
-        <div class="p-3 sm:p-4 space-y-3">
-          <div class="h-4 bg-green-200 dark:bg-green-800 rounded w-3/4" />
-          <div class="h-3 bg-green-100 dark:bg-green-900 rounded w-full" />
-          <div class="h-3 bg-green-100 dark:bg-green-900 rounded w-1/2" />
+      <div v-for="i in 6" :key="i" class="rounded-xl border border-gray-200 dark:border-gray-700 animate-pulse bg-white dark:bg-gray-900 overflow-hidden flex flex-col">
+        <div class="h-20 sm:h-24 bg-gradient-to-br from-green-200 to-emerald-200 dark:from-green-800 dark:to-emerald-900" />
+        <div class="p-3 sm:p-4 space-y-3 flex-1">
+          <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+          <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+          <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
+          <div class="mt-auto flex items-center justify-between pt-2">
+            <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-16" />
+            <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-12" />
+          </div>
         </div>
       </div>
     </div>
