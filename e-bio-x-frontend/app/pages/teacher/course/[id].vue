@@ -1,5 +1,5 @@
 <template>
-  <div class="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
+  <div>
     <h1 class="text-2xl sm:text-3xl font-bold text-green-500">{{ course.name }}</h1>
     <span class="text-sm sm:text-lg text-gray-700 dark:text-gray-300">Bareng {{ course.teacher }}</span>
 

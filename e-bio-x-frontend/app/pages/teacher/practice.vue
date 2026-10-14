@@ -1,13 +1,9 @@
 <template>
-  <div class="container mx-auto px-4 py-6">
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-      <div>
-        <h2 class="text-2xl font-semibold">Latihan per Bagian</h2>
-        <p class="text-sm text-gray-500">
-          Soal latihan untuk tiap bagian materi. Draf AI hanya tersimpan sebagai draf &mdash; guru yang
-          menyetujuinya sebelum bisa dipakai siswa.
-        </p>
-      </div>
+  <div>
+    <PageHeader
+      title="Latihan per Bagian"
+      subtitle="Soal latihan untuk tiap bagian materi. Draf AI hanya tersimpan sebagai draf &mdash; guru yang menyetujuinya sebelum bisa dipakai siswa."
+    >
       <button
         class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
         @click="loadAll"
@@ -15,7 +11,7 @@
         <Icon :name="loading ? 'mdi:loading' : 'material-symbols:refresh'" class="w-4 h-4" :class="loading ? 'animate-spin' : ''" />
         Muat ulang
       </button>
-    </div>
+    </PageHeader>
 
     <div
       v-if="!aiAvailable"

@@ -1,17 +1,16 @@
 <template>
-  <div class="container mx-auto px-4 py-6">
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-      <div>
-        <h2 class="text-2xl font-semibold">Bank Soal</h2>
-        <p class="text-sm text-gray-500">Kumpulan soal yang bisa digunakan kembali di kuis mana pun.</p>
-      </div>
+  <div>
+    <PageHeader
+      title="Bank Soal"
+      subtitle="Kumpulan soal yang bisa digunakan kembali di kuis mana pun."
+    >
       <button
         class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center gap-1 shadow-md shadow-green-300/50"
         @click="openForm()"
       >
         <Icon name="material-symbols:add" class="w-5 h-5" /> Tambah Soal
       </button>
-    </div>
+    </PageHeader>
 
     <div class="bg-white dark:bg-gray-900 border border-green-200 dark:border-gray-700 rounded-xl shadow-md p-4 mb-3">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-3">

@@ -1,10 +1,9 @@
 <template>
-  <div class="container mx-auto px-4 py-6">
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-      <div>
-        <h2 class="text-2xl font-semibold">Pembahasan Kuis</h2>
-        <p class="text-sm text-gray-500">Kelola pembahasan kuis yang dihasilkan sistem. Siswa hanya bisa melihat pembahasan berstatus disetujui.</p>
-      </div>
+  <div>
+    <PageHeader
+      title="Pembahasan AI"
+      subtitle="Kelola pembahasan kuis yang dihasilkan sistem. Siswa hanya bisa melihat pembahasan berstatus disetujui."
+    >
       <div class="flex items-center gap-2">
         <input
           v-model="questionIdForGen"
@@ -16,7 +15,7 @@
           <Icon name="material-symbols:auto-awesome" class="w-4 h-4 inline" /> Generate
         </button>
       </div>
-    </div>
+    </PageHeader>
 
     <div class="bg-white dark:bg-gray-900 border border-green-200 dark:border-gray-700 rounded-xl shadow-md p-4 mb-5">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">

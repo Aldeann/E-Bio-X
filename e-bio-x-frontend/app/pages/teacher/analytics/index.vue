@@ -1,13 +1,9 @@
 <template>
-  <div class="container mx-auto px-4 py-6">
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-      <div>
-        <h2 class="text-2xl font-semibold">Analitik Pembelajaran</h2>
-        <p class="text-sm text-gray-500">
-          Pantau progres siswa, penguasaan materi, kinerja kuis, dan topik.
-        </p>
-      </div>
-    </div>
+  <div>
+    <PageHeader
+      title="Analitik Pembelajaran"
+      subtitle="Pantau progres siswa, penguasaan materi, kinerja kuis, dan topik."
+    />
 
     <!-- Filter bar -->
     <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 mb-6">
@@ -169,7 +165,7 @@
                 <td class="px-4 py-2.5">
                   <div class="flex items-center gap-2">
                     <Icon name="material-symbols:expand-more" class="w-4 h-4 text-gray-400 shrink-0" :class="{ 'rotate-180': expandedMaterial === m.material_id }" />
-                    <span class="font-medium">{{ m.title }}</span>
+                    <span class="font-medium truncate max-w-[16rem]">{{ m.title }}</span>
                   </div>
                 </td>
                 <td class="px-4 py-2.5 text-gray-500">{{ m.phase ? 'Fase ' + m.phase : '-' }} / {{ m.topic || '-' }}</td>

@@ -1,25 +1,21 @@
 <template>
-  <div class="container mx-auto px-4 py-4">
-    <div class="flex flex-col md:flex-row justify-between items-center mb-6">
-      <h2 class="text-2xl font-semibold mb-3">
-        Halo,
-        <span class="text-green-700 dark:text-green-500">{{ useCookie("username").value }}</span
-        >!
-      </h2>
-      <div class="flex flex-wrap gap-2">
-        <button
-          class="bg-green-600 hover:bg-green-700 hover:shadow hover:shadow-green-300 text-white px-4 py-2 rounded"
-          @click="showCreateClassSwal">
-          + Buat Kelas Baru
-        </button>
-        <NuxtLink
-          to="/teacher/materials"
-          class="bg-white dark:bg-gray-900 border border-green-600 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-gray-800 px-4 py-2 rounded flex items-center gap-1">
-          <Icon name="material-symbols:menu-book" class="w-4 h-4" />
-          Materi Pembelajaran
-        </NuxtLink>
-      </div>
-    </div>
+  <div>
+    <PageHeader
+      title="Dasbor Guru"
+      :subtitle="username ? `Halo, ${username}!` : 'Ringkasan aktivitas kelas Anda'"
+    >
+      <button
+        class="bg-green-600 hover:bg-green-700 hover:shadow hover:shadow-green-300 text-white px-4 py-2 rounded"
+        @click="showCreateClassSwal">
+        + Buat Kelas Baru
+      </button>
+      <NuxtLink
+        to="/teacher/materials"
+        class="bg-white dark:bg-gray-900 border border-green-600 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-gray-800 px-4 py-2 rounded flex items-center gap-1">
+        <Icon name="material-symbols:menu-book" class="w-4 h-4" />
+        Materi Pembelajaran
+      </NuxtLink>
+    </PageHeader>
 
     <h4 class="text-lg font-medium mb-4">Kelas Saya</h4>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -73,6 +69,7 @@ import { useSwal } from "~/utils/swal";
 
 const config = useRuntimeConfig();
 const token = useCookie("access_token").value;
+const username = useCookie("username").value;
 const swal = useSwal();
 const toast = useToast();
 const myCourses = ref([]);

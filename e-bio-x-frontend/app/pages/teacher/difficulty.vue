@@ -1,13 +1,9 @@
 <template>
-  <div class="container mx-auto px-4 py-6">
-    <div class="mb-6">
-      <h2 class="text-2xl font-semibold">Analisis Tingkat Soal Otomatis</h2>
-      <p class="text-sm text-gray-500 mt-1">
-        Tingkat soal diukur dari performa siswa yang benar-benar mengerjakan
-        (bukan ditebak dari teks soal). Label guru tetap ditampilkan berdampingan
-        dan tidak pernah ditimpa.
-      </p>
-    </div>
+  <div>
+    <PageHeader
+      title="Analisis Tingkat Soal Otomatis"
+      subtitle="Tingkat soal diukur dari performa siswa yang benar-benar mengerjakan (bukan ditebak dari teks soal). Label guru tetap ditampilkan berdampingan dan tidak pernah ditimpa."
+    />
 
     <div v-if="loading" class="text-center py-16 text-green-600">
       <Icon name="mdi:loading" class="w-10 h-10 animate-spin mx-auto" />

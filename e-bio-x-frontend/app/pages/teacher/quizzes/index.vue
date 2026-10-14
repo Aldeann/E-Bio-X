@@ -1,10 +1,9 @@
 <template>
   <div class="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-4 sm:mb-6">
-      <div>
-        <h2 class="text-xl sm:text-2xl font-semibold">Manajemen Kuis</h2>
-        <p class="text-xs sm:text-sm text-gray-500">Buat, publikasikan, dan pantau kuis interaktif materi.</p>
-      </div>
+    <PageHeader
+      title="Manajemen Kuis"
+      subtitle="Buat, publikasikan, dan pantau kuis interaktif materi."
+    >
       <div class="flex gap-2">
         <NuxtLink
           to="/teacher/question-bank"
@@ -19,7 +18,7 @@
           <Icon name="material-symbols:add" class="w-4 h-4 sm:w-5 sm:h-5" /> Buat Kuis
         </NuxtLink>
       </div>
-    </div>
+    </PageHeader>
 
     <div v-if="loading" class="text-gray-500 text-center py-10">Memuat kuis...</div>
 

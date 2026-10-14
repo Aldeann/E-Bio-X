@@ -16,10 +16,15 @@
         <button
           v-if="role === 'teacher'"
           class="-ms-1 p-2 rounded-lg hover:bg-white/15 transition"
-          aria-label="Buka menu fitur guru"
+          :aria-label="teacherMenuOpen ? 'Tutup menu fitur guru' : 'Buka menu fitur guru'"
+          :aria-expanded="teacherMenuOpen"
+          title="Menu fitur"
           @click.stop="teacherMenuOpen = !teacherMenuOpen"
         >
-          <Icon name="material-symbols:menu" class="w-6 h-6" />
+          <Icon
+            :name="teacherMenuOpen ? 'material-symbols:close' : 'material-symbols:menu'"
+            class="w-6 h-6"
+          />
         </button>
 
         <button
@@ -39,7 +44,7 @@
             :key="link.to"
             :to="link.to"
             class="px-3 py-1.5 rounded-lg transition flex items-center gap-1"
-            :class="$route.path === link.to ? 'bg-white/20' : 'hover:bg-white/15'"
+            :class="isActive(link) ? 'bg-white/20' : 'hover:bg-white/15'"
           >
             <Icon :name="link.icon" class="w-4 h-4" />
             {{ link.label }}
@@ -96,11 +101,17 @@
         v-for="link in navLinks"
         :key="link.to"
         :to="link.to"
-        class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+        class="flex items-start gap-3 px-4 py-2.5 transition"
+        :class="isActive(link)
+          ? 'bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400'
+          : 'hover:bg-gray-100 dark:hover:bg-gray-700'"
         @click="teacherMenuOpen = false"
       >
-        <Icon :name="link.icon" class="w-5 h-5 shrink-0" />
-        {{ link.label }}
+        <Icon :name="link.icon" class="w-5 h-5 shrink-0 mt-0.5" />
+        <span class="min-w-0">
+          <span class="block text-sm font-medium truncate">{{ link.label }}</span>
+          <span v-if="link.desc" class="block text-[11px] text-gray-400 truncate">{{ link.desc }}</span>
+        </span>
       </NuxtLink>
     </div>
 
@@ -125,7 +136,7 @@
             <NuxtLink
               :to="link.to"
               class="flex items-center gap-3 px-3 py-3 rounded-lg transition"
-              :class="$route.path === link.to ? 'bg-white/25' : 'hover:bg-white/15'"
+              :class="isActive(link) ? 'bg-white/25' : 'hover:bg-white/15'"
               @click="mobileOpen = false"
             >
               <Icon :name="link.icon" class="w-5 h-5 shrink-0" />
@@ -199,25 +210,36 @@ const navLinks = computed(() => {
   if (!role.value) return [];
   const links = [];
   if (role.value === "student") {
-    links.push({ to: "/student/dashboard", icon: "material-symbols:dashboard", label: "Dashboard" });
+    links.push({ to: "/student/dashboard", icon: "material-symbols:dashboard", label: "Dashboard", desc: "Ringkasan belajar kamu" });
   }
   if (role.value === "teacher") {
-    links.push({ to: "/teacher/analytics", icon: "material-symbols:monitoring", label: "Analitik" });
-    links.push({ to: "/teacher/analytics/ml", icon: "material-symbols:psychology", label: "ML Insights" });
+    links.push({ to: "/teacher", icon: "material-symbols:dashboard", label: "Dasbor", desc: "Ringkasan & pintasan fitur" });
+    links.push({ to: "/teacher/analytics", icon: "material-symbols:monitoring", label: "Analitik", desc: "Progres, penguasaan & topik" });
+    links.push({ to: "/teacher/analytics/ml", icon: "material-symbols:psychology", label: "ML Insights", desc: "Profil belajar & rekomendasi" });
   }
-  links.push({ to: materialsLink.value, icon: "material-symbols:menu-book", label: "Materi" });
-  links.push({ to: quizzesLink.value, icon: "material-symbols:quiz", label: "Kuis" });
+  links.push({ to: materialsLink.value, icon: "material-symbols:menu-book", label: "Materi", desc: "Bahan ajar & bagian materi" });
+  links.push({ to: quizzesLink.value, icon: "material-symbols:quiz", label: "Kuis", desc: "Buat & pantau kuis" });
   if (role.value === "teacher") {
-    links.push({ to: "/teacher/question-bank", icon: "material-symbols:database", label: "Bank Soal" });
-    links.push({ to: "/teacher/practice", icon: "material-symbols:fitness_center", label: "Latihan Bagian" });
-    links.push({ to: "/teacher/difficulty", icon: "material-symbols:bar-chart", label: "Analisis Tingkat" });
+    links.push({ to: "/teacher/question-bank", icon: "material-symbols:database", label: "Bank Soal", desc: "Soal siap dipakai ulang" });
+    links.push({ to: "/teacher/practice", icon: "material-symbols:fitness_center", label: "Latihan Bagian", desc: "Soal latihan tiap bagian" });
+    links.push({ to: "/teacher/difficulty", icon: "material-symbols:bar-chart", label: "Analisis Tingkat", desc: "Kesulitan soal dari data siswa" });
   }
-  links.push({ to: forumLink.value, icon: "mdi:forum-outline", label: "Forum" });
+  links.push({ to: forumLink.value, icon: "mdi:forum-outline", label: "Forum", desc: "Diskusi kelas" });
   if (role.value === "teacher") {
-    links.push({ to: "/teacher/quiz/explanations", icon: "material-symbols:lightbulb", label: "Pembahasan AI" });
+    links.push({ to: "/teacher/quiz/explanations", icon: "material-symbols:lightbulb", label: "Pembahasan AI", desc: "Draf & persetujuan pembahasan" });
   }
   return links;
 });
+
+// Tandai menu aktif, termasuk saat berada di sub-halaman (mis. /teacher/quizzes/12
+// tetap menyorot "Kuis"). Dasbor /teacher hanya aktif saat tepat di halaman itu,
+// supaya tidak ikut menyorot semua halaman guru.
+const isActive = (link) => {
+  const path = router.currentRoute.value.path;
+  if (path === link.to) return true;
+  if (link.to === "/teacher") return false;
+  return path.startsWith(link.to + "/");
+};
 
 const mobileOpen = ref(false);
 const dropdownOpen = ref(false);

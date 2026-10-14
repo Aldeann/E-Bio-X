@@ -1,12 +1,9 @@
 <template>
-  <div class="container mx-auto px-4 py-6">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-      <div>
-        <h2 class="text-2xl font-semibold">Machine Learning Insights</h2>
-        <p class="text-sm text-gray-500">
-          Analisis penguasaan, profil belajar, dan rekomendasi berbasis data.
-        </p>
-      </div>
+  <div>
+    <PageHeader
+      title="Machine Learning Insights"
+      subtitle="Analisis penguasaan, profil belajar, dan rekomendasi berbasis data."
+    >
       <button
         @click="trainModel"
         :disabled="training"
@@ -18,7 +15,7 @@
         <Icon :name="training ? 'mdi:loading' : 'mdi:brain'" class="w-4 h-4" :class="training && 'animate-spin'" />
         {{ training ? "Melatih Model..." : "Latih / Retrain Model" }}
       </button>
-    </div>
+    </PageHeader>
 
     <div v-if="trainResult" class="mb-6 p-4 rounded-xl border text-sm"
       :class="trainResult.success

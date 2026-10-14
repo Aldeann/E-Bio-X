@@ -1,5 +1,5 @@
 <template>
-  <div class="container mx-auto px-4 py-6">
+  <div>
     <h1 class="text-3xl font-bold text-green-500 mb-4 flex items-center gap-2">
       <Icon name="mdi:shield-alert-outline" /> Moderasi Forum
     </h1>

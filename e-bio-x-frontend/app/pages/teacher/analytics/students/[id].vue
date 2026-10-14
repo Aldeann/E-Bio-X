@@ -1,5 +1,5 @@
 <template>
-  <div class="container mx-auto px-4 py-6">
+  <div>
     <div v-if="loading" class="text-center py-16 text-green-600">
       <Icon name="mdi:loading" class="w-10 h-10 animate-spin mx-auto" />
     </div>

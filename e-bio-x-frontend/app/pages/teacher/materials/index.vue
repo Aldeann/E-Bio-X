@@ -108,13 +108,10 @@ definePageMeta({
 <template>
   <div>
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 sm:mb-6 gap-3">
-      <div>
-        <h1 class="text-xl sm:text-2xl font-bold text-green-700 dark:text-green-400">
-          Materi Pembelajaran
-        </h1>
-        <p class="text-xs sm:text-sm text-gray-500">Kelola materi interaktif untuk siswa.</p>
-      </div>
+    <PageHeader
+      title="Materi Pembelajaran"
+      subtitle="Kelola materi interaktif untuk siswa."
+    >
       <NuxtLink
         to="/teacher/materials/create"
         class="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1 self-start sm:self-auto"
@@ -122,7 +119,7 @@ definePageMeta({
         <Icon name="material-symbols:add" class="w-4 h-4 sm:w-5 sm:h-5" />
         Buat Materi
       </NuxtLink>
-    </div>
+    </PageHeader>
 
     <!-- Skeleton -->
     <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
