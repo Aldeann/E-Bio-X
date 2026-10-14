@@ -19,47 +19,49 @@
 
     <h4 class="text-lg font-medium mb-4">Kelas Saya</h4>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div v-if="myCourses.length === 0" class="text-gray-500 text-sm mt-4">
-        Anda belum membuat kelas. Klik tombol di atas untuk membuat kelas baru.
+      <div v-if="myCourses.length === 0" class="col-span-full">
+        <EmptyState
+          icon="mdi:class-variant"
+          title="Belum ada kelas"
+          description="Klik 'Buat Kelas Baru' untuk membuat kelas pertama."
+        />
       </div>
-      <div
-        v-else
-        v-for="(kelas, index) in myCourses"
-        :key="index"
-        class="bg-white dark:bg-gray-900 border rounded-lg p-4 shadow-md shadow-green-300 hover:shadow-lg hover:shadow-green-300 relative">
-        <button
-          @click="deleteClass(kelas.id)"
-          class="absolute top-1 right-1 text-red-600 w-9 h-9 flex items-center justify-center rounded-lg hover:text-red-700 hover:bg-red-50 dark:hover:bg-gray-800 transition"
-          aria-label="Hapus kelas">
-          <Icon name="material-symbols:delete-rounded" class="w-5 h-5" />
-        </button>
-        <div class="flex justify-between items-start mb-2">
-          <h5 class="text-lg font-semibold">{{ kelas.name }}</h5>
-          <span class="bg-green-100 text-green-600 text-sm px-2 py-1 rounded">
-            <Icon name="mdi:account-multiple" />
-            {{ kelas.students }}
-          </span>
-        </div>
-        <p class="text-sm text-gray-600 mb-4">{{ kelas.description }}</p>
-        <div class="flex justify-between items-center text-sm text-gray-500">
-          <div class="flex items-center space-x-2">
-            <span class="text-sm text-gray-600 dark:text-gray-200">Kode: {{ kelas.code }}</span>
-            <button
-              @click="copyToClipboard(kelas.code)"
-              class="text-green-500 hover:text-green-800 p-1.5 -m-1.5 rounded transition duration-200"
-              aria-label="Salin kode kelas">
-              <Icon name="material-symbols:content-copy" class="w-5 h-5" />
-            </button>
+      <AppCard v-for="(kelas, index) in myCourses" :key="index" withShadow class="relative">
+        <div class="p-4">
+          <button
+            @click="deleteClass(kelas.id)"
+            class="absolute top-1 right-1 text-red-600 w-9 h-9 flex items-center justify-center rounded-lg hover:text-red-700 hover:bg-red-50 dark:hover:bg-gray-800 transition"
+            aria-label="Hapus kelas">
+            <Icon name="material-symbols:delete-rounded" class="w-5 h-5" />
+          </button>
+          <div class="flex justify-between items-start mb-2 pr-8">
+            <h5 class="text-lg font-semibold truncate">{{ kelas.name }}</h5>
+            <span class="bg-green-100 text-green-600 text-sm px-2 py-1 rounded flex items-center gap-1">
+              <Icon name="mdi:account-multiple" />
+              {{ kelas.students }}
+            </span>
           </div>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">{{ kelas.description }}</p>
+          <div class="flex justify-between items-center text-sm text-gray-500">
+            <div class="flex items-center space-x-2">
+              <span class="text-sm text-gray-600 dark:text-gray-200">Kode: {{ kelas.code }}</span>
+              <button
+                @click="copyToClipboard(kelas.code)"
+                class="text-green-500 hover:text-green-800 p-1.5 -m-1.5 rounded transition duration-200"
+                aria-label="Salin kode kelas">
+                <Icon name="material-symbols:content-copy" class="w-5 h-5" />
+              </button>
+            </div>
 
-          <NuxtLink
-            :to="'/teacher/course/' + kelas.id"
-            class="inline-flex items-center gap-1 bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-500 hover:shadow hover:shadow-green-300  transition">
-            <Icon name="material-symbols:login" class="w-4 h-4" />
-            Kelola
-          </NuxtLink>
+            <NuxtLink
+              :to="'/teacher/course/' + kelas.id"
+              class="inline-flex items-center gap-1 bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-500 hover:shadow hover:shadow-green-300  transition">
+              <Icon name="material-symbols:login" class="w-4 h-4" />
+              Kelola
+            </NuxtLink>
+          </div>
         </div>
-      </div>
+      </AppCard>
     </div>
   </div>
 </template>
