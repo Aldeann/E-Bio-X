@@ -559,6 +559,8 @@ loadAll();
 loadStudents();
 
 definePageMeta({
+  layout: "teacher",
+
   middleware: "auth",
   role: "teacher",
 });

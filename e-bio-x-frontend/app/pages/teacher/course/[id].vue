@@ -138,6 +138,8 @@ onMounted(() => {
 });
 
 definePageMeta({
+  layout: "teacher",
+
   middleware: "auth",
   role: "teacher",
 });

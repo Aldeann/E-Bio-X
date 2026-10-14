@@ -92,7 +92,9 @@
 <script setup>
 import { useSwal } from "~/utils/swal";
 
-definePageMeta({ middleware: "auth", role: "teacher" });
+definePageMeta({
+  layout: "teacher",
+ middleware: "auth", role: "teacher" });
 
 const config = useRuntimeConfig();
 const token = useCookie("access_token").value;

@@ -58,6 +58,8 @@ const fetchData = async () => {
 onMounted(fetchData);
 
 definePageMeta({
+  layout: "teacher",
+
   middleware: "auth",
   role: "teacher",
 });

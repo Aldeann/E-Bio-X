@@ -14,6 +14,8 @@
 const quizId = Number(useRoute().params.id);
 
 definePageMeta({
+  layout: "teacher",
+
   middleware: "auth",
   role: "teacher",
 });

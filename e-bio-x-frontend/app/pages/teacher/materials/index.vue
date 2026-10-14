@@ -100,6 +100,8 @@ const deleteMaterial = async (m) => {
 onMounted(fetchData);
 
 definePageMeta({
+  layout: "teacher",
+
   middleware: "auth",
   role: "teacher",
 });

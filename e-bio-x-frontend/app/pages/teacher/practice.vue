@@ -375,6 +375,8 @@ const onSaved = () => {
 loadSections();
 
 definePageMeta({
+  layout: "teacher",
+
   middleware: "auth",
   role: "teacher",
 });

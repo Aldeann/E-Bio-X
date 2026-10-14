@@ -3,5 +3,7 @@
 </template>
 
 <script setup>
-definePageMeta({ middleware: "auth", role: "teacher" });
+definePageMeta({
+  layout: "teacher",
+ middleware: "auth", role: "teacher" });
 </script>

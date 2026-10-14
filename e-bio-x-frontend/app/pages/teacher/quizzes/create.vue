@@ -24,6 +24,8 @@ const onSaved = (quiz) => {
 };
 
 definePageMeta({
+  layout: "teacher",
+
   middleware: "auth",
   role: "teacher",
 });

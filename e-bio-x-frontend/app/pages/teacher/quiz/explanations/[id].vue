@@ -234,6 +234,8 @@ const openManual = async () => {
 load();
 
 definePageMeta({
+  layout: "teacher",
+
   middleware: "auth",
   role: "teacher",
 });

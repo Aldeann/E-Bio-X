@@ -227,6 +227,8 @@ const regenerate = (item) => mutate(item.id, "regenerate");
 load();
 
 definePageMeta({
+  layout: "teacher",
+
   middleware: "auth",
   role: "teacher",
 });

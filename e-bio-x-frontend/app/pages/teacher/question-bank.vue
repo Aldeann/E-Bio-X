@@ -291,6 +291,8 @@ watch(filters, () => {
 load();
 
 definePageMeta({
+  layout: "teacher",
+
   middleware: "auth",
   role: "teacher",
 });

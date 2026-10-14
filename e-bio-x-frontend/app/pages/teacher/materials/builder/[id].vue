@@ -8,6 +8,8 @@
 const route = useRoute();
 
 definePageMeta({
+  layout: "teacher",
+
   middleware: "auth",
   role: "teacher",
 });

@@ -36,6 +36,8 @@ const selectSection = (id) => (activeSectionId.value = id);
 onMounted(fetchDetail);
 
 definePageMeta({
+  layout: "teacher",
+
   middleware: "auth",
   role: "teacher",
 });

@@ -159,6 +159,8 @@ const removeQuiz = async (q) => {
 load();
 
 definePageMeta({
+  layout: "teacher",
+
   middleware: "auth",
   role: "teacher",
 });

@@ -199,6 +199,8 @@ const load = async () => {
 load();
 
 definePageMeta({
+  layout: "teacher",
+
   middleware: "auth",
   role: "teacher",
 });

@@ -173,6 +173,8 @@ const deleteClass = async (id) => {
 fetchCoursesData();
 
 definePageMeta({
+  layout: "teacher",
+
   middleware: "auth",
   role: "teacher",
 });

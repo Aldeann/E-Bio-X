@@ -1,5 +1,5 @@
 <template>
-  <nav class="bg-gradient-to-br from-green-500 to-emerald-600 dark:from-green-600 dark:to-emerald-700 text-white shadow relative z-40">
+  <nav v-if="showSidebar !== false" class="bg-gradient-to-br from-green-500 to-emerald-600 dark:from-green-600 dark:to-emerald-700 text-white shadow relative z-40">
     <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center space-x-3 min-w-0">
         <button
@@ -177,6 +177,10 @@ import { useCookie } from "#app";
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useSwal } from "~/utils/swal";
+
+const props = defineProps({
+  showSidebar: { type: Boolean, default: true },
+});
 
 const router = useRouter();
 const swal = useSwal();

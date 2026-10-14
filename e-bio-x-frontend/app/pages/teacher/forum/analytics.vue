@@ -99,7 +99,9 @@
 </template>
 
 <script setup>
-definePageMeta({ middleware: "auth", role: "teacher" });
+definePageMeta({
+  layout: "teacher",
+ middleware: "auth", role: "teacher" });
 
 const config = useRuntimeConfig();
 const token = useCookie("access_token").value;
