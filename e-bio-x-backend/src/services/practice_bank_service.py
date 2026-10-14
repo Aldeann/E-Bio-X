@@ -30,8 +30,8 @@ except ImportError:  # pragma: no cover
     requests = None
 
 PROMPT_VERSION = 'sec-draft-v1'
-DEFAULT_COUNT = 3
-MAX_COUNT = 10
+DEFAULT_COUNT = 5
+MAX_COUNT = 20
 VALID_DIFFICULTIES = ('easy', 'medium', 'hard')
 
 DIFFICULTY_LABEL = {

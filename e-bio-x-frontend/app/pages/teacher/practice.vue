@@ -102,7 +102,7 @@
                     class="dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm"
                     :title="'Jumlah draf'"
                   >
-                    <option v-for="n in 5" :key="n" :value="n">{{ n }} soal</option>
+                    <option v-for="n in [3,5,8,10,12,15,20]" :key="n" :value="n">{{ n }} soal</option>
                   </select>
                   <button
                     class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition"
