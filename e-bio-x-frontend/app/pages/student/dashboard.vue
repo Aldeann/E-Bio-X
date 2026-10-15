@@ -7,6 +7,49 @@
       </p>
     </div>
 
+    <!-- Langkah berikutnya (Fase 5): SATU arahan utama supaya siswa tidak
+         bingung harus apa setelah membaca. Alasan ditampilkan apa adanya;
+         alternatif disediakan bila siswa ingin memilih sendiri. -->
+    <div
+      v-if="nextAction && nextAction.action && nextAction.action.type !== 'done'"
+      class="mb-6 rounded-xl border border-green-300 dark:border-green-700 bg-gradient-to-br from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 p-4"
+    >
+      <div class="flex items-start gap-3">
+        <div class="shrink-0 w-9 h-9 rounded-full bg-green-600 text-white flex items-center justify-center">
+          <Icon :name="nbaIcon" class="w-5 h-5" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-[11px] uppercase tracking-wide font-semibold text-green-700 dark:text-green-400">
+            Langkah berikutnya
+          </p>
+          <p class="font-semibold text-gray-800 dark:text-gray-100">
+            {{ nextAction.action.title }}
+          </p>
+          <p v-if="nextAction.action.reason" class="text-sm text-gray-600 dark:text-gray-300 mt-0.5">
+            {{ nextAction.action.reason }}
+          </p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button
+              v-if="nextAction.action.cta"
+              @click="runAction(nextAction.action)"
+              class="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold flex items-center gap-1.5"
+            >
+              <Icon :name="ctaIcon(nextAction.action.cta.kind)" class="w-4 h-4" />
+              {{ nextAction.action.cta.label }}
+            </button>
+            <button
+              v-for="(alt, ai) in (nextAction.alternatives || [])"
+              :key="ai"
+              @click="runAction(alt)"
+              class="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm"
+            >
+              {{ alt.title }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="text-center py-16 text-green-600">
       <Icon name="mdi:loading" class="w-10 h-10 animate-spin mx-auto" />
     </div>
@@ -414,6 +457,30 @@ const practiceMaterialId = ref(null);
 const practiceSectionId = ref(null);
 const practiceSectionTitle = ref("");
 
+// Langkah berikutnya (Fase 5): satu aksi tunggal dari server.
+const nextAction = ref(null);
+const nbaIcon = computed(() => {
+  const t = nextAction.value?.action?.type;
+  const map = {
+    practice_weak: "material-symbols:fitness-center",
+    practice_after_read: "material-symbols:fitness-center",
+    continue_reading: "material-symbols:menu-book",
+    take_quiz: "material-symbols:quiz",
+    start_next_material: "material-symbols:rocket-launch",
+    review_mastered: "material-symbols:refresh",
+  };
+  return map[t] || "material-symbols:bolt";
+});
+const ctaIcon = (kind) => {
+  const map = {
+    practice: "material-symbols:auto-awesome",
+    read: "material-symbols:menu-book",
+    quiz: "material-symbols:quiz",
+    material: "material-symbols:rocket-launch",
+  };
+  return map[kind] || "material-symbols:arrow-forward";
+};
+
 const clusterLabelMap = {
   "High Achievement": "Pencapaian Tinggi",
   "Active Learner": "Pembelajar Aktif",
@@ -557,6 +624,42 @@ const openPractice = async (s) => {
 const closePractice = () => {
   practiceOpen.value = false;
   loadRecs();
+  loadNextAction();
+};
+
+// Langkah berikutnya (Fase 5): ambil satu aksi utama dari server.
+const loadNextAction = async () => {
+  try {
+    nextAction.value = await $fetch(
+      `${config.public.backend}/api/student/next-action`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+  } catch (e) {
+    nextAction.value = null;
+  }
+};
+
+// Jalankan aksi yang disarankan. Latihan memakai jalur modal yang sudah ada
+// (sekaligus mencatat klik saran); aksi lain hanya berpindah halaman.
+const runAction = (action) => {
+  const cta = action && action.cta;
+  if (!cta) return;
+  if (cta.kind === "practice" && cta.section_id) {
+    openPractice({
+      material_id: cta.material_id,
+      section_id: cta.section_id,
+      section_title: cta.section_title || action.title,
+    });
+    return;
+  }
+  if (cta.kind === "quiz" && cta.quiz_id) {
+    navigateTo(`/student/quizzes/${cta.quiz_id}`);
+    return;
+  }
+  if (cta.material_id) {
+    const q = cta.section_id ? `?section=${cta.section_id}` : "";
+    navigateTo(`/student/materials/${cta.material_id}${q}`);
+  }
 };
 
 const formatSeconds = (s) => {
@@ -615,6 +718,7 @@ const load = async () => {
 
 load();
 loadRecs();
+loadNextAction();
 
 definePageMeta({
   middleware: "auth",

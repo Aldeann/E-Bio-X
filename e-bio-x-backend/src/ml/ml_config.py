@@ -233,6 +233,28 @@ PRACTICE_PASS_MIN = 3
 FOCUS_MIN_SAMPLE = 2      # minimal soal terjawab pada satu label
 FOCUS_LABEL_MAXLEN = 160  # pemotongan teks label untuk pencocokan/tampilan
 
+# --- Next Best Action (Fase 5) --------------------------------------
+# Satu "langkah berikutnya" yang diprioritaskan server, dihitung dari sinyal
+# yang SUDAH ada (penguasaan bagian, progres baca, ketersediaan latihan,
+# kuis, dan kebaruan latihan). Tidak ada model dan tidak ada ranker kedua:
+# NBA hanya MEMILIH satu aksi dari kandidat, memakai bobot dasar di bawah.
+# Bobot lebih besar = lebih didahulukan. Semua transparan dan bisa diaudit.
+NBA_WEIGHTS = {
+    'practice_weak': 1.00,        # bagian terbukti lemah & soal latihannya ada
+    'practice_after_read': 0.90,  # bagian sudah dibaca tapi belum pernah dilatih
+    'continue_reading': 0.70,     # lanjutkan bagian berikutnya pada materi aktif
+    'take_quiz': 0.55,            # kuis tertunda untuk bagian/materi yang dibaca
+    'start_next_material': 0.45,  # mulai materi berikutnya (materi aktif selesai)
+    'review_mastered': 0.25,      # ulangi (spaced) bagian yang sudah tuntas
+    'done': 0.00,                 # tidak ada aksi jujur yang bisa disarankan
+}
+# Dorongan kecil bila halaman yang meminta sedang menyorot satu materi/bagian,
+# supaya saran "nyambung" dengan apa yang sedang dibuka siswa.
+NBA_CONTEXT_MATERIAL_BOOST = 0.15
+NBA_CONTEXT_SECTION_BOOST = 0.10
+# Ambang kesegaran latihan untuk "ulangi bagian yang sudah tuntas".
+NBA_REVIEW_STALE_DAYS = 14
+
 # --- Recommendation closed-loop evaluation -----------------------
 # The recommendation events (clicked_at / completed_at) are already
 # recorded by recommendation.mark_clicked / mark_completed. These

@@ -91,6 +91,7 @@ def create_app():
         get_student_dashboard, get_student_progress_list, get_student_material_detail,
         get_student_section_mastery,
         get_student_quiz_performance, get_student_activity,
+        get_student_next_action,
         get_teacher_analytics_overview, get_teacher_analytics_options,
         get_teacher_analytics_materials, get_teacher_analytics_material, get_teacher_analytics_quiz,
         get_teacher_analytics_students, get_teacher_analytics_student,
@@ -254,6 +255,7 @@ def create_app():
     app.add_url_rule('/api/student/sections/<material_id>', view_func=get_student_section_mastery, methods=['GET'])
     app.add_url_rule('/api/student/performance', view_func=get_student_quiz_performance, methods=['GET'])
     app.add_url_rule('/api/student/activity', view_func=get_student_activity, methods=['GET'])
+    app.add_url_rule('/api/student/next-action', view_func=get_student_next_action, methods=['GET'])
 
     app.add_url_rule('/api/teacher/analytics', view_func=get_teacher_analytics_overview, methods=['GET'])
     app.add_url_rule('/api/teacher/analytics/options', view_func=get_teacher_analytics_options, methods=['GET'])

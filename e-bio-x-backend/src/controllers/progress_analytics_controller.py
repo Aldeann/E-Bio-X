@@ -18,6 +18,7 @@ from src.services import learning_analytics_service as analytics
 from src.services import student_practice_service as spractice
 from src.services import prerequisite_service as prereq
 from src.services import impact_analytics_service as impact
+from src.services import next_action_service as next_action
 
 
 def _user():
@@ -307,6 +308,26 @@ def get_student_activity():
         } for a in rows],
         'page': page, 'per_page': per_page, 'total': total,
     }), 200
+
+
+@jwt_required()
+def get_student_next_action():
+    """Satu langkah berikutnya untuk siswa (Fase 5).
+
+    Query opsional `material_id`/`section_id`/`context` dipakai halaman yang
+    sedang dibuka agar saran menyambung; tanpa itu, state terakhir siswa yang
+    dipakai. Logika keputusan ada di next_action_service.
+    """
+    student, err, code = _student()
+    if err:
+        return err, code
+    result = next_action.next_action_for_student(
+        student,
+        material_id=request.args.get('material_id'),
+        section_id=request.args.get('section_id'),
+        context=request.args.get('context'),
+    )
+    return jsonify(result), 200
 
 
 # ============================================================
