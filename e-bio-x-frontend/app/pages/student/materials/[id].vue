@@ -28,6 +28,31 @@ const practiceSectionTitle = ref("");
 const practiceAvailable = ref({});
 // Rekomendasi materi berikutnya, ditampilkan di layar "Materi Selesai".
 const nextMaterials = ref([]);
+// Langkah berikutnya (Fase 5b): SATU aksi yang diprioritaskan server,
+// ditampilkan di layar "Materi Selesai" supaya murid tahu harus apa.
+const nextAction = ref(null);
+const lastNbaShownKey = ref(null);
+const nbaIcon = computed(() => {
+  const t = nextAction.value?.action?.type;
+  const map = {
+    practice_weak: "material-symbols:fitness-center",
+    practice_after_read: "material-symbols:fitness-center",
+    continue_reading: "material-symbols:menu-book",
+    take_quiz: "material-symbols:quiz",
+    start_next_material: "material-symbols:rocket-launch",
+    review_mastered: "material-symbols:refresh",
+  };
+  return map[t] || "material-symbols:bolt";
+});
+const ctaIcon = (kind) => {
+  const map = {
+    practice: "material-symbols:auto-awesome",
+    read: "material-symbols:menu-book",
+    quiz: "material-symbols:quiz",
+    material: "material-symbols:rocket-launch",
+  };
+  return map[kind] || "material-symbols:arrow-forward";
+};
 
 const signalActivity = async (eventType, sectionId = null, contentId = null, data = null) => {
   try {
@@ -157,6 +182,9 @@ const closePractice = () => {
   practiceOpen.value = false;
   // Segarkan jumlah soal setelah latihan (mis. status bagian berubah).
   fetchPracticeAvailability();
+  // Bila layar "Materi Selesai" sedang terbuka, perbarui langkah berikutnya
+  // supaya ikut memperhitungkan jawaban yang barusan masuk.
+  if (showCompletion.value) loadNextAction();
 };
 
 // Rekomendasi materi berikutnya (bukan materi yang sedang dibuka). Dipakai di
@@ -187,6 +215,80 @@ const openRecommendedMaterial = async (r) => {
   }
   navigateTo(`/student/materials/${r.material_id}`);
 };
+
+// --- Langkah berikutnya (Fase 5b) ---------------------------------------
+const nbaKey = (action) => {
+  const c = (action && action.cta) || {};
+  return [action?.type, c.material_id, c.section_id, c.quiz_id].join(":");
+};
+
+// Catat tayang/klik. Endpoint ini TIDAK menyentuh status materi, jadi
+// menampilkan kartu tidak akan menandai materi lain sebagai "dimulai".
+const logNbaEvent = async (eventType, action) => {
+  const cta = action && action.cta;
+  if (!cta || !cta.material_id) return;
+  try {
+    await $fetch(`${config.public.backend}/api/student/next-action/event`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: {
+        event_type: eventType,
+        material_id: cta.material_id,
+        section_id: cta.section_id || null,
+        action_type: action.type,
+        surface: "material_completion",
+      },
+    });
+  } catch (e) {
+    // pencatatan opsional
+  }
+};
+
+const loadNextAction = async () => {
+  try {
+    const q = new URLSearchParams();
+    q.set("material_id", route.params.id);
+    if (activeSectionId.value) q.set("section_id", activeSectionId.value);
+    q.set("context", "just_finished_section");
+    nextAction.value = await $fetch(
+      `${config.public.backend}/api/student/next-action?${q.toString()}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const act = nextAction.value && nextAction.value.action;
+    if (act && act.cta && act.type !== "done") {
+      const k = nbaKey(act);
+      if (k !== lastNbaShownKey.value) {
+        lastNbaShownKey.value = k;
+        logNbaEvent("next_action_shown", act);
+      }
+    }
+  } catch (e) {
+    nextAction.value = null;
+  }
+};
+
+const runAction = (action) => {
+  const cta = action && action.cta;
+  if (!cta) return;
+  logNbaEvent("next_action_clicked", action);
+  if (cta.kind === "practice" && cta.section_id) {
+    openPractice(cta.section_id, cta.section_title || action.title);
+    return;
+  }
+  if (cta.kind === "quiz" && cta.quiz_id) {
+    navigateTo(`/student/quizzes/${cta.quiz_id}`);
+    return;
+  }
+  if (cta.material_id) {
+    const s = cta.section_id ? `?section=${cta.section_id}` : "";
+    navigateTo(`/student/materials/${cta.material_id}${s}`);
+  }
+};
+
+// Layar "Materi Selesai" muncul -> minta server menentukan langkah berikutnya.
+watch(showCompletion, (v) => {
+  if (v) loadNextAction();
+});
 
 const fetchDetail = async () => {
   loading.value = true;
@@ -522,40 +624,81 @@ definePageMeta({
           @restart="restartLearning"
         >
           <template #next>
-            <div v-if="practiceSections.length" class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
-              <p class="text-sm font-semibold text-indigo-700 dark:text-indigo-300 mb-2 flex items-center justify-center gap-1">
-                <Icon name="material-symbols:auto-awesome" class="w-4 h-4" />
-                Latihan adaptif
-              </p>
-              <div class="flex flex-wrap justify-center gap-2">
-                <button
-                  v-for="s in practiceSections"
-                  :key="s.id"
-                  @click="openPractice(s.id, s.title)"
-                  class="px-3 py-2 rounded-lg border border-indigo-300 dark:border-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 text-sm font-medium"
-                >
-                  {{ s.title }}
-                </button>
+            <!-- Langkah berikutnya (Fase 5b): satu aksi utama dari server.
+                 Bila tidak tersedia, blok lama (latihan per bagian + materi
+                 berikutnya) dipakai sebagai cadangan agar layar tetap berguna. -->
+            <div
+              v-if="nextAction && nextAction.action && nextAction.action.type !== 'done'"
+              class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-left"
+            >
+              <div class="rounded-xl border border-green-300 dark:border-green-700 bg-green-50/60 dark:bg-green-900/20 p-4">
+                <p class="text-[11px] uppercase tracking-wide font-semibold text-green-700 dark:text-green-400 flex items-center gap-1">
+                  <Icon :name="nbaIcon" class="w-4 h-4" />
+                  Langkah berikutnya
+                </p>
+                <p class="font-semibold text-gray-800 dark:text-gray-100 mt-1">
+                  {{ nextAction.action.title }}
+                </p>
+                <p v-if="nextAction.action.reason" class="text-sm text-gray-600 dark:text-gray-300 mt-0.5">
+                  {{ nextAction.action.reason }}
+                </p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <button
+                    v-if="nextAction.action.cta"
+                    @click="runAction(nextAction.action)"
+                    class="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold flex items-center gap-1.5"
+                  >
+                    <Icon :name="ctaIcon(nextAction.action.cta.kind)" class="w-4 h-4" />
+                    {{ nextAction.action.cta.label }}
+                  </button>
+                  <button
+                    v-for="(alt, ai) in (nextAction.alternatives || [])"
+                    :key="ai"
+                    @click="runAction(alt)"
+                    class="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm"
+                  >
+                    {{ alt.title }}
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div v-if="nextMaterials.length" class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-left">
-              <p class="text-sm font-semibold text-green-700 dark:text-green-400 mb-2 flex items-center justify-center gap-1">
-                <Icon name="material-symbols:play-circle" class="w-4 h-4" />
-                Materi berikutnya
-              </p>
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <button
-                  v-for="r in nextMaterials"
-                  :key="r.material_id"
-                  @click="openRecommendedMaterial(r)"
-                  class="rounded-xl border border-green-200 dark:border-green-800 bg-white dark:bg-gray-900 p-3 text-left hover:shadow-md transition"
-                >
-                  <p class="font-semibold text-sm text-gray-800 dark:text-gray-100 truncate">{{ r.title }}</p>
-                  <p class="text-xs text-gray-500 mt-0.5 truncate">Topik: {{ r.topic || "-" }}</p>
-                </button>
+            <template v-else>
+              <div v-if="practiceSections.length" class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
+                <p class="text-sm font-semibold text-indigo-700 dark:text-indigo-300 mb-2 flex items-center justify-center gap-1">
+                  <Icon name="material-symbols:auto-awesome" class="w-4 h-4" />
+                  Latihan adaptif
+                </p>
+                <div class="flex flex-wrap justify-center gap-2">
+                  <button
+                    v-for="s in practiceSections"
+                    :key="s.id"
+                    @click="openPractice(s.id, s.title)"
+                    class="px-3 py-2 rounded-lg border border-indigo-300 dark:border-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 text-sm font-medium"
+                  >
+                    {{ s.title }}
+                  </button>
+                </div>
               </div>
-            </div>
+
+              <div v-if="nextMaterials.length" class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-left">
+                <p class="text-sm font-semibold text-green-700 dark:text-green-400 mb-2 flex items-center justify-center gap-1">
+                  <Icon name="material-symbols:play-circle" class="w-4 h-4" />
+                  Materi berikutnya
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    v-for="r in nextMaterials"
+                    :key="r.material_id"
+                    @click="openRecommendedMaterial(r)"
+                    class="rounded-xl border border-green-200 dark:border-green-800 bg-white dark:bg-gray-900 p-3 text-left hover:shadow-md transition"
+                  >
+                    <p class="font-semibold text-sm text-gray-800 dark:text-gray-100 truncate">{{ r.title }}</p>
+                    <p class="text-xs text-gray-500 mt-0.5 truncate">Topik: {{ r.topic || "-" }}</p>
+                  </button>
+                </div>
+              </div>
+            </template>
           </template>
         </MaterialCompletion>
 

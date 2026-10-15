@@ -95,6 +95,11 @@ ALLOWED_EVENT_TYPES = {
     'bookmark_created',
     'recommendation_clicked',
     'recommendation_shown',
+    # Langkah berikutnya / Next Best Action (Fase 5). Dicatat TANPA menyentuh
+    # status materi (lihat log_activity touch=False): menampilkan saran bukan
+    # tanda siswa membuka materi.
+    'next_action_shown',
+    'next_action_clicked',
     # forum learning events (Prompt 11)
     'FORUM_CREATED',
     'FORUM_VIEWED',
@@ -117,7 +122,7 @@ ALLOWED_EVENT_TYPES = {
 }
 
 
-def log_activity(student_id, material_id, event_type, section_id=None, content_id=None, data=None, silent=True):
+def log_activity(student_id, material_id, event_type, section_id=None, content_id=None, data=None, silent=True, touch=True):
     if event_type not in ALLOWED_EVENT_TYPES:
         return None
     try:
@@ -130,7 +135,11 @@ def log_activity(student_id, material_id, event_type, section_id=None, content_i
             data=data or {},
         )
         db.session.add(activity)
-        t = touch_state(student_id, material_id, section_id=section_id, content_id=content_id, silent=True)
+        # `touch=False` untuk event yang BUKAN tanda aktivitas belajar (mis.
+        # saran ditampilkan). Menyentuh state akan menandai materi sebagai
+        # "dimulai" hanya karena sebuah kartu muncul - itu keliru.
+        if touch:
+            touch_state(student_id, material_id, section_id=section_id, content_id=content_id, silent=True)
         db.session.commit()
         return activity
     except Exception:

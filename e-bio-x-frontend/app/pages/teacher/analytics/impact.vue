@@ -140,6 +140,41 @@
         </div>
       </div>
 
+      <!-- Next Best Action (Fase 5) -->
+      <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 mb-6">
+        <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-1 flex items-center gap-1.5">
+          <Icon name="material-symbols:bolt" class="w-4 h-4 text-green-600" />
+          Langkah Berikutnya (Next Best Action)
+        </h4>
+        <p class="text-xs text-gray-500 mb-4">
+          Satu aksi yang disarankan sistem setelah siswa membaca. Diukur dari jejak tayang & klik yang sama seperti rekomendasi.
+        </p>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <p class="text-2xl font-bold text-gray-800 dark:text-gray-100">{{ data.next_action?.ctr == null ? "–" : data.next_action.ctr + "%" }}</p>
+            <p class="text-xs text-gray-500 mt-1">CTR langkah berikutnya</p>
+          </div>
+          <div>
+            <p class="text-2xl font-bold text-gray-800 dark:text-gray-100">{{ data.next_action?.impressions ?? 0 }}</p>
+            <p class="text-xs text-gray-500 mt-1">Impresi (aksi tayang)</p>
+          </div>
+          <div>
+            <p class="text-2xl font-bold text-gray-800 dark:text-gray-100">{{ data.next_action?.clicked ?? 0 }}</p>
+            <p class="text-xs text-gray-500 mt-1">Klik setelah tayang</p>
+          </div>
+          <div>
+            <p class="text-2xl font-bold text-gray-800 dark:text-gray-100">{{ data.next_action?.students_shown ?? 0 }}</p>
+            <p class="text-xs text-gray-500 mt-1">Siswa yang melihat</p>
+          </div>
+        </div>
+        <p class="text-[11px] text-gray-400 mt-4">
+          Impresi = pasangan (siswa × materi) yang aksinya benar-benar ditayangkan. CTR = klik setelah tayang / impresi (maks. 100%).
+          <span v-if="data.next_action?.clicks_without_impression">
+            {{ data.next_action.clicks_without_impression }} klik belum punya impresi tercatat sehingga tidak dihitung di CTR.
+          </span>
+        </p>
+      </div>
+
       <!-- Practice lift -->
       <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 mb-6">
         <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-1">Perbaikan Latihan (soal diulang)</h4>
@@ -215,7 +250,7 @@ const loading = ref(true);
 const options = ref({ courses: [], phases: [], topics: [], materials: [] });
 const filters = ref({ course_id: "", phase: "", topic: "", material_id: "", date_from: "", date_to: "" });
 const data = ref({
-  scope: {}, funnel: {}, recommendation: {}, practice_lift: {}, by_material: [],
+  scope: {}, funnel: {}, recommendation: {}, next_action: {}, practice_lift: {}, by_material: [],
 });
 
 const authHeaders = () => ({ Authorization: `Bearer ${token}` });

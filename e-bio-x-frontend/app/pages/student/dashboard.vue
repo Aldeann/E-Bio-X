@@ -628,22 +628,61 @@ const closePractice = () => {
 };
 
 // Langkah berikutnya (Fase 5): ambil satu aksi utama dari server.
+const nbaKey = (action) => {
+  const c = (action && action.cta) || {};
+  return [action?.type, c.material_id, c.section_id, c.quiz_id].join(":");
+};
+
+// Catat tayang/klik langkah berikutnya (Fase 5b). Endpoint ini tidak
+// menyentuh status materi, jadi aman dipanggil dari dasbor.
+const logNbaEvent = async (eventType, action, surface) => {
+  const cta = action && action.cta;
+  if (!cta || !cta.material_id) return;
+  try {
+    await $fetch(`${config.public.backend}/api/student/next-action/event`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: {
+        event_type: eventType,
+        material_id: cta.material_id,
+        section_id: cta.section_id || null,
+        action_type: action.type,
+        surface,
+      },
+    });
+  } catch (e) {
+    // pencatatan opsional, jangan ganggu alur belajar
+  }
+};
+
+const lastNbaShownKey = ref(null);
+
 const loadNextAction = async () => {
   try {
     nextAction.value = await $fetch(
       `${config.public.backend}/api/student/next-action`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
+    const act = nextAction.value && nextAction.value.action;
+    if (act && act.cta && act.type !== "done") {
+      const k = nbaKey(act);
+      // Satu tayang per aksi: hindari menggandakan impression saat refresh.
+      if (k !== lastNbaShownKey.value) {
+        lastNbaShownKey.value = k;
+        logNbaEvent("next_action_shown", act, "dashboard");
+      }
+    }
   } catch (e) {
     nextAction.value = null;
   }
 };
 
-// Jalankan aksi yang disarankan. Latihan memakai jalur modal yang sudah ada
-// (sekaligus mencatat klik saran); aksi lain hanya berpindah halaman.
+// Jalankan aksi yang disarankan. Latihan memakai jalur modal yang sudah ada;
+// aksi lain hanya berpindah halaman.
 const runAction = (action) => {
   const cta = action && action.cta;
   if (!cta) return;
+  logNbaEvent("next_action_clicked", action, "dashboard");
   if (cta.kind === "practice" && cta.section_id) {
     openPractice({
       material_id: cta.material_id,

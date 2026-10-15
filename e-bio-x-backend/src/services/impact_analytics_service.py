@@ -60,6 +60,31 @@ def _pct(part, whole):
     return round(part / whole * 100, 1) if whole else None
 
 
+def _pair_impressions(shown_acts, click_acts):
+    """Pasangkan klik dengan impresi (siswa, materi) yang mendahuluinya.
+
+    Sebuah klik hanya dihitung bila ada tayangan untuk (siswa, materi) yang
+    sama SEBELUM atau pada saat klik. Tanpa ini, klik lama (sebelum impresi
+    mulai dicatat) membuat CTR > 100%. Mengembalikan
+    (shown_pairs, matched_pairs, unmatched_clicks).
+    """
+    shown_pairs = {}
+    for a in shown_acts:
+        key = (a.student_id, a.material_id)
+        if key not in shown_pairs or a.created_at < shown_pairs[key]:
+            shown_pairs[key] = a.created_at
+    matched_pairs = set()
+    unmatched_clicks = 0
+    for a in click_acts:
+        key = (a.student_id, a.material_id)
+        st = shown_pairs.get(key)
+        if st is not None and a.created_at >= st:
+            matched_pairs.add(key)
+        else:
+            unmatched_clicks += 1
+    return shown_pairs, matched_pairs, unmatched_clicks
+
+
 def log_recommendation_impressions(student_id, material_ids):
     """Catat tayangan saran materi, maksimal sekali per (siswa, materi) per hari.
 
@@ -102,6 +127,9 @@ def _empty(filters):
                            'followed_practice': 0, 'followed_quiz': 0,
                            'practice_after_click_rate': None,
                            'quiz_after_click_rate': None},
+        'next_action': {'impressions': 0, 'students_shown': 0, 'clicked': 0,
+                        'ctr': None, 'clicks_total': 0,
+                        'clicks_without_impression': 0, 'students_clicked': 0},
         'practice_lift': {'retried_questions': 0, 'improved': 0, 'regressed': 0,
                           'improve_rate': None, 'first_attempt_accuracy': None,
                           'last_attempt_accuracy': None},
@@ -184,20 +212,8 @@ def teacher_impact(teacher_id, filters=None):
     # Pasangkan klik dengan impresi: sebuah klik hanya dihitung bila ada
     # tayangan untuk (siswa, materi) yang sama SEBELUM atau pada saat klik.
     # Tanpa ini, klik lama (sebelum impresi mulai dicatat) membuat CTR > 100%.
-    shown_pairs = {}
-    for a in shown_acts:
-        key = (a.student_id, a.material_id)
-        if key not in shown_pairs or a.created_at < shown_pairs[key]:
-            shown_pairs[key] = a.created_at
-    matched_pairs = set()
-    unmatched_clicks = 0
-    for a in click_acts:
-        key = (a.student_id, a.material_id)
-        st = shown_pairs.get(key)
-        if st is not None and a.created_at >= st:
-            matched_pairs.add(key)
-        else:
-            unmatched_clicks += 1
+    shown_pairs, matched_pairs, unmatched_clicks = _pair_impressions(
+        shown_acts, click_acts)
 
     impressions = len(shown_pairs)
     clicked = len(matched_pairs)
@@ -236,6 +252,30 @@ def teacher_impact(teacher_id, filters=None):
         'followed_quiz': len(followed_quiz),
         'practice_after_click_rate': _pct(len(followed_practice), len(students_clicked)),
         'quiz_after_click_rate': _pct(len(followed_quiz), len(students_clicked)),
+    }
+
+    # --- langkah berikutnya (Fase 5): tayang & klik, pasangan sama seperti saran ---
+    nba_acts = LearningActivity.query.filter(
+        LearningActivity.student_id.in_(student_ids),
+        LearningActivity.material_id.in_(material_ids),
+        LearningActivity.event_type.in_(
+            ('next_action_shown', 'next_action_clicked'))).all()
+    nba_shown_acts = [a for a in nba_acts
+                      if a.event_type == 'next_action_shown'
+                      and _in_range(a.created_at, start, end)]
+    nba_click_acts = [a for a in nba_acts
+                      if a.event_type == 'next_action_clicked'
+                      and _in_range(a.created_at, start, end)]
+    nba_shown_pairs, nba_matched, nba_unmatched = _pair_impressions(
+        nba_shown_acts, nba_click_acts)
+    next_action = {
+        'impressions': len(nba_shown_pairs),
+        'students_shown': len({k[0] for k in nba_shown_pairs}),
+        'clicked': len(nba_matched),
+        'ctr': _pct(len(nba_matched), len(nba_shown_pairs)),
+        'clicks_total': len(nba_click_acts),
+        'clicks_without_impression': nba_unmatched,
+        'students_clicked': len({a.student_id for a in nba_click_acts}),
     }
 
     # --- latihan membaik (percobaan ulang soal yang sama) ---
@@ -311,6 +351,7 @@ def teacher_impact(teacher_id, filters=None):
                   'date_to': filters.get('date_to')},
         'funnel': funnel,
         'recommendation': recommendation,
+        'next_action': next_action,
         'practice_lift': practice_lift,
         'by_material': per_material,
     }

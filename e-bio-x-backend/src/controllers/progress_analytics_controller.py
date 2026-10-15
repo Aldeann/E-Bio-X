@@ -330,6 +330,65 @@ def get_student_next_action():
     return jsonify(result), 200
 
 
+# Event NBA yang boleh dicatat lewat endpoint di bawah. SENGAJA hanya dua:
+# tayang dan diklik. Selain itu bukan urusan endpoint ini.
+_NBA_EVENT_TYPES = ('next_action_shown', 'next_action_clicked')
+
+
+@jwt_required()
+def post_student_next_action_event():
+    """Catat tayang/klik "langkah berikutnya" (Fase 5).
+
+    Berbeda dari /api/materials/<id>/activity, pencatatan di sini TIDAK
+    menyentuh status materi (`touch=False`): sekadar menampilkan saran bukan
+    tanda siswa membuka materi, jadi tidak boleh mengubah "belum dimulai"
+    menjadi "dimulai".
+    """
+    student, err, code = _student()
+    if err:
+        return err, code
+
+    data = request.get_json(silent=True) or {}
+    event_type = data.get('event_type')
+    if event_type not in _NBA_EVENT_TYPES:
+        return jsonify({'error': 'event_type tidak valid'}), 400
+
+    material_id = data.get('material_id')
+    try:
+        material_id = int(material_id)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'material_id wajib diisi'}), 400
+
+    material = Material.query.get(material_id)
+    if not material or not _can_student_access(material, student):
+        return jsonify({'error': 'Material tidak dapat diakses'}), 404
+
+    section_id = data.get('section_id')
+    try:
+        section_id = int(section_id) if section_id is not None else None
+    except (TypeError, ValueError):
+        section_id = None
+    if section_id is not None:
+        section = MaterialSection.query.filter_by(
+            id=section_id, material_id=material.id).first()
+        section_id = section.id if section else None
+
+    payload = {
+        'action_type': data.get('action_type'),
+        'surface': data.get('surface'),
+        'context': data.get('context'),
+    }
+    payload.update(data.get('data') or {})
+
+    activity = analytics.log_activity(
+        student.id, material.id, event_type,
+        section_id=section_id, data=payload, silent=False, touch=False,
+    )
+    if activity is None:
+        return jsonify({'error': 'Gagal mencatat event'}), 500
+    return jsonify({'ok': True, 'id': activity.id}), 201
+
+
 # ============================================================
 # TEACHER ANALYTICS
 # ============================================================
