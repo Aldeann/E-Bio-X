@@ -206,6 +206,25 @@ SESSION_MIX_BELOW = 0.30
 SESSION_MIX_ABOVE = 0.10
 SESSION_LEVEL_ORDER = ['easy', 'medium', 'hard']
 
+# --- Tujuan & status keluar sesi latihan (Fase 3 lanjutan) -----------
+# Sebuah bagian dianggap "tuntas" bila siswa sudah menjawab minimal
+# PRACTICE_MIN_SAMPLE soal latihan (jawaban terakhir per soal) dengan
+# akurasi >= PRACTICE_PASS_SCORE. Nilai SENGAJA sama dengan
+# REC_PASS_SCORE / MIN_SECTION_SAMPLE supaya rekomendasi dan sesi latihan
+# berbicara dengan ambang yang sama. Di bawah ambang, statusnya hanya
+# "sedang berlatih" - tidak ada klaim tuntas.
+PRACTICE_PASS_SCORE = 75
+PRACTICE_MIN_SAMPLE = 3
+
+# --- Tujuan & aturan keluar sesi latihan (Fase 3 lanjutan) -----------
+# Satu bagian dianggap TUNTAS bila siswa sudah menjawab minimal
+# PRACTICE_PASS_MIN soal latihan bagian itu dengan akurasi >=
+# PRACTICE_PASS_SCORE. Di bawah ambang, status hanya "sedang berlatih" -
+# tidak ada klaim tuntas. Angka ini dipakai HANYA untuk bahasa status/next
+# step di sesi latihan, bukan untuk mengarang skor penguasaan.
+PRACTICE_PASS_SCORE = 75
+PRACTICE_PASS_MIN = 3
+
 # --- Fokus miskonsepsi (Tahap 2) ------------------------------------
 # Label miskonsepsi terlemah siswa pada suatu bagian hanya mengubah URUTAN
 # soal DI DALAM tiap tingkat sesi (komposisi 60/30/10 tetap). Label dipakai

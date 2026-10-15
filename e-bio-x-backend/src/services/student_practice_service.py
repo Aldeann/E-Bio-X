@@ -199,6 +199,25 @@ def practice_stats(student_id, material_id):
     return out
 
 
+def section_progress(student_id, material_id, section_id):
+    """Ringkasan latihan SATU bagian: answered/correct/accuracy.
+
+    Sumbernya sama dengan practice_stats - jawaban TERAKHIR per soal - jadi
+    mengulang satu soal sampai benar tidak menambah bukti. `accuracy` None bila
+    belum ada jawaban (tidak mengarang 0%). Dipakai untuk menentukan status
+    keluar sesi (tuntas / sedang berlatih), bukan untuk skor resmi.
+    """
+    answered = correct = 0
+    for sid, _stid, _bqid, ok, _attempts in latest_attempts(material_id, student_id):
+        if int(sid) != int(section_id):
+            continue
+        answered += 1
+        if ok:
+            correct += 1
+    accuracy = round(correct / answered * 100, 1) if answered else None
+    return {'answered': answered, 'correct': correct, 'accuracy': accuracy}
+
+
 # ============================================================
 # SESI LATIHAN ADAPTIF (Fase 3f)
 # ============================================================
@@ -552,6 +571,45 @@ def session_for_section(material_id, section_id, student):
             basis = 'sequential'
             basis_text = 'Tingkat soal tidak diketahui, jadi urutan tidak diubah.'
 
+    # --- tujuan & status keluar bagian (Fase 3 lanjutan) ---
+    # Tuntas hanya diklaim bila buktinya cukup (>= PRACTICE_MIN_SAMPLE soal)
+    # DAN akurasinya >= PRACTICE_PASS_SCORE. Sebelum itu statusnya "sedang
+    # berlatih" - kita tidak pernah bilang tuntas tanpa dasar.
+    progress = section_progress(student.id, material_id, section_id)
+    if progress['answered'] == 0:
+        exit_status = 'not_started'
+    elif progress['answered'] < cfg.PRACTICE_MIN_SAMPLE:
+        exit_status = 'in_progress'
+    elif (progress['accuracy'] or 0) >= cfg.PRACTICE_PASS_SCORE:
+        exit_status = 'mastered'
+    else:
+        exit_status = 'needs_reinforcement'
+
+    # "Naik tingkat saat tuntas": hanya bila bagian sudah tuntas DAN bagian ini
+    # memang masih menyimpan soal di tingkat atasnya. Kalau tidak ada, jangan
+    # menjanjikan tantangan yang tidak eksis.
+    next_level = None
+    if exit_status == 'mastered' and target:
+        candidate = _LEVEL_ABOVE.get(target)
+        if candidate and any(
+                (effective.get(int(bq.id)) or {}).get('label') == candidate
+                for bq in approved):
+            next_level = candidate
+
+    if exit_status == 'mastered':
+        exit_message = f"Bagian ini sudah tuntas (akurasi {progress['accuracy']}%). "
+        exit_message += (f"Tantang soal {_level_label(next_level)} berikutnya."
+                         if next_level else
+                         "Ulangi besok agar pemahamanmu bertahan.")
+    elif exit_status == 'in_progress':
+        exit_message = (f"Baru {progress['answered']} dari minimal "
+                        f"{cfg.PRACTICE_MIN_SAMPLE} soal terjawab di bagian ini.")
+    elif exit_status == 'needs_reinforcement':
+        exit_message = (f"Akurasi bagian ini {progress['accuracy']}%, masih di bawah "
+                        f"{cfg.PRACTICE_PASS_SCORE}%. Latih lagi.")
+    else:
+        exit_message = "Belum ada jawaban di bagian ini. Mulai dari soal pertama."
+
     entries = []
     for bq in ordered:
         entry = effective.get(int(bq.id)) or {}
@@ -586,5 +644,15 @@ def session_for_section(material_id, section_id, student):
                        if focus else None),
         'note': ('Urutan sesi: 60% sasaran, 30% satu tingkat di bawah, 10% di atas. '
                  'Hanya soal yang disetujui guru; soal baru tidak pernah dibuat.'),
+        # --- aturan keluar sesi (Fase 3 lanjutan) ---
+        # Status bagian ini + kalimat langkah berikutnya. Angka apa adanya:
+        # `accuracy` None berarti belum ada jawaban.
+        'exit_status': exit_status,
+        'exit_message': exit_message,
+        'progress': progress,
+        'pass_score': cfg.PRACTICE_PASS_SCORE,
+        'pass_min_sample': cfg.PRACTICE_MIN_SAMPLE,
+        'next_level': next_level,
+        'next_level_label': _level_label(next_level),
     }
     return entries, session

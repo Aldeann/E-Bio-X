@@ -60,6 +60,13 @@
                 <Icon name="material-symbols:target" class="w-3.5 h-3.5 mt-0.5 shrink-0" />
                 {{ session.focus_text }}
               </p>
+              <p
+                v-if="session.exit_message"
+                class="text-[11px] text-gray-600 dark:text-gray-300 mt-1.5 flex items-start gap-1"
+              >
+                <Icon name="material-symbols:flag" class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                {{ session.exit_message }}
+              </p>
             </div>
 
             <!-- question -->
@@ -149,6 +156,17 @@
               <p class="text-xs text-gray-500 mt-1">
                 {{ summary.answered }} soal dijawab, {{ summary.correct }} benar.
               </p>
+              <div
+                v-if="exitNow"
+                class="mt-3 rounded-lg border p-3 text-xs text-left"
+                :class="exitNow.tone === 'good'
+                  ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300'
+                  : exitNow.tone === 'warn'
+                    ? 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300'
+                    : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300'"
+              >
+                {{ exitNow.text }}
+              </div>
               <div
                 v-if="wrongQuestions.length"
                 class="mt-4 text-left rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3"
@@ -244,6 +262,38 @@ const feedbacks = ref([]);
 const wrongQuestions = computed(() =>
   feedbacks.value.filter((f) => !f.ok).map((f) => f.text)
 );
+
+// Status keluar sesi (Fase 3 lanjutan): dihitung dari agregat yang baru saja
+// dikirim server (summary), memakai ambang yang sama dengan backend
+// (session.pass_score / session.pass_min_sample). Tidak ada angka yang
+// dikarang - bila belum ada jawaban, tidak ada klaim.
+const exitNow = computed(() => {
+  const answered = summary.value.answered || 0;
+  const correct = summary.value.correct || 0;
+  const pass = session.value?.pass_score ?? 75;
+  const min = session.value?.pass_min_sample ?? 3;
+  if (!answered) return null;
+  const acc = Math.round((correct / answered) * 1000) / 10;
+  if (answered < min) {
+    return {
+      tone: "neutral",
+      text: `Baru ${answered} dari minimal ${min} soal terjawab di bagian ini.`,
+    };
+  }
+  if (acc >= pass) {
+    const next = session.value?.next_level_label;
+    return {
+      tone: "good",
+      text: next
+        ? `Bagian ini sudah tuntas (akurasi ${acc}%). Tantang soal ${next} berikutnya.`
+        : `Bagian ini sudah tuntas (akurasi ${acc}%). Ulangi besok agar pemahamanmu bertahan.`,
+    };
+  }
+  return {
+    tone: "warn",
+    text: `Akurasi bagian ini ${acc}%, masih di bawah ${pass}%. Latih lagi.`,
+  };
+});
 
 const current = computed(() => questions.value[index.value] || null);
 
