@@ -28,9 +28,15 @@ from src.services import storage_service
 from src.services import question_difficulty_service as qds
 from src.ml import ml_config as cfg
 
-# Long enough for any realistic section, short enough that the payload stays
-# small. The real total is reported alongside so nothing looks trimmed.
+# Jendela jalur DIAGNOSTIK: urutan tetap dan jumlahnya kecil (beberapa soal per
+# bagian), jadi 20 cukup memuat semuanya sekaligus. Jalur LATIHAN adaptif
+# memakai SESSION_SIZE + rotasi di bawah, bukan MAX_SERVED.
 MAX_SERVED = 20
+
+# Jendela satu sesi latihan adaptif (lihat ml_config.SESSION_SIZE untuk alasan
+# angkanya). Nilainya diambil dari konfigurasi supaya ambang sesi tinggal
+# diubah di satu tempat.
+SESSION_SIZE = cfg.SESSION_SIZE
 
 
 def approved_for_section(section_id):
@@ -539,15 +545,78 @@ def focus_for_student_section(student, approved):
             'correct': best['correct'], 'total': best['total']}
 
 
-def _order_questions(approved, effective, target, focus_label=None):
-    """Urutkan soal sesuai komposisi 60/30/10 tanpa menghilangkan soal apa pun.
+def _rotation_key(bq, history, focus_label=None):
+    """Kunci rotasi: soal yang BELUM dijawab dulu, lalu yang paling lama.
 
-    Bila `focus_label` dikenal (fokus miskonsepsi, Tahap 2), urutan DI DALAM
-    tiap tingkat menaruh soal berlabel fokus lebih dulu; sisanya tetap menurut
-    id yang stabil. Jumlah per tingkat 60/30/10 TIDAK berubah. Tanpa fokus
-    perilaku identik dengan sebelum perubahan (regresi aman).
+    `history` = {bank_question_id: waktu jawaban latihan terakhir}. Soal yang
+    tidak ada di sana selalu di depan (diurutkan fokus lebih dulu lalu id).
+    Sesama soal yang sudah dijawab diurutkan dari yang paling lama, sehingga
+    sesi berikutnya memakai soal yang lebih jarang dilihat. `focus_label` hanya
+    memecah seri - tidak pernah menimpa rotasi.
     """
+    at = history.get(int(bq.id)) if history else None
+    focus_rank = (
+        0 if (focus_label
+              and (bq.misconception or '').strip()[:cfg.FOCUS_LABEL_MAXLEN] == focus_label)
+        else 1
+    )
+    return (1 if at is not None else 0, at or datetime.min, focus_rank, int(bq.id))
+
+
+def _practice_history(section_id, student_id):
+    """bank_question_id -> waktu jawaban LATIHAN terakhir (mode='practice').
+
+    Hanya jalur latihan yang dihitung: jawaban asesmen diagnostik tidak boleh
+    dianggap "sudah dilatih" (dua pool itu memang dipisah). Dipakai untuk
+    rotasi sesi supaya seluruh bank terpakai lintas sesi.
+    """
+    rows = PracticeAnswer.query.filter_by(
+        student_id=student_id, section_id=section_id, mode='practice'
+    ).order_by(PracticeAnswer.answered_at.asc(), PracticeAnswer.id.asc()).all()
+    out = {}
+    for r in rows:
+        out[int(r.bank_question_id)] = r.answered_at
+    return out
+
+
+def section_practice_counts(section_id, student_id):
+    """(total, seen) soal latihan APPROVED satu bagian untuk satu siswa.
+
+    `total` = soal latihan yang disetujui guru; `seen` = berapa yang sudah
+    pernah dijawab (mode='practice'). Dipakai UI untuk menawarkan "sesi
+    berikutnya" hanya bila memang masih ada soal yang belum dilatih - tidak ada
+    sisa yang dikarang.
+    """
+    total = len(approved_for_section(section_id))
+    seen = len(_practice_history(section_id, student_id))
+    return total, seen
+
+
+def _order_questions(approved, effective, target, focus_label=None,
+                     history=None, size=None):
+    """Urutkan soal sesuai komposisi 60/30/10, dengan jendela + rotasi.
+
+    Dua perilaku, sengaja dipisah:
+
+    - Tanpa `size` ATAU bank <= jendela: seluruh soal tersaji dalam urutan
+      60/30/10 (fokus lebih dulu di dalam tiap tingkat, lalu id stabil). Ini
+      perilaku lama, jadi regresi aman.
+    - Bank lebih besar dari jendela DAN ada `history`: kuota 60/30/10 dihitung
+      dari ukuran jendela, dan tiap tingkat dirotasi - soal yang belum pernah
+      dijawab didahulukan, lalu yang paling lama dijawab. Sifat adaptif tetap,
+      tetapi seluruh bank terpakai lintas sesi.
+
+    Hasil selalu memuat SELURUH soal (jendela dulu, sisa di belakang), supaya
+    pemanggil bisa memotong `[:size]` untuk sesi dan tetap tahu totalnya.
+    """
+    total = len(approved)
+    window = min(total, size) if size else total
+    rotating = bool(history) and total > window
+
     if not target:
+        if rotating:
+            return sorted(
+                approved, key=lambda bq: _rotation_key(bq, history, focus_label))
         return list(approved)
 
     queues = {lvl: [] for lvl in cfg.SESSION_LEVEL_ORDER}
@@ -556,8 +625,10 @@ def _order_questions(approved, effective, target, focus_label=None):
         if level in queues:
             queues[level].append(bq)
 
-    if focus_label:
-        for lvl in cfg.SESSION_LEVEL_ORDER:
+    for lvl in cfg.SESSION_LEVEL_ORDER:
+        if rotating:
+            queues[lvl].sort(key=lambda bq: _rotation_key(bq, history, focus_label))
+        elif focus_label:
             queues[lvl].sort(key=lambda bq: (
                 # 0 = cocok fokus -> didahulukan; 1 = bukan fokus. Hanya
                 # menggeser posisi, tidak menambah/membuang soal.
@@ -565,10 +636,9 @@ def _order_questions(approved, effective, target, focus_label=None):
                 bq.id,
             ))
 
-    total = len(approved)
-    n_target = round(total * cfg.SESSION_MIX_TARGET)
-    n_below = round(total * cfg.SESSION_MIX_BELOW)
-    n_above = max(total - n_target - n_below, 0)
+    n_target = round(window * cfg.SESSION_MIX_TARGET)
+    n_below = round(window * cfg.SESSION_MIX_BELOW)
+    n_above = max(window - n_target - n_below, 0)
     below = _LEVEL_BELOW[target]
     above = _LEVEL_ABOVE[target]
 
@@ -580,10 +650,14 @@ def _order_questions(approved, effective, target, focus_label=None):
         chosen += queues[above][:n_above]
 
     chosen_ids = {bq.id for bq in chosen}
-    # Sisa semua soal (termasuk sisa kuota tiap tingkat) ikut di belakang,
-    # urutan id stabil. Soal tanpa tingkat ikut di sini - bukan ditebak
-    # tingkatnya, cuma tidak ditempatkan di komposisi.
-    chosen += [bq for bq in approved if bq.id not in chosen_ids]
+    # Sisa semua soal (termasuk sisa kuota tiap tingkat) ikut di belakang.
+    # Soal tanpa tingkat ikut di sini - bukan ditebak tingkatnya, cuma tidak
+    # ditempatkan di komposisi. Saat berotasi, sisa pun diurut rotasi supaya
+    # jendela berikutnya tetap menghitung soal yang belum dijawab lebih dulu.
+    rest = [bq for bq in approved if bq.id not in chosen_ids]
+    if rotating:
+        rest.sort(key=lambda bq: _rotation_key(bq, history, focus_label))
+    chosen += rest
     return chosen
 
 
@@ -612,16 +686,21 @@ def session_for_section(material_id, section_id, student):
     focus = focus_for_student_section(student, approved)
     focus_label = focus['label'] if focus else None
 
-    # --- komposisi 60/30/10 ---
-    ordered = _order_questions(approved, effective, target, focus_label)
+    # --- rotasi sesi: riwayat jawaban LATIHAN bagian ini (bukan diagnostik) ---
+    history = _practice_history(section_id, student.id)
+
+    # --- komposisi 60/30/10 di dalam jendela sesi ---
+    ordered = _order_questions(approved, effective, target, focus_label,
+                               history=history, size=SESSION_SIZE)
     total = len(approved)
+    window_served = min(total, SESSION_SIZE)
     mix = {'target': 0, 'below': 0, 'above': 0}
     if target:
         mix = {
-            'target': round(total * cfg.SESSION_MIX_TARGET),
-            'below': round(total * cfg.SESSION_MIX_BELOW),
-            'above': max(total - round(total * cfg.SESSION_MIX_TARGET)
-                         - round(total * cfg.SESSION_MIX_BELOW), 0),
+            'target': round(window_served * cfg.SESSION_MIX_TARGET),
+            'below': round(window_served * cfg.SESSION_MIX_BELOW),
+            'above': max(window_served - round(window_served * cfg.SESSION_MIX_TARGET)
+                         - round(window_served * cfg.SESSION_MIX_BELOW), 0),
         }
 
     # --- basis: bagaimana sasaran itu terbentuk ---
@@ -723,7 +802,14 @@ def session_for_section(material_id, section_id, student):
         'answered_interactive': counts['interactive'],
         'mix': mix,
         'total': total,
-        'served': min(total, MAX_SERVED),
+        'served': window_served,
+        'session_size': window_served,
+        # Rotasi sesi: berapa soal latihan bagian ini yang sudah pernah dijawab
+        # (`seen_in_section`) dan apakah masih ada soal yang belum pernah
+        # muncul. Dipakai UI untuk menawarkan "Lanjut sesi berikutnya" tanpa
+        # mengarang sisa yang tidak ada.
+        'seen_in_section': len(history),
+        'has_more': len(history) < total,
         # Fokus miskonsepsi (Tahap 2): hanya agregat ANGKA yang keluar, teks
         # label tidak pernah dikirim sebelum dijawab. Urutan sudah memakai
         # label ini secara diam-diam di server.

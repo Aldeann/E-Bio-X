@@ -17,12 +17,16 @@
 #   - jawaban latihan masuk ke diagnosis Fase 2 sebagai sumber TERPISA
 #     dan ambang INSUFFICIENT_DATA tetap berlaku
 #   - akses: hanya siswa kelas yang mengikuti; guru/siswa lain 403
+#   - sesi latihan menyajikan jendela <= SESSION_SIZE soal (10) dan
+#     MEROTASI soal yang belum pernah dijawab lebih dulu, sehingga bank yang
+#     lebih besar dari satu jendela tetap terpakai lintas sesi
 #
 # Berjalan pada app + database nyata, membuat lalu menghapus fixture
 # miliknya sendiri. Baris lama hanya dibaca.
 # ============================================================
 import os
 import sys
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -150,7 +154,7 @@ def drop_fixture():
     for bq in rows:
         db.session.delete(bq)
     db.session.flush()
-    for key in ('sec_a', 'sec_b', 'sec_empty', 'sec_other', 'sec_draft', 'sec_focus'):
+    for key in ('sec_a', 'sec_b', 'sec_empty', 'sec_other', 'sec_draft', 'sec_focus', 'sec_win'):
         if created.get(key) is not None:
             db.session.delete(created[key])
     for key in ('material', 'other_material', 'draft_material'):
@@ -571,6 +575,90 @@ def main():
             check('tanpa sasaran fokus tidak mengubah urutan apa pun',
                   [b.id for b in ident] == [g1.id, g2.id, g3.id, g4.id],
                   str([b.id for b in ident]))
+
+            # --------------------- 14. JENDELA SESI + ROTASI (Opsi A)
+            print('\n[14] JENDELA SESI LATIHAN (10 SOAL) + ROTASI')
+            sec_win = MaterialSection(material_id=material.id,
+                                      title='Bagian Banyak Soal', position=6)
+            db.session.add(sec_win)
+            db.session.flush()
+            win_banks = [
+                add_bank(teacher, sec_win, 'APPROVED', f'Soal jendela {i}',
+                         misconception=f'Miskonsepsi {i}')
+                for i in range(14)
+            ]
+            created['banks'] += win_banks
+            created['sec_win'] = sec_win
+            db.session.commit()
+
+            r = client.get(f'/api/student/practice/{material.id}/sections/{sec_win.id}',
+                           headers=h_s)
+            body = r.get_json()
+            sess1 = body.get('session') or {}
+            first_served = [q['id'] for q in body['questions']]
+            check('bank 14 soal, jendela memuat 10',
+                  body.get('total_available') == 14 and body.get('total_served') == 10,
+                  f"available={body.get('total_available')} served={body.get('total_served')}")
+            check('session.session_size = 10', sess1.get('session_size') == 10,
+                  str(sess1.get('session_size')))
+            check('belum menjawab -> has_more True', sess1.get('has_more') is True,
+                  str(sess1.get('has_more')))
+
+            # jawab kesepuluh soal jendela pertama
+            for q in body['questions']:
+                client.post(
+                    f'/api/student/practice/{material.id}/sections/{sec_win.id}/answer',
+                    headers=h_s,
+                    json={'bank_question_id': q['id'], 'selected_option': 0})
+
+            # sesi berikutnya: rotasi harus memunculkan soal yang BELUM pernah
+            # dijawab lebih dulu, bukan mengulang 10 yang sama.
+            r2 = client.get(f'/api/student/practice/{material.id}/sections/{sec_win.id}',
+                            headers=h_s)
+            body2 = r2.get_json()
+            second_served = [q['id'] for q in body2['questions']]
+            never_seen = [b.id for b in win_banks if b.id not in first_served]
+            check('rotasi: seluruh soal yang belum terjamah ikut sesi kedua',
+                  all(u in second_served for u in never_seen),
+                  f'unseen={never_seen} served2={second_served}')
+            check('sesi kedua bukan pengulangan 10 yang sama',
+                  set(second_served) != set(first_served),
+                  f'served1={first_served} served2={second_served}')
+            check('masih ada sisa setelah 10 dijawab',
+                  (body2.get('session') or {}).get('has_more') is True)
+
+            # jawab sisanya sampai seluruh bank terjamah
+            for q in body2['questions']:
+                client.post(
+                    f'/api/student/practice/{material.id}/sections/{sec_win.id}/answer',
+                    headers=h_s,
+                    json={'bank_question_id': q['id'], 'selected_option': 0})
+            r3 = client.get(f'/api/student/practice/{material.id}/sections/{sec_win.id}',
+                            headers=h_s)
+            body3 = r3.get_json()
+            check('semua soal sudah dijawab -> has_more False',
+                  (body3.get('session') or {}).get('has_more') is False,
+                  str((body3.get('session') or {}).get('has_more')))
+
+            # ---- fungsi murni: jendela + rotasi tanpa lewat API
+            eff_win = {int(b.id): {'label': 'medium'} for b in win_banks}
+            answered_at = {int(b.id): datetime(2026, 1, 1, 0, 0, i)
+                           for i, b in enumerate(win_banks[:10])}
+            ordered_win = spractice._order_questions(
+                win_banks, eff_win, 'medium', None,
+                history=answered_at, size=10)
+            head = [b.id for b in ordered_win[:10]]
+            unseen_ids = [int(b.id) for b in win_banks[10:]]
+            check('_order_questions tetap memuat SELURUH soal',
+                  len(ordered_win) == 14, str(len(ordered_win)))
+            check('rotasi murni: soal belum dijawab masuk jendela',
+                  all(u in head for u in unseen_ids),
+                  f'head={head} unseen={unseen_ids}')
+            plain = spractice._order_questions(
+                win_banks, eff_win, 'medium', None, history={}, size=10)
+            check('tanpa riwayat: jendela pertama urut id (perilaku lama)',
+                  [b.id for b in plain[:10]] == [b.id for b in win_banks[:10]],
+                  str([b.id for b in plain[:10]]))
 
         finally:
             db.session.rollback()

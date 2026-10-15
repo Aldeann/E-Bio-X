@@ -370,17 +370,17 @@ def get_student_practice_questions(material_id, section_id):
 
     entries, session = spractice.session_for_section(material.id, section.id, user)
     items = spractice.approved_for_section(section.id)
-    served = entries[:spractice.MAX_SERVED]
+    served = entries[:spractice.SESSION_SIZE]
     stats = spractice.practice_stats(user.id, material.id).get(
         section.id, {'answered': 0, 'correct': 0, 'attempts': 0})
 
+    # Pesan hanya untuk kasus JUJUR (tidak ada soal). Pemotongan jendela sesi
+    # bukan pesan galat: UI membacanya dari `session` (total/served/has_more)
+    # supaya tidak memunculkan notifikasi berulang tiap sesi dimuat.
     message = None
     if not items:
         message = (f'Belum ada soal latihan yang disetujui guru untuk bagian '
                    f'"{section.title}".')
-    elif len(items) > len(served):
-        message = (f'Bagian ini punya {len(items)} soal latihan; '
-                   f'{len(served)} yang ditampilkan sekaligus.')
 
     questions = [
         spractice.question_for_student(
@@ -453,6 +453,10 @@ def submit_student_practice_answer(material_id, section_id):
 
     stats = spractice.practice_stats(user.id, material.id).get(
         section.id, {'answered': 0, 'correct': 0, 'attempts': 0})
+    # Hitungan live (setelah baris ini tersimpan) supaya layar "selesai" tahu
+    # apakah masih ada soal latihan yang belum pernah dikerjakan, tanpa
+    # menebak dari state lama.
+    bank_total, bank_seen = spractice.section_practice_counts(section.id, user.id)
 
     payload = dict(graded)
     payload.update({
@@ -461,6 +465,9 @@ def submit_student_practice_answer(material_id, section_id):
         'attempt_no': row.attempt_no,
         'practice_answered': stats['answered'],
         'practice_correct': stats['correct'],
+        'practice_total': bank_total,
+        'practice_seen': bank_seen,
+        'has_more': bank_seen < bank_total,
     })
     return jsonify(payload), 200
 

@@ -42,11 +42,13 @@ Riwayat implementasi Tahap 2 (kode):
   menampilkan daftar soal yang masih keliru (dihitung klien dari jawaban yang
   sudah diterima) + tombol **Latihan lagi** yang memuat ulang sesi (server
   menghitung fokus ulang sehingga urutan berikutnya lebih terarah); baris fokus
-  netral di banner sesi.
+  netral di banner sesi. Bila masih ada soal yang belum pernah dikerjakan,
+  tombolnya menjadi **Lanjut sesi berikutnya** dan ada catatan jujur berapa
+  soal yang tersisa.
 - `test_student_practice.py` - blok `[13]`: fokus terdeteksi / tidak terdeteksi
   (benar > salah, 1 soal), label tidak bocor di payload, urutan kuota campuran
-  bergeser ke soal fokus, ekor tetap urut id, `_order_questions` murni
-  (85/85 lulus).
+  bergeser ke soal fokus, ekor tetap urut id, `_order_questions` murni; blok
+  `[14]`: jendela sesi + rotasi (95/95 lulus).
 - Kontrak yang disepakati saat implementasi: fokus memengaruhi KUOTA CAMPURAN
   (soal fokus mengisi posisi 60/30/10 lebih dulu); sisa soal di luar kuota
   tetap ikut di belakang dengan urutan id stabil (perilaku lama dipertahankan).
@@ -242,6 +244,26 @@ def _order_questions(approved, effective, target, focus_label=None):
 Tanpa fokus (`focus_label is None`) -> perilaku identik dengan sekarang, jadi
 tes lama tetap aman.
 
+### 6.3 Jendela sesi + rotasi (Tahap 3f lanjutan)
+
+Satu sesi tidak lagi memuat seluruh bank bagian. `SESSION_SIZE = 10`
+(`ml_config.py`) membatasi berapa soal ditampilkan sekaligus, dan bila bank
+lebih besar dari jendela itu, tiap tingkat dirotasi: **soal yang belum pernah
+dijawab didahulukan, lalu yang paling lama dijawab**.
+
+- Kuota 60/30/10 dihitung dari **ukuran jendela**, bukan dari seluruh bank
+  (10 -> 6/3/1). Komposisi adaptif tidak berubah, hanya skalanya.
+- Rotasi memakai riwayat `PracticeAnswer` dengan `mode='practice'` saja, jadi
+  jawaban asesmen diagnostik tidak dianggap "sudah dilatih" dan dua pool itu
+  tetap terpisah.
+- Tanpa riwayat, atau bila bank muat dalam satu jendela, urutannya persis
+  seperti sebelumnya (id stabil) -> regresi aman. Soal yang tingkatnya belum
+  diketahui tetap menempel di belakang komposisi, tidak ditebak tingkatnya.
+- UI memberi tahu siswa secara jujur: banner "Sesi ini menampilkan X dari Y
+  soal" dan tombol **Lanjut sesi berikutnya** hanya muncul bila memang masih ada
+  soal yang belum pernah dikerjakan (`session.has_more`, diperbarui live pada
+  respons tiap jawaban lewat `practice_total`/`practice_seen`).
+
 ### 6.3 Privasi label (keputusan penting)
 
 Label miskonsepsi sering **membocorkan konsep benar** (mis. "virus adalah sel
@@ -331,8 +353,11 @@ soal dianggap "sulit" karena dijawab siswa lemah
       -> p-value makin rendah -> makin dianggap "sulit"
 ```
 
-Kecil untuk bagian yang <= 20 soal (semua soal tersaji; `MAX_SERVED = 20`),
-nyata untuk bagian yang lebih besar.
+Kecil untuk bagian yang <= 10 soal (seluruh bank tersaji dalam satu sesi;
+`SESSION_SIZE = 10`), nyata untuk bagian yang lebih besar. Batas jendela tidak
+memutus umpan balik di atas - ia hanya mengubah cakupan SATU sesi. Yang membuat
+paparannya merata adalah rotasinya: soal yang belum pernah dijawab didahulukan,
+sehingga seluruh bank tetap terjawab lintas sesi (bukan selalu 20 soal teratas).
 
 Pilihan:
 

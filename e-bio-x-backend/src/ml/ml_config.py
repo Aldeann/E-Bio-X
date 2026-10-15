@@ -212,12 +212,20 @@ MATERIAL_LEVEL_MIN_STUDENTS = 20
 # --- Sesi latihan adaptif (Fase 3f) ---------------------------------
 # Komposisi satu sesi latihan: 60% tingkat sasaran (terlemah siswa), 30%
 # satu tingkat di bawah sasaran (fondasi), 10% satu tingkat di atas
-# (tantangan). Sifatnya mengatur URUTAN soal yang SUDAH ADA di bagian itu
-# (hanya status APPROVED); tidak ada soal baru yang dibuat di sini.
+# (tantangan). Sifatnya mengatur urutan/komposisi soal yang SUDAH ADA di
+# bagian itu (hanya status APPROVED); tidak ada soal baru yang dibuat di sini.
 SESSION_MIX_TARGET = 0.60
 SESSION_MIX_BELOW = 0.30
 SESSION_MIX_ABOVE = 0.10
 SESSION_LEVEL_ORDER = ['easy', 'medium', 'hard']
+
+# Jumlah soal per sesi latihan. Bila sebuah bagian punya lebih banyak soal
+# daripada ini, sesi menyajikan jendela `SESSION_SIZE` soal secara BERGILIR
+# (rotasi): soal yang belum pernah dijawab didahulukan, lalu yang paling lama
+# dijawab. Kuota 60/30/10 dihitung dari ukuran jendela ini, bukan dari seluruh
+# bank. Angka 10 dipilih supaya satu sesi realistis diselesaikan sekali duduk,
+# sementara seluruh bank tetap terpakai lintas sesi.
+SESSION_SIZE = 10
 
 # --- Tujuan & status keluar sesi latihan (Fase 3 lanjutan) -----------
 # Sebuah bagian dianggap "tuntas" bila siswa sudah menjawab minimal

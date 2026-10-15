@@ -468,14 +468,16 @@ itu, angka `practice_answered` tidak bisa dibuat naik hanya dengan mengulang-ula
 
 ### 5.6 Test
 
-`test_student_practice.py` — **73/73 PASS**, antara lain memverifikasi: tabel terpisah ada dan
+`test_student_practice.py` — **95/95 PASS**, antara lain memverifikasi: tabel terpisah ada dan
 `student_answers` lama tidak berubah; hanya `APPROVED` yang terlihat dan bisa dijawab;
 `is_correct`/`explanation`/`misconception`/`feedback` tidak bocor di respons muat; bagian kosong
 200 + alasan; `option_id` ditolak; soal bagian lain dan status `DRAFT` ditolak; lima percobaan
 tetap dihitung satu soal terjawab; diagnosis Fase 2 menerima latihan sebagai sumber terpisah,
 `score_sources` terbuka, ambang minimum tetap berlaku, dan 3 soal latihan benar menghasilkan
 `66.7` (2 benar dari 3, tidak dikarang); siswa luar kelas 403; id/opsi rusak jadi 4xx
-yang jujur, bukan 500.
+yang jujur, bukan 500; blok `[14]` jendela sesi (`SESSION_SIZE = 10`) + rotasi (soal yang
+belum pernah dijawab masuk lebih dulu, `has_more` menghilang bila seluruh bank sudah
+dijawab), dan urutan lama dipertahankan persis bila tanpa riwayat.
 
 ### 5.7 Data demo
 
@@ -849,20 +851,33 @@ dua sumber untuk tiap soal dalam cakupan: `declared_*` (label guru) dan `observe
   (hanya soal bagian ini yang disajikan).
 - **Sasaran** = tingkat dengan akurasi terendah yang benar-benar dijawab siswa (seri dipecah
   ke tingkat yang lebih dasar). Komposisi sesi **60% sasaran, 30% satu tingkat di bawah,
-  10% di atas**; sisa soal ikut di belakang dengan urutan id yang stabil, jadi daftar soal
-  tidak pernah berkurang dan tidak berubah-ubah tanpa sebab.
-- Responsnya menyertakan `session.basis_text` (rumus pilihan sasaran, apa adanya) dan
-  `session.basis` = `observed` | `declared` | `sequential` | `empty`. Bila siswa belum
-  punya jawaban apa pun, sasarannya `None` dan soal disajikan berurutan - sistem tidak
-  mengarang sasaran.
+  10% di atas**; sisa soal ikut di belakang, jadi daftar soal tidak pernah berkurang dan
+  tidak berubah-ubah tanpa sebab.
+- **Jendela sesi** (`SESSION_SIZE = 10`): komposisi dihitung dari ukuran jendela
+  (6/3/1), bukan dari seluruh bank. Bila bank lebih besar dari jendela, tiap tingkat
+  dirotasi - soal yang **belum pernah dijawab** didahulukan, lalu yang paling lama
+  dijawab, sehingga seluruh bank terpakai lintas sesi. Riwayatnya hanya memakai
+  `PracticeAnswer.mode='practice'`, jadi jawaban asesmen diagnostik tidak dianggap
+  "sudah dilatih". Bank yang muat dalam satu jendela, atau belum ada riwayat,
+  mempertahankan urutan lama persis (regresi aman).
+- Respons sesi menyertakan `session.basis_text` (rumus pilihan sasaran, apa adanya) dan
+  `session.basis` = `observed` | `declared` | `sequential` | `empty`; ditambah
+  `session.session_size`, `session.total`, `session.served`, `session.seen_in_section`,
+  dan `session.has_more`. Respons tiap jawaban memutakhirkan `practice_total`,
+  `practice_seen`, dan `has_more` secara live. Bila siswa belum punya jawaban apa pun,
+  sasarannya `None` dan soal disajikan berurutan - sistem tidak mengarang sasaran.
 - Tiap soal yang disajikan membawa `difficulty` (terukur bila ada), `declared_difficulty`
   (label guru, selalu ikut), `difficulty_basis`, dan `difficulty_note` (kalimat sumber).
 
 ### 9.7 UI
 
 - Siswa (`SectionPracticeModal.vue`): banner "Sesi latihan adaptif" berisi `basis_text`,
-  sasaran, komposisi 60/30/10, dan catatan; tiap soal menampilkan lencana tingkat dengan
-  penanda **"terukur"** atau **"label guru"** dan `difficulty_note` sebagai tooltip.
+  sasaran, komposisi 60/30/10, dan catatan. Bila bank lebih besar dari satu sesi ada baris
+  jujur "Sesi ini menampilkan X dari Y soal. Sisa soalnya muncul di sesi berikutnya."
+  Tiap soal menampilkan lencana tingkat dengan penanda **"terukur"** atau **"label guru"**
+  dan `difficulty_note` sebagai tooltip. Di layar **Latihan selesai**, tombolnya menjadi
+  **Lanjut sesi berikutnya** (bersama jumlah soal tersisa) bila masih ada yang belum
+  pernah dikerjakan, selain **Tutup**.
 - Guru (`pages/teacher/difficulty.vue`, tautan nav "Analisis Tingkat"): kartu aturan,
   ringkasan `counts`, filter "Siap diukur"/"Belum cukup data", dan daftar soal dengan
   label guru vs label terukur berdampingan (n, p, margin, "dekat batas").

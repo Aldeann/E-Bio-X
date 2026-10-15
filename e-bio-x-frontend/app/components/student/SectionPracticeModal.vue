@@ -67,6 +67,13 @@
                 <Icon name="material-symbols:flag" class="w-3.5 h-3.5 mt-0.5 shrink-0" />
                 {{ session.exit_message }}
               </p>
+              <p
+                v-if="totalAvailable > questions.length"
+                class="text-[11px] text-gray-500 dark:text-gray-400 mt-1.5 flex items-start gap-1"
+              >
+                <Icon name="material-symbols:view-carousel" class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                Sesi ini menampilkan {{ questions.length }} dari {{ totalAvailable }} soal. Sisa soalnya muncul di sesi berikutnya.
+              </p>
             </div>
 
             <!-- question -->
@@ -188,9 +195,15 @@
               <p class="text-xs text-gray-400 mt-2">
                 Angka ini masuk ke peta pemahaman bagian ini, terpisah dari kuis dan soal interaktif.
               </p>
+              <p
+                v-if="liveHasMore"
+                class="text-xs text-gray-500 mt-3"
+              >
+                Masih ada {{ liveRemaining }} soal yang belum kamu latih di bagian ini.
+              </p>
               <div class="mt-4 flex items-center justify-center gap-2">
                 <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm" @click="restart">
-                  Latihan lagi
+                  {{ liveHasMore ? 'Lanjut sesi berikutnya' : 'Latihan lagi' }}
                 </button>
                 <button class="border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg text-sm" @click="close">
                   Tutup
@@ -254,6 +267,11 @@ const submitting = ref(false);
 const loadError = ref("");
 const error = ref("");
 const summary = ref({ answered: 0, correct: 0 });
+// Ukuran jendela sesi: berapa dari total soal bagian ini yang ditampilkan
+// sekaligus, plus apakah masih ada soal yang belum pernah dikerjakan.
+const totalAvailable = ref(0);
+const liveHasMore = ref(false);
+const liveRemaining = ref(0);
 // Tahap 2: status "selesai sesi" + jejak jawaban sesi ini untuk ringkasan
 // klien (daftar soal yang masih keliru). Dihitung di sisi klien dari respons
 // jawaban yang sudah diterima - tidak ada endpoint agregat baru.
@@ -340,6 +358,9 @@ const submit = async () => {
     );
     feedback.value = res;
     feedbacks.value.push({ text: current.value.question_text, ok: res.is_correct });
+    // Hitungan live: apakah masih ada soal yang belum pernah dikerjakan.
+    liveHasMore.value = res.has_more === true;
+    liveRemaining.value = Math.max((res.practice_total || 0) - (res.practice_seen || 0), 0);
     emit("answered", res);
   } catch (e) {
     error.value = (e && e.data && e.data.error) || "Jawaban tidak dapat dinilai.";
@@ -391,6 +412,13 @@ const load = async () => {
     questions.value = res.questions || [];
     session.value = res.session || null;
     emptyMessage.value = res.message || emptyMessage.value;
+    totalAvailable.value = res.total_available || 0;
+    // Nilai awal sebelum ada jawaban (nanti diperbarui live tiap jawaban).
+    liveHasMore.value = !!res.session && res.session.has_more === true;
+    liveRemaining.value = Math.max(
+      totalAvailable.value - ((res.session && res.session.seen_in_section) || 0),
+      0
+    );
     summary.value = {
       answered: res.practice_answered || 0,
       correct: res.practice_correct || 0,
