@@ -166,6 +166,25 @@
         </div>
 
         <div>
+          <label class="block text-sm font-medium mb-1">Jenis Soal</label>
+          <select
+            v-model="form.purpose"
+            class="w-full dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500"
+          >
+            <option value="practice">Latihan (adaptif)</option>
+            <option value="diagnostic">Diagnostik (asesmen level materi)</option>
+          </select>
+          <p v-if="form.purpose === 'diagnostic'" class="text-xs text-gray-500 mt-1">
+            Soal diagnostik disajikan dengan <strong>urutan tetap</strong> dan tidak
+            menyesuaikan jawaban siswa. Hanya jawaban soal diagnostik yang dipakai
+            untuk mengukur tingkat materi.
+          </p>
+          <p v-else class="text-xs text-gray-500 mt-1">
+            Soal latihan mengikuti mesin adaptif (fokus ke tingkat terlemah siswa).
+          </p>
+        </div>
+
+        <div>
           <label class="block text-sm font-medium mb-1">Topik (opsional)</label>
           <input
             v-model="form.topic"
@@ -255,6 +274,7 @@ function defaultForm() {
   return {
     topic: "",
     section_id: null,
+    purpose: "practice",
     misconception: "",
     question_type: "multiple_choice",
     question_text: "",
@@ -311,6 +331,7 @@ const applyInitial = () => {
   if (props.question) {
     form.value.topic = props.question.topic || "";
     form.value.section_id = props.question.section_id ?? null;
+    form.value.purpose = props.question.purpose || "practice";
     form.value.misconception = props.question.misconception || "";
     form.value.question_type = props.question.question_type || "multiple_choice";
     form.value.question_text = props.question.question_text || "";
@@ -415,6 +436,7 @@ const save = async () => {
   const body = {
     topic: form.value.topic,
     section_id: form.value.section_id ?? null,
+    purpose: form.value.purpose || "practice",
     misconception: form.value.misconception,
     question_type: form.value.question_type,
     question_text: form.value.question_text,

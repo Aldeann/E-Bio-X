@@ -9,6 +9,20 @@ from datetime import datetime
 BANK_SOURCES = ('teacher', 'ai')
 BANK_STATUSES = ('DRAFT', 'APPROVED', 'REJECTED')
 
+# Whether a question measures a section (diagnostic set) or drills it
+# (adaptive practice). The two pools are deliberately disjoint:
+#
+# - 'practice'     : served by the adaptive session (60/30/10 mix).
+# - 'diagnostic'   : served by fixed order with NO adaptation, and it is the
+#                    ONLY input for the measured difficulty of a material
+#                    (`level materi`). Keeping it out of the adaptive pool is
+#                    what keeps the sample neutral; letting it in would
+#                    re-introduce the very bias the feature exists to avoid.
+#
+# NULL is not a valid state: the column carries NOT NULL + default in the
+# migration, and the model default covers a fresh create_all().
+BANK_PURPOSES = ('practice', 'diagnostic')
+
 
 class QuestionBank(db.Model):
     __tablename__ = 'question_bank'
@@ -28,6 +42,11 @@ class QuestionBank(db.Model):
     # Material section this question practices (Fase 3). NULL = not tagged.
     # Set explicitly by the teacher, never inferred from the topic string.
     section_id = db.Column(db.Integer, db.ForeignKey('material_sections.id'), nullable=True)
+
+    # Adaptive practice pool vs non-adaptive diagnostic set (Fase 4 level).
+    # Default 'practice' keeps every pre-existing row in the pool it was
+    # already being served from, so nothing changes for old data.
+    purpose = db.Column(db.String(20), nullable=False, default='practice')
 
     # Review trail for AI drafts.
     source = db.Column(db.String(20), nullable=False, default='teacher')

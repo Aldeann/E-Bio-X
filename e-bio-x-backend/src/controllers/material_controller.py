@@ -383,7 +383,32 @@ def _compute_analytics(material):
         'students': students_count,
         'completion_percentage': round(completion, 1),
         'students_list': students_list,
+        # Level materi: deklarasi guru/seed di kiri, hasil pengukuran dari set
+        # diagnostik di kanan. Terukur TIDAK menimpa deklarasi.
+        'difficulty_declared': material.difficulty,
+        'difficulty_observed': _observed_level(material.id),
+        # Berapa soal diagnostik yang sudah disetujui per bagian, supaya guru
+        # tahu bagian mana yang belum punya sampel pengukuran.
+        'section_diagnostics': [
+            {'section_id': s.id, 'title': s.title, 'position': s.position,
+             'diagnostic_count': count}
+            for (s, count) in _section_diagnostic_counts(material)
+        ],
     }
+
+
+def _observed_level(material_id):
+    """Tingkat materi terukur dari set diagnostik (impor lokal, pola sama
+    dengan service analitik: jangan seret model PracticeAnswer saat import)."""
+    from src.services import question_difficulty_service as qds
+    return qds.material_level_observed(material_id)
+
+
+def _section_diagnostic_counts(material):
+    from src.services import student_practice_service as spractice
+    sections = sorted(material.sections or [], key=lambda s: s.position or 0)
+    counts = spractice.diagnostic_count_map([s.id for s in sections])
+    return [(s, counts.get(s.id, 0)) for s in sections]
 
 
 # ============================================================

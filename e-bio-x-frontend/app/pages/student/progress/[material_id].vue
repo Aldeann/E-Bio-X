@@ -92,6 +92,9 @@
                     <template v-if="s.practice_answered">
                       · {{ s.practice_answered }} soal latihan
                     </template>
+                    <template v-if="s.diagnostic_answered">
+                      · {{ s.diagnostic_answered }} soal diagnostik
+                    </template>
                   </p>
                   <p v-if="s.advisory" class="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-start gap-1">
                     <Icon name="material-symbols:info" class="w-3.5 h-3.5 mt-0.5 shrink-0" />
@@ -110,6 +113,19 @@
                   @click="openPractice(s)"
                 >
                   Latihan{{ s.practice_total ? ` (${s.practice_total})` : '' }}
+                </button>
+                <button
+                  :disabled="!s.diagnostic_total"
+                  class="text-xs px-2.5 py-1 rounded-lg shrink-0 transition border"
+                  :class="s.diagnostic_total
+                    ? 'border-cyan-600 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-50 dark:hover:bg-cyan-900/30'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-400 cursor-not-allowed'"
+                  :title="s.diagnostic_total
+                    ? `${s.diagnostic_total} soal diagnostik untuk mengukur tingkat materi pada bagian ini`
+                    : 'Belum ada soal diagnostik yang disetujui guru untuk bagian ini'"
+                  @click="openDiagnostic(s)"
+                >
+                  Diagnostik{{ s.diagnostic_total ? ` (${s.diagnostic_total})` : '' }}
                 </button>
                 <span
                   v-if="s.mastery"
@@ -272,6 +288,15 @@
       @close="closePractice"
       @answered="onPracticeAnswered"
     />
+
+    <StudentSectionDiagnosticModal
+      :open="diagnosticOpen"
+      :material-id="detail ? detail.material_id : null"
+      :section-id="diagnosticSection ? diagnosticSection.section_id : null"
+      :section-title="diagnosticSection ? diagnosticSection.title : ''"
+      @close="closeDiagnostic"
+      @answered="onPracticeAnswered"
+    />
   </div>
 </template>
 
@@ -285,6 +310,8 @@ const detail = ref(null);
 const loading = ref(true);
 const practiceOpen = ref(false);
 const practiceSection = ref(null);
+const diagnosticOpen = ref(false);
+const diagnosticSection = ref(null);
 
 const openPractice = (section) => {
   if (!section.practice_total) return;
@@ -294,6 +321,16 @@ const openPractice = (section) => {
 const closePractice = () => {
   practiceOpen.value = false;
   practiceSection.value = null;
+};
+
+const openDiagnostic = (section) => {
+  if (!section.diagnostic_total) return;
+  diagnosticSection.value = section;
+  diagnosticOpen.value = true;
+};
+const closeDiagnostic = () => {
+  diagnosticOpen.value = false;
+  diagnosticSection.value = null;
 };
 // Jawaban latihan ikut dihitung pada diagnosis per bagian (Fase 2), jadi
 // angka di halaman ini disegarkan dari server setelah menjawab - bukan
@@ -370,7 +407,9 @@ const activityLabel = (t) => {
 const load = async () => {
   loading.value = true;
   try {
-    detail.value = await $fetch(`${config.public.backend}/api/student/progress/${route.params.id}`, {
+    // Parameter rute bernama `material_id` (file [material_id].vue); memakai
+    // `route.params.id` menghasilkan "undefined" dan halaman kosong.
+    detail.value = await $fetch(`${config.public.backend}/api/student/progress/${route.params.material_id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
   } catch (e) {

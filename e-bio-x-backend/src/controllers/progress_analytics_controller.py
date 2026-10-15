@@ -90,6 +90,10 @@ def _enrich_material_detail(user, material):
     # halaman progres bisa menyalakan tombol Latihan tanpa permintaan kedua,
     # dan mematikan tombol dengan alasan bila belum ada soalnya.
     practice_total_map = spractice.approved_count_map([s.id for s in sections])
+    # Pool diagnostik berdiri sendiri: jumlah soal & berapa yang sudah
+    # dikerjakan siswa ini. Tidak pernah dicampur dengan angka latihan.
+    diagnostic_total_map = spractice.diagnostic_count_map([s.id for s in sections])
+    diagnostic_done_map = spractice.diagnostic_stats(user.id, material.id)
     sec_mastery_map = {r['section_id']: r for r in section_mastery['sections']}
     for sec in sections:
         sid = sec.id
@@ -123,6 +127,8 @@ def _enrich_material_detail(user, material):
             'practice_answered': sm.get('practice_answered', 0),
             'practice_correct': sm.get('practice_correct', 0),
             'practice_total': practice_total_map.get(sid, 0),
+            'diagnostic_total': diagnostic_total_map.get(sid, 0),
+            'diagnostic_answered': diagnostic_done_map.get(sid, {}).get('answered', 0),
             'score_sources': sm.get('score_sources', []),
             'answered': sm.get('answered', 0),
             'correct': sm.get('correct', 0),

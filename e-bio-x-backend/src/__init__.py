@@ -79,6 +79,7 @@ def create_app():
         approve_bank_draft, reject_bank_draft,
         get_student_practice_sections, get_student_practice_questions,
         submit_student_practice_answer, get_teacher_difficulty_observed,
+        get_student_diagnostic_questions, submit_student_diagnostic_answer,
     )
     from src.controllers.forum_controller import (
         list_forums, create_forum, get_forum_detail, update_forum, delete_forum,
@@ -234,6 +235,12 @@ def create_app():
     app.add_url_rule('/api/student/practice/<material_id>/sections', view_func=get_student_practice_sections, methods=['GET'])
     app.add_url_rule('/api/student/practice/<material_id>/sections/<section_id>', view_func=get_student_practice_questions, methods=['GET'])
     app.add_url_rule('/api/student/practice/<material_id>/sections/<section_id>/answer', view_func=submit_student_practice_answer, methods=['POST'])
+
+    # Student diagnostic assessment (Fase 4 level materi). SEPARATE pool from
+    # practice: fixed order, no adaptation. Answers feed the measured
+    # difficulty of the material AND remain ordinary learning evidence.
+    app.add_url_rule('/api/student/diagnostic/<material_id>/sections/<section_id>', view_func=get_student_diagnostic_questions, methods=['GET'])
+    app.add_url_rule('/api/student/diagnostic/<material_id>/sections/<section_id>/answer', view_func=submit_student_diagnostic_answer, methods=['POST'])
 
     app.add_url_rule('/api/student/quizzes', view_func=get_student_quizzes, methods=['GET'])
     app.add_url_rule('/api/student/quizzes/<quiz_id>', view_func=get_student_quiz, methods=['GET'])

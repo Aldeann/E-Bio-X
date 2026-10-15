@@ -14,7 +14,7 @@
 
     <!-- Filter -->
     <div class="bg-white dark:bg-gray-900 border border-green-200 dark:border-gray-700 rounded-2xl shadow-md p-4 mb-4">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
         <div class="relative">
           <Icon
             name="material-symbols:search"
@@ -44,6 +44,11 @@
           <option value="APPROVED">Disetujui</option>
           <option value="DRAFT">Menunggu review</option>
           <option value="REJECTED">Ditolak</option>
+        </select>
+        <select v-model="filters.purpose" class="dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500">
+          <option value="">Semua jenis</option>
+          <option value="practice">Latihan (adaptif)</option>
+          <option value="diagnostic">Diagnostik (level materi)</option>
         </select>
       </div>
       <div
@@ -159,6 +164,13 @@
                       <span class="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-400">
                         {{ difficultyLabel(b.difficulty) }}
                       </span>
+                      <span
+                        v-if="b.purpose === 'diagnostic'"
+                        class="text-[11px] px-2 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300"
+                        title="Soal diagnostik: urutan tetap, dipakai mengukur tingkat materi"
+                      >
+                        Diagnostik
+                      </span>
                       <span v-if="b.topic" class="text-[11px] px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-400">
                         {{ b.topic }}
                       </span>
@@ -256,7 +268,7 @@
                 </div>
 
                 <p v-if="b.section_title" class="mt-3 text-xs text-blue-600 dark:text-blue-400">
-                  Latihan untuk bagian: {{ b.section_title }}
+                  {{ b.purpose === "diagnostic" ? "Asesmen diagnostik untuk bagian: " : "Latihan untuk bagian: " }}{{ b.section_title }}
                 </p>
               </div>
             </article>
@@ -329,14 +341,14 @@ const loading = ref(true);
 const formOpen = ref(false);
 const editing = ref(null);
 const generatingId = ref(null);
-const filters = reactive({ q: "", type: "", difficulty: "", status: "" });
+const filters = reactive({ q: "", type: "", difficulty: "", status: "", purpose: "" });
 
 const pageSize = ref(10);
 const page = ref(1);
 const direction = ref("next");
 const slideTop = ref(null);
 
-const hasActiveFilter = computed(() => !!(filters.q || filters.type || filters.difficulty || filters.status));
+const hasActiveFilter = computed(() => !!(filters.q || filters.type || filters.difficulty || filters.status || filters.purpose));
 
 const totalPages = computed(() => Math.max(1, Math.ceil(items.value.length / pageSize.value)));
 const pagedItems = computed(() =>
@@ -376,6 +388,7 @@ const resetFilters = () => {
   filters.type = "";
   filters.difficulty = "";
   filters.status = "";
+  filters.purpose = "";
 };
 
 // Navigasi slide
@@ -453,6 +466,7 @@ const load = async () => {
     if (filters.type) params.set("type", filters.type);
     if (filters.difficulty) params.set("difficulty", filters.difficulty);
     if (filters.status) params.set("status", filters.status);
+    if (filters.purpose) params.set("purpose", filters.purpose);
     const qs = params.toString() ? `?${params.toString()}` : "";
     const data = await $fetch(`${config.public.backend}/api/teacher/question-bank${qs}`, {
       headers: { Authorization: `Bearer ${token}` },

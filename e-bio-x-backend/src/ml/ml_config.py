@@ -196,6 +196,19 @@ DIFFICULTY_P_HARD = 0.40
 MIN_DIFFICULTY_SAMPLE = 20
 DIFFICULTY_MARGIN_Z = 1.96
 
+# --- Level materi dari set diagnostik (Fase 4 level) -----------------
+# Level sebuah MATERI (bukan satu soal) diukur dari jawaban soal diagnostik
+# saja - soal yang disajikan TANPA adaptasi, sehingga sampelnya netral.
+# Dua gerbang harus lewat sebelum ada label:
+#   - MATERIAL_LEVEL_MIN_ITEMS   : jumlah soal diagnostik yang masing-masing
+#     sudah READY (>= MIN_DIFFICULTY_SAMPLE siswa). Kurang dari ini, satu
+#     soal bisa menentukan seluruh materi.
+#   - MATERIAL_LEVEL_MIN_STUDENTS: jumlah siswa BERBEDA di seluruh soal
+#     READY. Ini menjaga "mudah" tidak lahir dari 2-3 siswa saja.
+# Selama salah satu belum lewat -> INSUFFICIENT_DATA, tanpa label.
+MATERIAL_LEVEL_MIN_ITEMS = 3
+MATERIAL_LEVEL_MIN_STUDENTS = 20
+
 # --- Sesi latihan adaptif (Fase 3f) ---------------------------------
 # Komposisi satu sesi latihan: 60% tingkat sasaran (terlemah siswa), 30%
 # satu tingkat di bawah sasaran (fondasi), 10% satu tingkat di atas

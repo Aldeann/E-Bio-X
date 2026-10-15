@@ -55,9 +55,23 @@
 
       <div v-else class="space-y-6">
         <div v-for="g in groups" :key="g.material_id">
-          <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-            {{ g.material_title }}
-          </h3>
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              {{ g.material_title }}
+            </h3>
+            <span
+              class="text-xs px-2 py-0.5 rounded-full"
+              :class="g.diagnostic_total >= 3
+                ? 'bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300'
+                : 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300'"
+              :title="g.diagnostic_total >= 3
+                ? 'Set diagnostik materi ini sudah cukup untuk mengukur tingkat'
+                : 'Tingkat materi belum bisa diukur: butuh minimal 3 soal diagnostik'"
+            >
+              {{ g.diagnostic_total }} soal diagnostik
+              <template v-if="g.diagnostic_total < 3"> &middot; belum cukup (min. 3)</template>
+            </span>
+          </div>
           <div class="space-y-2">
             <div
               v-for="row in g.rows"
@@ -77,6 +91,15 @@
                         : 'bg-gray-100 dark:bg-gray-800 text-gray-500'"
                     >
                       {{ row.approved_count }} soal disetujui
+                    </span>
+                    <span
+                      class="text-xs px-2 py-0.5 rounded-full"
+                      :class="row.diagnostic_count > 0
+                        ? 'bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500'"
+                      title="Soal diagnostik: urutan tetap, dipakai mengukur tingkat materi"
+                    >
+                      {{ row.diagnostic_count }} diagnostik
                     </span>
                     <span
                       v-if="row.draft_count"
@@ -161,6 +184,13 @@
             >{{ statusLabel(d.status) }}</span>
             <span class="text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-400">
               {{ d.source === 'ai' ? 'Draf AI' : 'Tulis guru' }}
+            </span>
+            <span
+              v-if="d.purpose === 'diagnostic'"
+              class="text-xs px-2 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300"
+              title="Soal diagnostik: urutan tetap, dipakai mengukur tingkat materi"
+            >
+              Diagnostik
             </span>
             <span v-if="d.section_title" class="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-400">
               {{ d.section_title }}
@@ -258,6 +288,11 @@ const groups = computed(() => {
       map.set(row.material_id, { material_id: row.material_id, material_title: row.material_title, rows: [] });
     }
     map.get(row.material_id).rows.push(row);
+  }
+  // Total diagnostik per materi dipakai untuk menandai "belum cukup soal
+  // diagnostik" (K = 3), supaya guru tahu mengapa level materi belum terukur.
+  for (const g of map.values()) {
+    g.diagnostic_total = g.rows.reduce((n, r) => n + (r.diagnostic_count || 0), 0);
   }
   return Array.from(map.values());
 });

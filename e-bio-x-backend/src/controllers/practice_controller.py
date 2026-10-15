@@ -325,6 +325,7 @@ def get_student_practice_sections(material_id):
     sections = MaterialSection.query.filter_by(
         material_id=material.id).order_by(MaterialSection.position).all()
     approved = spractice.approved_count_map([s.id for s in sections])
+    diagnostics = spractice.diagnostic_count_map([s.id for s in sections])
     stats = spractice.practice_stats(user.id, material.id)
 
     rows = []
@@ -342,6 +343,10 @@ def get_student_practice_sections(material_id):
             'practice_correct': st['correct'],
             'practice_attempts': st['attempts'],
             'available': total > 0,
+            # Pool diagnostik berdiri sendiri: 0 berarti bagian ini belum
+            # punya soal pengukuran, dan tombol asesmen dimatikan.
+            'diagnostic_total': diagnostics.get(sec.id, 0),
+            'diagnostic_available': diagnostics.get(sec.id, 0) > 0,
         })
 
     return jsonify({
@@ -432,6 +437,12 @@ def submit_student_practice_answer(material_id, section_id):
         return jsonify({'error': 'Soal ini belum disetujui guru, tidak bisa dikerjakan'}), 403
     if bq.section_id != section.id:
         return jsonify({'error': 'Soal ini bukan milik bagian yang diminta'}), 400
+    # Pool terpisah, tidak boleh tertukar: soal diagnostik dijawab lewat jalur
+    # diagnostik supaya catatannya tetap bisa dibedakan dan sesi adaptif tidak
+    # pernah menyerap soal pengukuran.
+    if (bq.purpose or 'practice') != 'practice':
+        return jsonify({'error': 'Soal ini bagian dari asesmen diagnostik; '
+                                 'kerjakan lewat menu Asesmen Diagnostik'}), 400
 
     graded = spractice.grade(bq, selected)
     if graded is None:
@@ -450,6 +461,115 @@ def submit_student_practice_answer(material_id, section_id):
         'attempt_no': row.attempt_no,
         'practice_answered': stats['answered'],
         'practice_correct': stats['correct'],
+    })
+    return jsonify(payload), 200
+
+
+# ============================================================
+# STUDENT SIDE: ASESMEN DIAGNOSTIK (Fase 4 level materi)
+# ============================================================
+#
+# Dua pool yang tidak pernah bercampur:
+#   - latihan adaptif  -> soal purpose='practice', urutan dari mesin 60/30/10
+#   - asesmen diagnostik -> soal purpose='diagnostic', URUTAN TETAP
+#
+# Urutan tetap itu bukan detail kosmetik: membandingkan hasil antar-siswa dan
+# antar-bagian hanya sah bila semuanya menjawab soal yang sama dengan urutan
+# yang sama. Tidak ada satu pun field tingkat yang dihitung dari performa di
+# sini - yang dikirim hanya soal apa adanya.
+
+@jwt_required()
+def get_student_diagnostic_questions(material_id, section_id):
+    """Soal diagnostik satu bagian, urutan tetap. Kunci jawaban TIDAK ikut."""
+    user, ctx, err = _practice_guard(material_id, section_id)
+    if err:
+        return err
+    material, section = ctx
+
+    items = spractice.diagnostic_for_section(section.id)
+    served = items[:spractice.MAX_SERVED]
+    stats = spractice.diagnostic_stats(user.id, material.id).get(
+        section.id, {'answered': 0, 'correct': 0, 'attempts': 0})
+
+    message = None
+    if not items:
+        message = (f'Bagian "{section.title}" belum punya soal diagnostik. '
+                   f'Guru perlu menandai soal sebagai diagnostik di menu '
+                   f'Latihan per Bagian.')
+    elif len(items) > len(served):
+        message = (f'Bagian ini punya {len(items)} soal diagnostik; '
+                   f'{len(served)} ditampilkan sekaligus.')
+
+    return jsonify({
+        'material_id': material.id,
+        'section_id': section.id,
+        'section_title': section.title,
+        'questions': [spractice.question_for_student(bq) for bq in served],
+        'total_available': len(items),
+        'total_served': len(served),
+        'diagnostic_answered': stats['answered'],
+        'diagnostic_correct': stats['correct'],
+        'message': message,
+        'session': {
+            'basis': 'diagnostic',
+            'basis_text': ('Asesmen diagnostik: urutan soal tetap dan tidak '
+                           'disesuaikan dengan jawaban sebelumnya. Dipakai '
+                           'mengukur tingkat materi, bukan untuk berlatih.'),
+        },
+    }), 200
+
+
+@jwt_required()
+def submit_student_diagnostic_answer(material_id, section_id):
+    """Nilai satu jawaban diagnostik dan catat sebagai bukti pengukuran.
+
+    Server memuat ulang soalnya dari bank dan mencocokkan opsi dengan
+    `order_index` tersimpan, sama seperti jalur latihan: klien tidak bisa
+    memilih kunci jawaban lewat kiriman.
+    """
+    user, ctx, err = _practice_guard(material_id, section_id)
+    if err:
+        return err
+    material, section = ctx
+
+    data = request.get_json(silent=True) or {}
+    raw = data.get('selected_option', data.get('selected_index'))
+    if raw is None:
+        return jsonify({'error': 'Opsi jawaban belum dikirim'}), 400
+    try:
+        selected = int(raw)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Opsi jawaban tidak valid'}), 400
+
+    bq = QuestionBank.query.get(_int_or_none(data.get('bank_question_id')))
+    if not bq:
+        return jsonify({'error': 'Soal diagnostik tidak ditemukan'}), 404
+    if bq.status != 'APPROVED':
+        return jsonify({'error': 'Soal ini belum disetujui guru, tidak bisa dikerjakan'}), 403
+    if bq.section_id != section.id:
+        return jsonify({'error': 'Soal ini bukan milik bagian yang diminta'}), 400
+    if (bq.purpose or 'practice') != 'diagnostic':
+        return jsonify({'error': 'Soal ini soal latihan; kerjakan lewat menu '
+                                 'Latihan'}), 400
+
+    graded = spractice.grade(bq, selected)
+    if graded is None:
+        return jsonify({'error': 'Opsi jawaban tidak ditemukan pada soal ini'}), 400
+
+    row = spractice.record(user.id, material.id, section.id, bq, graded,
+                           mode='diagnostic')
+    db.session.commit()
+
+    stats = spractice.diagnostic_stats(user.id, material.id).get(
+        section.id, {'answered': 0, 'correct': 0, 'attempts': 0})
+
+    payload = dict(graded)
+    payload.update({
+        'section_id': section.id,
+        'section_title': section.title,
+        'attempt_no': row.attempt_no,
+        'diagnostic_answered': stats['answered'],
+        'diagnostic_correct': stats['correct'],
     })
     return jsonify(payload), 200
 

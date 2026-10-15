@@ -1245,12 +1245,31 @@ def material_student_ids(material_id, teacher_id):
     return list(touched)
 
 
+def _material_level_observed(material_id):
+    """Pembungkus tipis: level materi diukur dari set diagnostik.
+
+    Diimpor di dalam fungsi supaya modul analitik tidak menyeret service
+    kesulitan soal (dan model PracticeAnswer) ke saat import - pola yang sama
+    dipakai `_difficulty_accuracy_material` di atas.
+    """
+    from src.services import question_difficulty_service as qds
+    return qds.material_level_observed(material_id)
+
+
 def material_analytics(material, teacher_id):
     total_sec = total_sections(material.id)
     students = teacher_student_users(teacher_id)
     student_ids = [u.id for u in students]
     if not student_ids:
-        return {'empty': True}
+        return {
+            'empty': True,
+            'material_id': material.id,
+            'title': material.title,
+            # Level tetap dilaporkan meski kelas kosong: yang diukur di sini
+            # adalah jawaban nyata pada set diagnostik, bukan aktivitas kelas.
+            'difficulty_declared': material.difficulty,
+            'difficulty_observed': _material_level_observed(material.id),
+        }
 
     states = MaterialStudentState.query.filter(MaterialStudentState.material_id == material.id,
                                               MaterialStudentState.student_id.in_(student_ids)).all()
@@ -1278,6 +1297,8 @@ def material_analytics(material, teacher_id):
 
     # section completion
     sections = MaterialSection.query.filter_by(material_id=material.id).order_by(MaterialSection.position).all()
+    from src.services import student_practice_service as _spractice
+    diag_total_map = _spractice.diagnostic_count_map([s.id for s in sections])
     section_completion = []
     for sec in sections:
         done_count = sum(1 for done in done_map.values() if sec.id in done)
@@ -1289,6 +1310,10 @@ def material_analytics(material, teacher_id):
             'completed_students': done_count,
             'total_students': len(student_ids),
             'completion_rate': round(done_count / len(student_ids) * 100, 1) if student_ids else 0.0,
+            # Berapa soal DIAGNOSTIK yang sudah disetujui guru di bagian ini.
+            # Berdampingan dengan latihan supaya guru tahu bagian mana yang
+            # belum punya sampel pengukuran untuk level materi.
+            'diagnostic_count': diag_total_map.get(sec.id, 0),
         })
 
     interactive_rows = StudentAnswer.query.filter(StudentAnswer.material_id == material.id,
@@ -1357,6 +1382,10 @@ def material_analytics(material, teacher_id):
         'mastery_distribution': mastery_dist,
         'status_distribution': status_dist,
         'difficulty': difficulty,
+        # Level MATERI, berdampingan dengan deklarasi. Terukur hanya dari
+        # jawaban set diagnostik; INSUFFICIENT_DATA bila sampel belum cukup.
+        'difficulty_declared': material.difficulty,
+        'difficulty_observed': _material_level_observed(material.id),
     }
 
 

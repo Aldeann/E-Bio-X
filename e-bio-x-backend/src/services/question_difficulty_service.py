@@ -112,12 +112,12 @@ def _slot_of(row):
     return int(row.bank_question_id)
 
 
-def aggregate_rows(rows, exclude_student_id=None, min_sample=None, key_fn=None):
-    """Ukur tingkat tiap soal dari sekumpulan baris jawaban.
+def _count_slots(rows, exclude_student_id=None, key_fn=None):
+    """slot -> {'students': set(...), 'correct': int}.
 
-    Satu siswa dihitung sekali per soal memakai jawaban PERTAMA (paling
-    awal `answered_at`). Baris milik `exclude_student_id` dilewati lebih
-    dulu, jadi leave-one-out mengubah count sebelum ambang diperiksa.
+    INI satu-satunya tempat aturan "satu siswa = satu jawaban pertama"
+    didefinisikan; `aggregate_rows` dan `material_level_observed` sama-sama
+    memanggilnya supaya aturannya tidak mungkin berbeda.
     """
     key_fn = key_fn or _slot_of
     exclude = int(exclude_student_id) if exclude_student_id is not None else None
@@ -142,7 +142,18 @@ def aggregate_rows(rows, exclude_student_id=None, min_sample=None, key_fn=None):
         bucket['students'].add(student_id)
         if bool(getattr(r, 'is_correct')):
             bucket['correct'] += 1
+    return counts
 
+
+def aggregate_rows(rows, exclude_student_id=None, min_sample=None, key_fn=None):
+    """Ukur tingkat tiap soal dari sekumpulan baris jawaban.
+
+    Satu siswa dihitung sekali per soal memakai jawaban PERTAMA (paling
+    awal `answered_at`). Baris milik `exclude_student_id` dilewati lebih
+    dulu, jadi leave-one-out mengubah count sebelum ambang diperiksa.
+    """
+    counts = _count_slots(rows, exclude_student_id=exclude_student_id,
+                          key_fn=key_fn)
     result = {}
     for slot, bucket in counts.items():
         result[slot] = classify(len(bucket['students']), bucket['correct'],
@@ -173,6 +184,162 @@ def interactive_batch(rows, exclude_student_id=None):
     """Hasil terukur sekumpulan baris StudentAnswer yang sudah dimuat."""
     return aggregate_rows(rows, exclude_student_id=exclude_student_id,
                           key_fn=interactive_slot_key)
+
+
+# ------------------------------------------------------------
+# LEVEL MATERI dari set diagnostik (Fase 4 level)
+# ------------------------------------------------------------
+#
+# Materi tidak punya kolom material_id pada soal: satu-satunya jalan dari
+# sebutan "soal ini milik materi X" adalah `question_bank.section_id` ->
+# `material_sections.material_id`. Jadi semua kueri di bawah join ke sana,
+# bukan menebak dari string topic.
+
+def diagnostic_questions_for_material(material_id):
+    """Soal ber-purpose='diagnostic' yang sudah APPROVED pada satu materi."""
+    from src.models.material_section import MaterialSection
+    from src.models.question_bank import QuestionBank
+
+    return (
+        QuestionBank.query
+        .join(MaterialSection, MaterialSection.id == QuestionBank.section_id)
+        .filter(MaterialSection.material_id == int(material_id),
+                QuestionBank.status == 'APPROVED',
+                QuestionBank.purpose == 'diagnostic')
+        .order_by(QuestionBank.id)
+        .all()
+    )
+
+
+def _level_insufficient(reason, message, thresholds, meta):
+    return {
+        'status': 'INSUFFICIENT_DATA',
+        'label': None,
+        'label_id': None,
+        'p': None,
+        'margin': None,
+        'margin_points': None,
+        'near_boundary': False,
+        'reason': reason,
+        'message': message,
+        'basis': 'observed_diagnostic',
+        'thresholds': thresholds,
+        'computed_at': datetime.utcnow().isoformat() + 'Z',
+        'n_answers': meta['n_answers'],
+        'correct': meta['correct'],
+        'n_students': meta['n_students'],
+        'n_items': meta['n_items'],
+        'n_items_total': meta['n_items_total'],
+    }
+
+
+def material_level_observed(material_id, min_items=None, min_students=None,
+                            item_sample=None):
+    """Tingkat kesulitan terukur SATU MATERI dari jawaban diagnostik.
+
+    Tahapannya sengaja berurutan dan semuanya harus lewat sebelum ada label:
+
+    1. Kumpulkan soal ber-purpose='diagnostic' (APPROVED) milik materi ini.
+    2. Hitung tiap soal memakai `_count_slots` - aturan yang PERSIS sama
+       dengan soal latihan biasa: satu siswa dihitung sekali, jawaban
+       pertama yang dipakai.
+    3. Hanya soal yang per READY (>= `item_sample` siswa) yang masuk ke
+       penghitungan bersama. Soal yang datanya tipis ikut dilaporkan
+       `n_items_total` supaya jelas apa yang belum siap, bukan hilang.
+    4. Jumlah soal READY >= K dan siswa berbeda >= N -> label diberikan,
+       bersama p, margin, dan penanda "dekat batas" (persis satu aturan
+       dengan `classify`).
+
+    Jawaban latihan adaptif TIDAK ikut: pemisahnya kolom `mode` pada
+    `practice_answers`. Soal memang terpisah dari pool adaptif, tapi itu hanya
+    menjamin soalnya; yang menjamin sampelnya adalah catatan jalur per jawaban,
+    sebab sebuah soal bisa berpindah jalur kapan saja. Hasilnya bebas dari
+    campur tangan mesin 60/30/10.
+    """
+    min_items = cfg.MATERIAL_LEVEL_MIN_ITEMS if min_items is None else int(min_items)
+    min_students = cfg.MATERIAL_LEVEL_MIN_STUDENTS if min_students is None else int(min_students)
+    item_sample = cfg.MIN_DIFFICULTY_SAMPLE if item_sample is None else int(item_sample)
+
+    thresholds = {'items': min_items, 'students': min_students,
+                  'item_sample': item_sample}
+
+    questions = diagnostic_questions_for_material(material_id)
+    meta = {'n_answers': 0, 'correct': 0, 'n_students': 0,
+            'n_items': 0, 'n_items_total': len(questions)}
+
+    if not questions:
+        return _level_insufficient(
+            'no_questions',
+            'Materi ini belum punya soal diagnostik. Tambahkan soal di '
+            'bagian "Latihan per Bagian" lalu tandai sebagai diagnostik.',
+            thresholds, meta)
+
+    # Jawaban latihan adaptif TIDAK ikut, dan penanda yang sah adalah kolom
+    # `practice_answers.mode`, bukan `purpose` soal. Sebab soal boleh berpindah
+    # jalur (guru menandai soal latihan lama sebagai diagnostik); kalau kita
+    # hanya menyaring "soal purpose-nya diagnostic", jawaban-jawaban adaptif
+    # masa lalu ikut terhitung dan sampelnya kembali bias mesin 60/30/10.
+    rows = PracticeAnswer.query.filter(
+        PracticeAnswer.bank_question_id.in_([q.id for q in questions]),
+        PracticeAnswer.mode == 'diagnostic',
+    ).all()
+    counts = _count_slots(rows)
+
+    ready_ids = []
+    students_ready = set()
+    n_answers = 0
+    n_correct = 0
+    for q in questions:
+        bucket = counts.get(q.id, {'students': set(), 'correct': 0})
+        per_item = classify(len(bucket['students']), bucket['correct'])
+        if per_item['status'] != 'READY':
+            continue
+        ready_ids.append(q.id)
+        students_ready |= bucket['students']
+        n_answers += per_item['n']
+        n_correct += per_item['correct']
+
+    meta.update({
+        'n_items': len(ready_ids),
+        'n_answers': n_answers,
+        'correct': n_correct,
+        'n_students': len(students_ready),
+    })
+
+    if len(ready_ids) < min_items:
+        return _level_insufficient(
+            'items',
+            f'Baru {len(ready_ids)} soal diagnostik yang terukur '
+            f'(perlu {min_items}); {meta["n_items_total"] - len(ready_ids)} '
+            f'soal lain belum dijawab cukup banyak siswa.',
+            thresholds, meta)
+    if len(students_ready) < min_students:
+        return _level_insufficient(
+            'students',
+            f'Baru {len(students_ready)} siswa berbeda yang menjawab soal '
+            f'diagnostik siap ukur (perlu {min_students}).',
+            thresholds, meta)
+
+    # Gerbang di atas sudah memastikan n_answers >= n_students >= min_students,
+    # jadi min_sample=1 hanya dipakai untuk melewati pembagian nol tanpa
+    # memutuskan apa pun; p, label, margin, dan near_boundary tetap dihitung
+    # oleh `classify` - satu sumber ambang untuk seluruh sistem.
+    result = classify(n_answers, n_correct, min_sample=1)
+    result.update({
+        'basis': 'observed_diagnostic',
+        # Label Indonesia berdampingan dengan kunci kanonik, supaya UI tidak
+        # perlu tahu kamusnya dan tidak ada dua sumber ambang.
+        'label_id': LABEL_TEXT.get(result.get('label')),
+        'margin_points': (round(result['margin'] * 100)
+                          if result.get('margin') is not None else None),
+        'thresholds': thresholds,
+        'n_students': len(students_ready),
+        'n_items': len(ready_ids),
+        'n_items_total': len(questions),
+        'n_answers': n_answers,
+        'computed_at': datetime.utcnow().isoformat() + 'Z',
+    })
+    return result
 
 
 def empty_observed(slot=None):

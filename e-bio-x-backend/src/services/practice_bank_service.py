@@ -364,27 +364,39 @@ def section_rows(user, material_id=None):
         materials = [m for m in materials if m.id == int(material_id)]
 
     counts = {}
+    diagnostic = {}
     query = db.session.query(
         QuestionBank.section_id.label('section_id'),
         QuestionBank.status.label('status'),
+        QuestionBank.purpose.label('purpose'),
         func.count(QuestionBank.id).label('n'),
     ).filter(QuestionBank.section_id.isnot(None))
     if owner_id is not None:
         query = query.filter(QuestionBank.teacher_id == owner_id)
-    for section_id, status, n in query.group_by(QuestionBank.section_id, QuestionBank.status).all():
-        counts.setdefault(section_id, {})[status] = n
+    for section_id, status, purpose, n in query.group_by(
+        QuestionBank.section_id, QuestionBank.status, QuestionBank.purpose
+    ).all():
+        counts.setdefault(section_id, {})
+        counts[section_id][status] = counts[section_id].get(status, 0) + n
+        if status == 'APPROVED' and (purpose or 'practice') == 'diagnostic':
+            diagnostic[section_id] = diagnostic.get(section_id, 0) + n
 
     rows = []
     for material in materials:
         for section in (material.sections or []):
             bucket = counts.get(section.id, {})
+            diag = diagnostic.get(section.id, 0)
             rows.append({
                 'section_id': section.id,
                 'title': section.title,
                 'position': section.position,
                 'material_id': material.id,
                 'material_title': material.title,
-                'approved_count': bucket.get('APPROVED', 0),
+                # approved_count = soal LATIHAN saja; diagnostic_count berdiri
+                # sendiri supaya dua pool berbeda tidak pernah dijumlahkan
+                # diam-diam lalu disebut "soal latihan".
+                'approved_count': bucket.get('APPROVED', 0) - diag,
+                'diagnostic_count': diag,
                 'draft_count': bucket.get('DRAFT', 0),
                 'rejected_count': bucket.get('REJECTED', 0),
             })
@@ -393,8 +405,13 @@ def section_rows(user, material_id=None):
 
 
 def practice_ready(section_id):
-    """True when a section has at least one teacher-approved practice question."""
+    """True when a section has at least one teacher-approved practice question.
+
+    Diagnostic questions do NOT count: the adaptive runner cannot serve them,
+    so a section holding only diagnostic questions is not ready for practice.
+    """
     return QuestionBank.query.filter_by(
         section_id=section_id,
         status='APPROVED',
+        purpose='practice',
     ).count() > 0

@@ -34,14 +34,34 @@ MAX_SERVED = 20
 
 
 def approved_for_section(section_id):
-    """APPROVED practice questions of one section, in a stable order."""
+    """APPROVED practice questions of one section, in a stable order.
+
+    `purpose='practice'` is what keeps the ADAPTIVE session (and the plain
+    question list shown to students) free of diagnostic questions. The two
+    sets must never mix: a diagnostic answer would drag the 60/30/10 mix
+    towards a fixed question, and a practice answer would drag the measured
+    difficulty of the material towards a question deliberately aimed at the
+    student's weakest level.
+    """
     return QuestionBank.query.filter_by(
-        section_id=section_id, status='APPROVED'
+        section_id=section_id, status='APPROVED', purpose='practice'
+    ).order_by(QuestionBank.id).all()
+
+
+def diagnostic_for_section(section_id):
+    """APPROVED diagnostic questions of one section, stable order (no mix).
+
+    Fixed order, never reshuffled: the diagnostic set is only comparable
+    between students because everyone answers the same questions in the
+    same sequence.
+    """
+    return QuestionBank.query.filter_by(
+        section_id=section_id, status='APPROVED', purpose='diagnostic'
     ).order_by(QuestionBank.id).all()
 
 
 def approved_count_map(section_ids):
-    """section_id -> jumlah soal APPROVED. Satu query untuk semua bagian."""
+    """section_id -> jumlah soal latihan APPROVED. Satu query untuk semua bagian."""
     if not section_ids:
         return {}
     rows = db.session.query(
@@ -49,6 +69,25 @@ def approved_count_map(section_ids):
     ).filter(
         QuestionBank.section_id.in_(section_ids),
         QuestionBank.status == 'APPROVED',
+        QuestionBank.purpose == 'practice',
+    ).group_by(QuestionBank.section_id).all()
+    return {int(sid): int(total or 0) for sid, total in rows}
+
+
+def diagnostic_count_map(section_ids):
+    """section_id -> jumlah soal diagnostik APPROVED. Satu query untuk semua bagian.
+
+    Terpisah dari `approved_count_map` supaya UI tidak pernah menjumlahkan
+    dua pool yang berbeda lalu menyebutnya "soal latihan".
+    """
+    if not section_ids:
+        return {}
+    rows = db.session.query(
+        QuestionBank.section_id, db.func.count(QuestionBank.id)
+    ).filter(
+        QuestionBank.section_id.in_(section_ids),
+        QuestionBank.status == 'APPROVED',
+        QuestionBank.purpose == 'diagnostic',
     ).group_by(QuestionBank.section_id).all()
     return {int(sid): int(total or 0) for sid, total in rows}
 
@@ -126,8 +165,13 @@ def grade(bq, selected_option):
     }
 
 
-def record(student_id, material_id, section_id, bq, graded):
-    """Store one attempt. Repeated attempts are kept, not overwritten."""
+def record(student_id, material_id, section_id, bq, graded, mode='practice'):
+    """Store one attempt. Repeated attempts are kept, not overwritten.
+
+    `mode` is the honest marker of which lane wrote this row: 'practice' for
+    adaptive answers, 'diagnostic' for Asesmen Diagnostik. The material level
+    reads only 'diagnostic' rows (see material_level_observed).
+    """
     previous = db.session.query(db.func.count(PracticeAnswer.id)).filter_by(
         student_id=student_id, bank_question_id=bq.id
     ).scalar() or 0
@@ -140,6 +184,7 @@ def record(student_id, material_id, section_id, bq, graded):
         is_correct=graded['is_correct'],
         attempt_no=int(previous) + 1,
         question_snapshot=bq.question_text,
+        mode=mode or 'practice',
         answered_at=datetime.utcnow(),
     )
     db.session.add(row)
@@ -147,7 +192,7 @@ def record(student_id, material_id, section_id, bq, graded):
     return row
 
 
-def latest_attempts(material_id, student_ids):
+def latest_attempts(material_id, student_ids, mode=None):
     """(section_id, student_id, bank_question_id, is_correct, attempts) per question.
 
     One row per (siswa, soal): jawaban TERAKHIR yang dihitung, bukan jumlah
@@ -155,6 +200,9 @@ def latest_attempts(material_id, student_ids):
     sebagai satu soal terjawab, jadi percobaan berulang tidak bisa besar-besaran
     menambah bukti sebuah bagian. Urutan dibuat eksplisit agar "terakhir" tidak
     bergantung pada urutan acak yang kembalikan database.
+
+    `mode` menyaring jalur jawaban ('practice' atau 'diagnostic'). `None` berarti
+    semua jalur, yang dipakai oleh hitungan latihan biasa.
     """
     if isinstance(student_ids, (list, tuple, set)):
         ids = [int(s) for s in student_ids]
@@ -163,7 +211,7 @@ def latest_attempts(material_id, student_ids):
     if not ids:
         return []
 
-    rows = db.session.query(
+    query = db.session.query(
         PracticeAnswer.section_id,
         PracticeAnswer.student_id,
         PracticeAnswer.bank_question_id,
@@ -173,7 +221,11 @@ def latest_attempts(material_id, student_ids):
     ).filter(
         PracticeAnswer.material_id == material_id,
         PracticeAnswer.student_id.in_(ids),
-    ).order_by(
+    )
+    if mode:
+        query = query.filter(PracticeAnswer.mode == mode)
+
+    rows = query.order_by(
         PracticeAnswer.answered_at.asc(), PracticeAnswer.id.asc()).all()
 
     latest = {}
@@ -191,6 +243,44 @@ def practice_stats(student_id, material_id):
     """section_id -> hitungan latihan satu siswa (lihat latest_attempts)."""
     out = {}
     for sid, _stid, _bqid, ok, attempts in latest_attempts(material_id, student_id):
+        bucket = out.setdefault(sid, {'answered': 0, 'correct': 0, 'attempts': 0})
+        bucket['answered'] += 1
+        bucket['attempts'] += attempts
+        if ok:
+            bucket['correct'] += 1
+    return out
+
+
+def diagnostic_stats(student_id, material_id):
+    """section_id -> hitungan ASESMEN DIAGNOSTIK satu siswa.
+
+    Terpisah dari `practice_stats` dengan sengaja: angka latihan adaptif dan
+    angka diagnostik menjawab dua pertanyaan berbeda (sedang berlatih vs
+    sampel pengukuran yang netral) dan tidak pernah dijumlahkan. Sumber
+    hitungannya tetap `latest_attempts` - satu soal dihitung dari jawaban
+    terakhir - supaya dua fungsi ini tidak bisa berbeda aturan. Yang menambah
+    ketat di sini adalah `mode='diagnostic'`: sebuah soal yang tadinya latihan
+    lalu guru tandai diagnostik tidak otomatis dianggap "sudah dikerjakan"
+    hanya karena ada jawaban lamanya.
+    """
+    from src.models.material_section import MaterialSection
+
+    section_ids = [s.id for s in MaterialSection.query.filter_by(
+        material_id=material_id).all()]
+    if not section_ids:
+        return {}
+    diag_ids = {int(b.id) for b in QuestionBank.query.filter(
+        QuestionBank.section_id.in_(section_ids),
+        QuestionBank.purpose == 'diagnostic',
+    ).all()}
+    if not diag_ids:
+        return {}
+
+    out = {}
+    for sid, _stid, bqid, ok, attempts in latest_attempts(
+            material_id, student_id, mode='diagnostic'):
+        if int(bqid) not in diag_ids:
+            continue
         bucket = out.setdefault(sid, {'answered': 0, 'correct': 0, 'attempts': 0})
         bucket['answered'] += 1
         bucket['attempts'] += attempts

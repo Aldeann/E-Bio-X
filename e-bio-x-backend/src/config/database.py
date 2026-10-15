@@ -41,7 +41,20 @@ _COMPAT_COLUMNS = [
     ('question_bank', 'reviewed_by', 'ALTER TABLE question_bank ADD COLUMN reviewed_by INT NULL'),
     ('question_bank', 'reviewed_at', 'ALTER TABLE question_bank ADD COLUMN reviewed_at DATETIME NULL'),
     ('question_bank', 'misconception', 'ALTER TABLE question_bank ADD COLUMN misconception TEXT NULL'),
+    # Practice pool vs diagnostic set (Fase 4 level materi). Diagnostic
+    # questions are answered WITHOUT adaptation and are the only thing the
+    # measured difficulty of a material may be computed from; practice
+    # questions keep their old meaning, and the default below keeps every
+    # existing row where it already was.
+    ('question_bank', 'purpose', "ALTER TABLE question_bank ADD COLUMN purpose VARCHAR(20) NOT NULL DEFAULT 'practice'"),
     ('question_bank_options', 'feedback', 'ALTER TABLE question_bank_options ADD COLUMN feedback TEXT NULL'),
+    # Which lane an answer was written in: 'practice' (adaptive) or
+    # 'diagnostic' (Asesmen Diagnostik). A question's `purpose` cannot serve as
+    # this marker because a teacher may flip a question from practice to
+    # diagnostic after years of adaptive answers; without this column those
+    # old answers would silently become "diagnostic evidence" and bias the
+    # measured material level (see material_level_observed).
+    ('practice_answers', 'mode', "ALTER TABLE practice_answers ADD COLUMN mode VARCHAR(16) NOT NULL DEFAULT 'practice'"),
     # Per-section recommendation (Fase 3e). section_id IS NULL -> the row is
     # a material-level recommendation (unchanged behaviour); a value -> the
     # row recommends that one section. material_id stays NOT NULL on

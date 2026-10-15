@@ -26,6 +26,12 @@ const practiceSectionId = ref(null);
 const practiceSectionTitle = ref("");
 // section_id -> jumlah soal latihan yang sudah disetujui guru.
 const practiceAvailable = ref({});
+// Asesmen diagnostik per bagian (non-adaptif): tombolnya berdampingan dengan
+// latihan adaptif, tapi memakai set soal dan endpoint yang berbeda.
+const diagnosticOpen = ref(false);
+const diagnosticSectionId = ref(null);
+const diagnosticSectionTitle = ref("");
+const diagnosticAvailable = ref({});
 // Rekomendasi materi berikutnya, ditampilkan di layar "Materi Selesai".
 const nextMaterials = ref([]);
 // Langkah berikutnya (Fase 5b): SATU aksi yang diprioritaskan server,
@@ -106,9 +112,16 @@ const progressPct = computed(
 const activePracticeTotal = computed(
   () => practiceAvailable.value[activeSectionId.value] || 0
 );
+const activeDiagnosticTotal = computed(
+  () => diagnosticAvailable.value[activeSectionId.value] || 0
+);
 // Bagian yang punya soal latihan, untuk tombol di layar "Materi Selesai".
 const practiceSections = computed(() =>
   sections.value.filter((s) => (practiceAvailable.value[s.id] || 0) > 0)
+);
+// Bagian yang punya soal diagnostik (pool terpisah, non-adaptif).
+const diagnosticSections = computed(() =>
+  sections.value.filter((s) => (diagnosticAvailable.value[s.id] || 0) > 0)
 );
 
 const noteFor = (contentId) =>
@@ -162,12 +175,16 @@ const fetchPracticeAvailability = async () => {
       { headers: { Authorization: `Bearer ${token}` } }
     );
     const map = {};
+    const diag = {};
     (res.sections || []).forEach((s) => {
       if (s.available) map[s.section_id] = s.practice_total || 0;
+      if (s.diagnostic_available) diag[s.section_id] = s.diagnostic_total || 0;
     });
     practiceAvailable.value = map;
+    diagnosticAvailable.value = diag;
   } catch (e) {
     practiceAvailable.value = {};
+    diagnosticAvailable.value = {};
   }
 };
 
@@ -176,6 +193,18 @@ const openPractice = (sectionId, title = "") => {
   practiceSectionId.value = sectionId;
   practiceSectionTitle.value = title;
   practiceOpen.value = true;
+};
+
+const openDiagnostic = (sectionId, title = "") => {
+  if (!sectionId) return;
+  diagnosticSectionId.value = sectionId;
+  diagnosticSectionTitle.value = title;
+  diagnosticOpen.value = true;
+};
+
+const closeDiagnostic = () => {
+  diagnosticOpen.value = false;
+  fetchPracticeAvailability();
 };
 
 const closePractice = () => {
@@ -681,6 +710,26 @@ definePageMeta({
                 </div>
               </div>
 
+              <div v-if="diagnosticSections.length" class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                <p class="text-sm font-semibold text-cyan-700 dark:text-cyan-300 mb-2 flex items-center justify-center gap-1">
+                  <Icon name="material-symbols:fact-check" class="w-4 h-4" />
+                  Asesmen diagnostik
+                </p>
+                <p class="text-xs text-gray-500 mb-2">
+                  Soal tetap (tidak menyesuaikan jawabanmu). Dipakai mengukur tingkat materi ini.
+                </p>
+                <div class="flex flex-wrap justify-center gap-2">
+                  <button
+                    v-for="s in diagnosticSections"
+                    :key="s.id"
+                    @click="openDiagnostic(s.id, s.title)"
+                    class="px-3 py-2 rounded-lg border border-cyan-300 dark:border-cyan-700 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 text-sm font-medium"
+                  >
+                    {{ s.title }}
+                  </button>
+                </div>
+              </div>
+
               <div v-if="nextMaterials.length" class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-left">
                 <p class="text-sm font-semibold text-green-700 dark:text-green-400 mb-2 flex items-center justify-center gap-1">
                   <Icon name="material-symbols:play-circle" class="w-4 h-4" />
@@ -733,13 +782,23 @@ definePageMeta({
             </div>
           </div>
 
-          <div v-if="activePracticeTotal > 0" class="mt-6">
+          <div v-if="activePracticeTotal > 0 || activeDiagnosticTotal > 0" class="mt-6 flex flex-wrap gap-2">
             <button
+              v-if="activePracticeTotal > 0"
               @click="openPractice(activeSectionId, activeSection.title)"
               class="w-full sm:w-auto px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold flex items-center justify-center gap-1"
             >
               <Icon name="material-symbols:auto-awesome" class="w-4 h-4" />
               Latihan adaptif ({{ activePracticeTotal }} soal)
+            </button>
+            <button
+              v-if="activeDiagnosticTotal > 0"
+              @click="openDiagnostic(activeSectionId, activeSection.title)"
+              class="w-full sm:w-auto px-4 py-2.5 rounded-lg border border-cyan-300 dark:border-cyan-700 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 text-sm font-semibold flex items-center justify-center gap-1"
+              title="Soal tetap, dipakai mengukur tingkat materi ini"
+            >
+              <Icon name="material-symbols:fact-check" class="w-4 h-4" />
+              Asesmen Diagnostik ({{ activeDiagnosticTotal }} soal)
             </button>
           </div>
 
@@ -782,6 +841,14 @@ definePageMeta({
       :section-id="practiceSectionId"
       :section-title="practiceSectionTitle"
       @close="closePractice"
+    />
+
+    <StudentSectionDiagnosticModal
+      :open="diagnosticOpen"
+      :material-id="route.params.id"
+      :section-id="diagnosticSectionId"
+      :section-title="diagnosticSectionTitle"
+      @close="closeDiagnostic"
     />
   </template>
 </template>

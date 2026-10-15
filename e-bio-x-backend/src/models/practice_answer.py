@@ -32,6 +32,17 @@ class PracticeAnswer(db.Model):
     # Teks soal seperti tampil saat dijawab. Kalau guru menyunting soalnya
     # kemudian, catatan ini tetap bisa dibaca apa adanya yang dinilai siswa.
     question_snapshot = db.Column(db.Text, nullable=True)
+    # Jalur tempat jawaban ini dibuat: 'practice' (latihan adaptif) atau
+    # 'diagnostic' (Asesmen Diagnostik). INI penanda yang sah; `purpose` pada
+    # soal bukan. Sebab sebuah soal boleh guru ubah purpose-nya (latihan ->
+    # diagnostik) setelah lama dipakai latihan. Kalau pengukuran tingkat materi
+    # hanya menyaring "soal yang purpose-nya diagnostic", jawaban-jawaban lama
+    # dari latihan adaptif ikut terhitung dan sampelnya jadi terbias mesin
+    # 60/30/10 - persis yang ingin dihindari. Dengan kolom ini, bukti diagnostik
+    # hanya berasal dari jawaban yang memang dibuat lewat endpoint diagnostik,
+    # dan mengubah purpose soal tidak pernah menghitung ulang masa lalunya.
+    mode = db.Column(db.String(16), nullable=False, default='practice',
+                     server_default='practice')
     answered_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     student = db.relationship('User', backref=db.backref('practice_answers', lazy=True))

@@ -13,6 +13,33 @@ const loading = ref(true);
 const analytics = computed(() => data.value?.analytics || {});
 const students = computed(() => analytics.value.students_list || []);
 
+// --- Tingkat materi: deklarasi vs terukur (set diagnostik) ---
+const DIFF_LABELS = { easy: "Mudah", medium: "Sedang", hard: "Sulit" };
+const declaredLabel = computed(
+  () => DIFF_LABELS[analytics.value.difficulty_declared] || "Belum ditentukan"
+);
+const observed = computed(() => analytics.value.difficulty_observed || null);
+const observedReady = computed(() => observed.value?.status === "READY");
+const observedLabel = computed(() =>
+  observedReady.value
+    ? DIFF_LABELS[observed.value.label] || observed.value.label
+    : "Belum cukup data"
+);
+const observedNote = computed(() => {
+  const o = observed.value;
+  if (!o) return "Menunggu data.";
+  if (o.status !== "READY") return o.message || "Data belum cukup untuk memberi label.";
+  const margin = o.margin == null ? "–" : `±${Math.round(o.margin * 100)} poin`;
+  const pct = Math.round((o.p || 0) * 100);
+  return `${o.n_items} soal · ${o.n_students} siswa · p = ${pct}% benar (${margin})${
+    o.near_boundary ? " · dekat batas" : ""
+  }`;
+});
+// Bagian yang belum punya soal diagnostik: penjelasan mengapa level belum terukur.
+const sectionsWithoutDiagnostics = computed(() =>
+  (analytics.value.section_diagnostics || []).filter((s) => !s.diagnostic_count)
+);
+
 // Hanya bagian yang benar-benar punya prasyarat yang ditampilkan.
 const prereqRows = computed(() =>
   (prereq.value?.sections || []).filter((s) => (s.prerequisites || []).length)
@@ -167,6 +194,52 @@ definePageMeta({
             </ul>
           </li>
         </ul>
+      </div>
+
+      <div
+        class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 mb-6"
+      >
+        <h3 class="font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-1.5">
+          <Icon name="material-symbols:bar-chart" class="w-5 h-5 text-green-600" />
+          Tingkat Materi
+        </h3>
+        <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+            <p class="text-xs text-gray-500">Tingkat (deklarasi guru/seed)</p>
+            <p class="text-lg font-semibold text-gray-800 dark:text-gray-100 mt-1">
+              {{ declaredLabel }}
+            </p>
+            <p class="text-xs text-gray-400 mt-1">
+              Label yang ditulis guru/di-seed. Selalu ditampilkan apa adanya, tidak pernah ditimpa.
+            </p>
+          </div>
+          <div
+            class="rounded-lg border p-3"
+            :class="observedReady
+              ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20'
+              : 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20'"
+          >
+            <p class="text-xs text-gray-500">Tingkat (terukur dari set diagnostik)</p>
+            <p class="text-lg font-semibold mt-1" :class="observedReady ? 'text-green-700 dark:text-green-300' : 'text-amber-700 dark:text-amber-300'">
+              {{ observedLabel }}
+            </p>
+            <p class="text-xs text-gray-500 mt-1">{{ observedNote }}</p>
+            <p class="text-[11px] text-gray-400 mt-1">
+              Diukur dari jawaban soal diagnostik (urutan tetap, tanpa adaptasi) — bukan dari latihan adaptif.
+            </p>
+          </div>
+        </div>
+        <div
+          v-if="!observedReady && sectionsWithoutDiagnostics.length"
+          class="mt-3 text-xs text-gray-500 dark:text-gray-400"
+        >
+          Bagian yang belum punya soal diagnostik:
+          <span class="text-gray-700 dark:text-gray-200">
+            {{ sectionsWithoutDiagnostics.map((s) => s.title).join(", ") }}
+          </span>.
+          Tandai soal sebagai "Diagnostik" di menu
+          <NuxtLink to="/teacher/practice" class="text-green-600 hover:underline">Latihan per Bagian</NuxtLink>.
+        </div>
       </div>
 
       <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">

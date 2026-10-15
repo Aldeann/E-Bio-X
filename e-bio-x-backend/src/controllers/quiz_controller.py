@@ -515,7 +515,7 @@ def get_my_submission_by_id(quiz_id):
 # ============================================================
 from src.models.material import Material
 from src.models.material_section import MaterialSection
-from src.models.question_bank import QuestionBank
+from src.models.question_bank import QuestionBank, BANK_PURPOSES
 from src.models.question_bank_option import QuestionBankOption
 from datetime import datetime, timedelta
 from datetime import time as _dtime
@@ -1258,6 +1258,7 @@ def _serialize_bank(bq, times_used=None):
         'material_title': material.title if material else None,
         'source': bq.source or 'teacher',
         'status': bq.status or 'APPROVED',
+        'purpose': bq.purpose or 'practice',
         'generated_by': bq.generated_by,
         'model_name': bq.model_name,
         'prompt_version': bq.prompt_version,
@@ -1294,6 +1295,22 @@ def _resolve_bank_section(user, raw):
     if not _teacher_owns_material(user, section.material):
         return None, 'Anda tidak berhak menautkan soal ke bagian ini'
     return section, None
+
+
+def _resolve_purpose(raw, default='practice'):
+    """Validate the pool a bank question belongs to.
+
+    Anything unknown is REJECTED rather than silently coerced: a typo must not
+    be able to move a question into the diagnostic set (which feeds the
+    measured level of a material) or out of it.
+    """
+    if raw in (None, '', 'null'):
+        return default, None
+    value = str(raw).strip().lower()
+    if value not in BANK_PURPOSES:
+        return None, ('Jenis soal tidak dikenal (pilih '
+                      + ' atau '.join(BANK_PURPOSES) + ')')
+    return value, None
 
 
 @jwt_required()
@@ -1333,6 +1350,11 @@ def get_question_bank():
     source = (data.get('source') or '').strip()
     if source:
         query = query.filter(QuestionBank.source == source)
+    purpose = (data.get('purpose') or '').strip().lower()
+    if purpose:
+        if purpose not in BANK_PURPOSES:
+            return jsonify({'error': 'purpose tidak valid'}), 400
+        query = query.filter(QuestionBank.purpose == purpose)
     items = query.order_by(QuestionBank.created_at.desc()).all()
     usage_counts = {}
     if items:
@@ -1379,6 +1401,10 @@ def create_question_bank():
         # disagree in the bank list.
         bq.topic = section.title
     bq.misconception = (data.get('misconception') or '').strip() or None
+    purpose, err = _resolve_purpose(data.get('purpose'))
+    if err:
+        return jsonify({'error': err}), 400
+    bq.purpose = purpose
     # Teacher-written questions are approved by definition: the author is the
     # reviewer. AI drafts arrive through the draft endpoint instead.
     bq.source = 'teacher'
@@ -1431,6 +1457,11 @@ def update_question_bank(bank_id):
         bq.topic = (data.get('topic') or '').strip() or None
     if 'misconception' in data:
         bq.misconception = (data.get('misconception') or '').strip() or None
+    if 'purpose' in data:
+        purpose, err = _resolve_purpose(data.get('purpose'))
+        if err:
+            return jsonify({'error': err}), 400
+        bq.purpose = purpose
     if 'image_url' in data:
         bq.image_url = data['image_url']
     bq.updated_at = datetime.utcnow()
