@@ -150,6 +150,13 @@ const fetchDetail = async () => {
 const persistSection = async (sectionId) => {
   if (!sectionId || stateBusy.value) return;
   stateBusy.value = true;
+  // Simpan status selesai SEBELUM request. Materi yang sudah pernah selesai
+  // tetap melaporkan `completed: true` dari server (memang fakta historis),
+  // jadi layar "Materi Selesai" hanya boleh muncul saat transisi
+  // belum-selesai -> selesai, bukan setiap kali posisi bagian disimpan.
+  // Tanpa ini, mengulang/meninjau materi yang sudah selesai akan langsung
+  // memantulkan layar selesai lagi.
+  const wasCompleted = !!(studentState.value && studentState.value.completed);
   try {
     await $fetch(
       `${config.public.backend}/api/materials/${route.params.id}/progress`,
@@ -170,7 +177,7 @@ const persistSection = async (sectionId) => {
       );
       if (res && res.state) {
         studentState.value = res.state;
-        if (res.state.completed) showCompletion.value = true;
+        if (res.state.completed && !wasCompleted) showCompletion.value = true;
       }
     } catch (e) {
       // abaikan error menyimpan posisi
