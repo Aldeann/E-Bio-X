@@ -18,6 +18,7 @@ const sidebarOpen = ref(false);
 const showCompletion = ref(false);
 const heartbeatTimer = ref(null);
 const viewedContentIds = ref(new Set());
+const hasViewedCompletion = ref(false);
 
 const signalActivity = async (eventType, sectionId = null, contentId = null, data = null) => {
   try {
@@ -177,7 +178,7 @@ const persistSection = async (sectionId) => {
       );
       if (res && res.state) {
         studentState.value = res.state;
-        if (res.state.completed && !wasCompleted) showCompletion.value = true;
+        if (res.state.completed && !wasCompleted && !hasViewedCompletion.value) showCompletion.value = true;
       }
     } catch (e) {
       // abaikan error menyimpan posisi
@@ -193,7 +194,13 @@ const selectSection = (id) => {
 };
 
 const setSection = (id) => {
-  showCompletion.value = false;
+  // Jangan biarkan layar "Materi Selesai" muncul lagi saat user
+  // sedang meninjau ulang materi yang sudah pernah selesai.
+  if (hasViewedCompletion.value) {
+    showCompletion.value = false;
+  } else {
+    showCompletion.value = false;
+  }
   activeSectionId.value = id;
   sidebarOpen.value = false;
   persistSection(id);
@@ -228,15 +235,19 @@ const finishMaterial = async () => {
     student_progress: { ...(studentState.value?.student_progress || {}), finished: true },
     completed: true,
   };
+  hasViewedCompletion.value = false;
   showCompletion.value = true;
   window.scrollTo({ top: 0, behavior: "smooth" });
 };
 
 const restartLearning = async () => {
   showCompletion.value = false;
+  hasViewedCompletion.value = true;
   if (sections.value.length > 0) {
     activeSectionId.value = sections.value[0].id;
-    persistSection(sections.value[0].id);
+    try {
+      persistSection(sections.value[0].id);
+    } catch (e) {}
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 };
