@@ -42,8 +42,6 @@ const emit = defineEmits(["restart"]);
       </button>
     </div>
 
-    <div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-[11px] text-gray-400">
-      Fitur rekomendasi materi akan segera hadir.
-    </div>
+    <slot name="next" />
   </div>
 </template>

@@ -26,6 +26,8 @@ const practiceSectionId = ref(null);
 const practiceSectionTitle = ref("");
 // section_id -> jumlah soal latihan yang sudah disetujui guru.
 const practiceAvailable = ref({});
+// Rekomendasi materi berikutnya, ditampilkan di layar "Materi Selesai".
+const nextMaterials = ref([]);
 
 const signalActivity = async (eventType, sectionId = null, contentId = null, data = null) => {
   try {
@@ -157,6 +159,35 @@ const closePractice = () => {
   fetchPracticeAvailability();
 };
 
+// Rekomendasi materi berikutnya (bukan materi yang sedang dibuka). Dipakai di
+// layar "Materi Selesai" supaya murid tahu harus melanjutkan ke mana.
+const fetchRecommendations = async () => {
+  try {
+    const recs = await $fetch(
+      `${config.public.backend}/api/student/recommendations`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    nextMaterials.value = (recs.recommendations || [])
+      .filter((r) => String(r.material_id) !== String(route.params.id))
+      .slice(0, 3);
+  } catch (e) {
+    nextMaterials.value = [];
+  }
+};
+
+const openRecommendedMaterial = async (r) => {
+  try {
+    await $fetch(`${config.public.backend}/api/student/recommendations/click`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: { material_id: r.material_id },
+    });
+  } catch (e) {
+    // pencatatan klik tidak boleh menghalangi navigasi
+  }
+  navigateTo(`/student/materials/${r.material_id}`);
+};
+
 const fetchDetail = async () => {
   loading.value = true;
   try {
@@ -177,6 +208,7 @@ const fetchDetail = async () => {
     }
 
     await fetchPracticeAvailability();
+    await fetchRecommendations();
 
     const listed = [];
     // ?section= dipakai rekomendasi per bagian (Fase 3e): bagian yang
@@ -488,27 +520,44 @@ definePageMeta({
           :completed="sections.length"
           :percentage="100"
           @restart="restartLearning"
-        />
-
-        <div
-          v-if="showCompletion && practiceSections.length"
-          class="max-w-xl mx-auto mt-4"
         >
-          <p class="text-sm font-semibold text-indigo-700 dark:text-indigo-300 mb-2 flex items-center justify-center gap-1">
-            <Icon name="material-symbols:auto-awesome" class="w-4 h-4" />
-            Latihan adaptif
-          </p>
-          <div class="flex flex-wrap justify-center gap-2">
-            <button
-              v-for="s in practiceSections"
-              :key="s.id"
-              @click="openPractice(s.id, s.title)"
-              class="px-3 py-2 rounded-lg border border-indigo-300 dark:border-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 text-sm font-medium"
-            >
-              {{ s.title }}
-            </button>
-          </div>
-        </div>
+          <template #next>
+            <div v-if="practiceSections.length" class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
+              <p class="text-sm font-semibold text-indigo-700 dark:text-indigo-300 mb-2 flex items-center justify-center gap-1">
+                <Icon name="material-symbols:auto-awesome" class="w-4 h-4" />
+                Latihan adaptif
+              </p>
+              <div class="flex flex-wrap justify-center gap-2">
+                <button
+                  v-for="s in practiceSections"
+                  :key="s.id"
+                  @click="openPractice(s.id, s.title)"
+                  class="px-3 py-2 rounded-lg border border-indigo-300 dark:border-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 text-sm font-medium"
+                >
+                  {{ s.title }}
+                </button>
+              </div>
+            </div>
+
+            <div v-if="nextMaterials.length" class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 text-left">
+              <p class="text-sm font-semibold text-green-700 dark:text-green-400 mb-2 flex items-center justify-center gap-1">
+                <Icon name="material-symbols:play-circle" class="w-4 h-4" />
+                Materi berikutnya
+              </p>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  v-for="r in nextMaterials"
+                  :key="r.material_id"
+                  @click="openRecommendedMaterial(r)"
+                  class="rounded-xl border border-green-200 dark:border-green-800 bg-white dark:bg-gray-900 p-3 text-left hover:shadow-md transition"
+                >
+                  <p class="font-semibold text-sm text-gray-800 dark:text-gray-100 truncate">{{ r.title }}</p>
+                  <p class="text-xs text-gray-500 mt-0.5 truncate">Topik: {{ r.topic || "-" }}</p>
+                </button>
+              </div>
+            </div>
+          </template>
+        </MaterialCompletion>
 
         <template v-else-if="activeSection">
           <div class="flex flex-wrap items-center gap-3 mb-5">
