@@ -94,6 +94,7 @@ ALLOWED_EVENT_TYPES = {
     'note_created',
     'bookmark_created',
     'recommendation_clicked',
+    'recommendation_shown',
     # forum learning events (Prompt 11)
     'FORUM_CREATED',
     'FORUM_VIEWED',

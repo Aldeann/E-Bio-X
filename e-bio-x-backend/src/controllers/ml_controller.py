@@ -43,6 +43,20 @@ def _teacher():
     return user, None
 
 
+def _log_impressions(user, items):
+    """Catat tayangan saran (maks. sekali per materi per hari) untuk CTR.
+
+    Gagal mencatat TIDAK boleh menggagalkan permintaan rekomendasi: ini metrik,
+    bukan fungsi inti. Kesalahan di-rollback diam-diam.
+    """
+    try:
+        from src.services import impact_analytics_service as impact
+        mids = [i.get('material_id') for i in (items or []) if i.get('material_id')]
+        impact.log_recommendation_impressions(user.id, mids)
+    except Exception:
+        db.session.rollback()
+
+
 # ============================================================
 # MODEL SCOPE RESOLUTION
 #
@@ -214,6 +228,7 @@ def get_student_recommendations():
         # label above, NOT the order of these materials. Stamping the
         # tree's version on a rule-ranked list implied otherwise.
         recommended = rec_service.recommend_for_student(user, student_row=row)
+        _log_impressions(user, recommended)
         return jsonify({'profile': p, 'status': cfg.STATUS_READY,
                         'recommendations': recommended,
                         'section_recommendations': sections,
@@ -223,6 +238,7 @@ def get_student_recommendations():
                         'cluster_scope': km_scope}), 200
 
     fallback = rec_service.fallback_recommendations(user)
+    _log_impressions(user, fallback)
     return jsonify({'profile': p, 'status': p['status'],
                     'recommendations': fallback,
                     'section_recommendations': sections,

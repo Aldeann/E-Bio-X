@@ -220,6 +220,7 @@ const navLinks = computed(() => {
     links.push({ to: "/teacher", icon: "material-symbols:dashboard", label: "Dasbor", desc: "Ringkasan & pintasan fitur" });
     links.push({ to: "/teacher/analytics", icon: "material-symbols:monitoring", label: "Analitik", desc: "Progres, penguasaan & topik" });
     links.push({ to: "/teacher/analytics/ml", icon: "material-symbols:psychology", label: "ML Insights", desc: "Profil belajar & rekomendasi" });
+    links.push({ to: "/teacher/analytics/impact", icon: "material-symbols:ads-click", label: "Dampak Rekomendasi", desc: "CTR, funnel & perbaikan latihan" });
   }
   links.push({ to: materialsLink.value, icon: "material-symbols:menu-book", label: "Materi", desc: "Bahan ajar & bagian materi" });
   links.push({ to: quizzesLink.value, icon: "material-symbols:quiz", label: "Kuis", desc: "Buat & pantau kuis" });

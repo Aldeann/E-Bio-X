@@ -94,6 +94,7 @@ const menu = [
   { to: "/teacher", icon: "material-symbols:dashboard", label: "Dasbor" },
   { to: "/teacher/analytics", icon: "material-symbols:monitoring", label: "Analitik" },
   { to: "/teacher/analytics/ml", icon: "material-symbols:psychology", label: "ML Insights" },
+  { to: "/teacher/analytics/impact", icon: "material-symbols:ads-click", label: "Dampak Rekomendasi" },
   { to: "/teacher/materials", icon: "material-symbols:menu-book", label: "Materi" },
   { to: "/teacher/quizzes", icon: "material-symbols:quiz", label: "Kuis" },
   { to: "/teacher/question-bank", icon: "material-symbols:database", label: "Bank Soal" },

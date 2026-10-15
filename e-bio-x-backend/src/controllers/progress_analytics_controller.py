@@ -17,6 +17,7 @@ from src.config.database import db
 from src.services import learning_analytics_service as analytics
 from src.services import student_practice_service as spractice
 from src.services import prerequisite_service as prereq
+from src.services import impact_analytics_service as impact
 
 
 def _user():
@@ -361,6 +362,21 @@ def get_teacher_analytics_materials():
         return err, code
     filters = _filters_from_args()
     return jsonify(analytics.teacher_material_summaries(teacher.id, filters)), 200
+
+
+@jwt_required()
+def get_teacher_impact():
+    """Dampak rekomendasi & funnel belajar (Fase 4) untuk materi milik guru.
+
+    Memakai filter yang sama dengan analitik lain (course/phase/topic/material
+    + rentang tanggal). Semua angkanya berasal dari bukti yang sudah tercatat;
+    lihat impact_analytics_service untuk batas jujurnya.
+    """
+    teacher, err, code = _teacher()
+    if err:
+        return err, code
+    filters = _filters_from_args()
+    return jsonify(impact.teacher_impact(teacher.id, filters)), 200
 
 
 @jwt_required()

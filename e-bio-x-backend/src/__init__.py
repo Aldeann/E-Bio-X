@@ -96,6 +96,7 @@ def create_app():
         get_teacher_analytics_students, get_teacher_analytics_student,
         get_teacher_analytics_topics, get_teacher_analytics_difficulty,
         get_material_prerequisites,
+        get_teacher_impact,
         post_student_features, get_feature_dataset,
     )
     from src.controllers.ml_controller import (
@@ -265,6 +266,7 @@ def create_app():
     app.add_url_rule('/api/teacher/analytics/students/<student_id>', view_func=get_teacher_analytics_student, methods=['GET'])
     app.add_url_rule('/api/teacher/analytics/topics', view_func=get_teacher_analytics_topics, methods=['GET'])
     app.add_url_rule('/api/teacher/analytics/difficulty', view_func=get_teacher_analytics_difficulty, methods=['GET'])
+    app.add_url_rule('/api/teacher/analytics/impact', view_func=get_teacher_impact, methods=['GET'])
 
     app.add_url_rule('/api/analytics/features/<material_id>', view_func=post_student_features, methods=['POST'])
     app.add_url_rule('/api/analytics/dataset', view_func=get_feature_dataset, methods=['GET'])
