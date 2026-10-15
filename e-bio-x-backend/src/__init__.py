@@ -32,8 +32,20 @@ def create_app():
         db.create_all()
         ensure_schema_compat()
 
-    # CORS
-    CORS(app, resources={r"/api/*": {"origins": os.getenv("FRONTEND_URL")}})
+    # CORS. FRONTEND_URL boleh berisi beberapa origin dipisah koma
+    # (mis. frontend produksi + http://localhost:3000 untuk pengembangan
+    # lokal). Bila kosong, izinkan semua origin (perilaku default
+    # flask-cors), sama seperti sebelumnya saat env tidak diisi.
+    _env_origins = [o.strip() for o in (os.getenv("FRONTEND_URL") or "").split(",") if o.strip()]
+    # Origin pengembangan lokal selalu diizinkan supaya frontend dev
+    # (Nuxt di :3000) bisa memanggil API walau .env belum dimuat ulang.
+    _dev_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    _origins = (
+        _env_origins + [d for d in _dev_origins if d not in _env_origins]
+        if _env_origins
+        else "*"
+    )
+    CORS(app, resources={r"/api/*": {"origins": _origins}})
     
     # Import routes
     from src.controllers.user_controller import google_login, login, get_all_users, create_user, update_user, update_user_me, delete_user
