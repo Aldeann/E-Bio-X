@@ -17,6 +17,7 @@ from src.ml import ml_config as cfg
 from src.ml import model_manager, feature_service, decision_tree, kmeans as kmeans_mod
 from src.ml import cluster_interpreter, profile as profile_mod, recommendation as rec_service
 from src.ml import recommendation_evaluation as rec_eval
+from src.ml import ranker as ranker_mod
 from src.services import learning_analytics_service as analytics
 
 
@@ -225,14 +226,17 @@ def get_student_recommendations():
     if p['status'] == cfg.STATUS_READY and p.get('summary'):
         row = feature_service.aggregate_student_features(user) or {}
         # No model_version is passed: the Decision Tree shaped the profile
-        # label above, NOT the order of these materials. Stamping the
-        # tree's version on a rule-ranked list implied otherwise.
-        recommended = rec_service.recommend_for_student(user, student_row=row)
+        # label above, NOT the order of these materials. Stamping the tree's
+        # version on the list implied otherwise. `rank_meta` reports which
+        # ranker really produced the order ('ml' or 'rule') - never assumed.
+        rank_meta = {}
+        recommended = rec_service.recommend_for_student(
+            user, student_row=row, meta=rank_meta)
         _log_impressions(user, recommended)
         return jsonify({'profile': p, 'status': cfg.STATUS_READY,
                         'recommendations': recommended,
                         'section_recommendations': sections,
-                        'ranking_method': 'rule',
+                        'ranking_method': rank_meta.get('ranking_method', 'rule'),
                         'section_ranking_method': 'rule',
                         'model_scope': dt_scope,
                         'cluster_scope': km_scope}), 200
@@ -701,6 +705,57 @@ def get_recommendation_evaluation():
     user, err = _teacher()
     if err:
         return err
-    # admin sees the whole system; a teacher only sees their own students.
     scope_teacher = None if user.role == 'admin' else user
     return jsonify(rec_eval.evaluate_recommendations(teacher=scope_teacher)), 200
+
+
+@jwt_required()
+def train_ranker_endpoint():
+    user, err = _teacher()
+    if err:
+        return err
+    scope = None if user.role == 'admin' else user.id
+    res = ranker_mod.train_ranker(teacher_id=scope)
+    if res.get('status') == cfg.STATUS_READY:
+        try:
+            ranker_mod.save_ranker(res, teacher_id=scope)
+        except Exception:
+            pass
+    return jsonify(_ranker_summary(res)), 200
+
+
+@jwt_required()
+def get_ranker_evaluation():
+    user, err = _teacher()
+    if err:
+        return err
+    scope = None if user.role == 'admin' else user.id
+    art = ranker_mod.load_ranker(teacher_id=scope, require_deployable=False)
+    if art:
+        body = _ranker_summary({
+            'status': cfg.STATUS_READY,
+            **(art.get('meta') or {}),
+        })
+        body['model_version'] = (art.get('_meta') or {}).get('model_version')
+        body['trained_at'] = (art.get('_meta') or {}).get('trained_at')
+    else:
+        body = {'status': cfg.STATUS_MODEL_UNAVAILABLE,
+                'message': 'Ranker belum dilatih. Jalankan POST /api/ml/train-ranker.'}
+    return jsonify(body), 200
+
+
+def _ranker_summary(res):
+    """JSON-safe view of a ranker train/load result (drops the model object)."""
+    metrics = res.get('metrics') or {}
+    return {
+        'status': res.get('status'),
+        'message': res.get('message'),
+        'samples': res.get('sample_count', res.get('samples')),
+        'students': res.get('student_count', res.get('students')),
+        'pos': res.get('pos'),
+        'neg': res.get('neg'),
+        'deployable': res.get('deployable', metrics.get('deployable', False)),
+        'metrics': metrics,
+        'feature_coefficients': res.get('feature_coefficients'),
+        'evaluation_note': res.get('evaluation_note'),
+    }

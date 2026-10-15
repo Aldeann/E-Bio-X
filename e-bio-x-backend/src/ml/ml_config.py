@@ -316,6 +316,40 @@ DEFAULT_FEATURE_VERSION = '1.0'
 # retained because pruning runs after the new row is committed.
 KEEP_VERSIONS_PER_SCOPE = 5
 
+# --- Ranking ML (Learning-to-Rank, pointwise) ---------------------
+# Learned ranker trained to predict a real outcome (material completion).
+# Features are ONLY signals available BEFORE exposure: student ability,
+# material attributes and the material's cohort popularity. The student's
+# own per-material mastery/error is deliberately EXCLUDED - it already
+# mirrors the "selesai" status and would make the model read the label
+# (the same leakage guard as decision_tree's LABEL_DEFINING_FEATURES).
+RANKER_FEATURES = [
+    'quiz_average',          # student ability (student-level)
+    'interactive_accuracy',  # student ability
+    'correct_rate',          # student ability
+    'learning_minutes',      # student effort
+    'item_difficulty',       # material attribute (0/1/2)
+    'item_time_minutes',     # material attribute
+    'item_phase',            # material attribute
+    'item_sections',         # material attribute
+    'item_completion_rate',  # cohort popularity of the material
+]
+RANKER_MODEL_TYPE = 'logistic'  # 'logistic' or 'gbm'
+RANKER_K = 5
+RANKER_CV_FOLDS = 5
+RANKER_MIN_SAMPLES = 40
+RANKER_MIN_STUDENTS = 8
+RANKER_MIN_POS = 5
+RANKER_MIN_NEG = 5
+RANKER_LABEL_COMPLETED_ONLY = True
+RANKER_TOP_CONTRIB = 3
+# Deployment gate: the learned ranker is only used to ORDER recommendations
+# when its held-out NDCG@k beats the strongest non-ML baseline by at least
+# this margin. Below it the transparent rule stays in charge. This is a
+# deliberate anti-overclaiming guard: a model that has not proven itself
+# offline is not allowed to silently replace a known-good heuristic.
+RANKER_MIN_NDCG_GAIN = 0.02
+
 STATUS_INSUFFICIENT = 'INSUFFICIENT_DATA'
 STATUS_MODEL_UNAVAILABLE = 'MODEL_UNAVAILABLE'
 STATUS_READY = 'READY'

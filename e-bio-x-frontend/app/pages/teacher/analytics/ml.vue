@@ -297,6 +297,115 @@
         </div>
       </div>
 
+      <!-- Learned ranker (Learning-to-Rank) -->
+      <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 mb-6">
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <h4 class="font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+            <Icon name="material-symbols:leaderboard" class="w-5 h-5" />
+            Ranker Rekomendasi (Learning-to-Rank)
+          </h4>
+          <button
+            @click="trainRanker"
+            :disabled="trainingRanker"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0"
+            :class="trainingRanker
+              ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
+              : 'bg-indigo-600 hover:bg-indigo-700 text-white'"
+          >
+            <Icon :name="trainingRanker ? 'mdi:loading' : 'mdi:chart-line'" class="w-3.5 h-3.5" :class="trainingRanker && 'animate-spin'" />
+            {{ trainingRanker ? "Melatih..." : "Latih Ranker" }}
+          </button>
+        </div>
+
+        <p class="text-xs text-gray-500 mb-3">
+          Model ini mempelajari urutan rekomendasi dari hasil nyata (siswa menyelesaikan materi),
+          lalu diuji secara jujur dengan <b>cross-validation per siswa</b> terhadap baseline acak
+          dan popularitas. Rekomendasi hanya memakai model ini bila terbukti lebih baik.
+        </p>
+
+        <template v-if="ranker && ranker.status === 'READY'">
+          <div
+            class="mb-3 p-3 rounded-lg border text-sm flex items-start gap-2"
+            :class="ranker.deployable
+              ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/30'
+              : 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/30'"
+          >
+            <Icon
+              :name="ranker.deployable ? 'mdi:check-circle' : 'mdi:information'"
+              class="w-5 h-5 shrink-0 mt-0.5"
+              :class="ranker.deployable ? 'text-green-600' : 'text-amber-600'"
+            />
+            <div>
+              <p class="font-semibold text-gray-800 dark:text-gray-100">
+                {{ ranker.deployable
+                  ? "Model dipakai untuk mengurutkan rekomendasi"
+                  : "Rekomendasi tetap memakai rule transparan" }}
+              </p>
+              <p v-if="ranker.evaluation_note" class="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                {{ ranker.evaluation_note }}
+              </p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2" v-if="ranker.metrics && ranker.metrics.cross_validation">
+            <div class="rounded-lg bg-gray-100 dark:bg-gray-800 p-3 text-center">
+              <p class="text-lg font-bold text-gray-800 dark:text-gray-100">{{ ranker.metrics.cross_validation.ndcg_model_mean }}</p>
+              <p class="text-xs text-gray-500">NDCG@k (model)</p>
+            </div>
+            <div class="rounded-lg bg-gray-100 dark:bg-gray-800 p-3 text-center">
+              <p class="text-lg font-bold text-gray-800 dark:text-gray-100">{{ ranker.metrics.cross_validation.ndcg_random_mean }}</p>
+              <p class="text-xs text-gray-500">NDCG@k (acak)</p>
+            </div>
+            <div class="rounded-lg bg-gray-100 dark:bg-gray-800 p-3 text-center">
+              <p class="text-lg font-bold text-gray-800 dark:text-gray-100">{{ ranker.metrics.cross_validation.ndcg_popularity_mean }}</p>
+              <p class="text-xs text-gray-500">NDCG@k (popularitas)</p>
+            </div>
+            <div class="rounded-lg bg-gray-100 dark:bg-gray-800 p-3 text-center">
+              <p class="text-lg font-bold text-gray-800 dark:text-gray-100">
+                {{ ranker.metrics.cross_validation.roc_auc_model != null ? ranker.metrics.cross_validation.roc_auc_model : "-" }}
+              </p>
+              <p class="text-xs text-gray-500">ROC-AUC (held-out)</p>
+            </div>
+          </div>
+
+          <p class="text-xs text-gray-400 mt-2">
+            Label: <b>{{ ranker.metrics && ranker.metrics.label }}</b>
+            · Sampel: {{ ranker.samples }} ({{ ranker.pos }} selesai / {{ ranker.neg }} belum)
+            · Siswa: {{ ranker.students }}
+            <template v-if="ranker.model_version"> · v{{ ranker.model_version }}</template>
+          </p>
+          <p v-if="ranker.metrics && ranker.metrics.excluded_features_note" class="text-xs text-gray-500 mt-1">
+            {{ ranker.metrics.excluded_features_note }}
+          </p>
+          <ul v-if="ranker.metrics && ranker.metrics.limitations && ranker.metrics.limitations.length"
+              class="mt-1 text-xs text-amber-600 dark:text-amber-400 list-disc list-inside space-y-0.5">
+            <li v-for="(lim, i) in ranker.metrics.limitations" :key="i">{{ lim }}</li>
+          </ul>
+
+          <div v-if="ranker.feature_coefficients && ranker.feature_coefficients.length" class="mt-3">
+            <p class="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Bobot fitur yang dipelajari</p>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-1.5">
+              <div
+                v-for="c in sortedCoefs"
+                :key="c.feature"
+                class="flex items-center justify-between text-xs px-2 py-1 rounded bg-gray-50 dark:bg-gray-800"
+              >
+                <span class="text-gray-600 dark:text-gray-300 truncate">{{ featureLabel(c.feature) }}</span>
+                <span class="font-mono" :class="c.coef >= 0 ? 'text-green-600' : 'text-red-500'">
+                  {{ c.coef > 0 ? "+" : "" }}{{ c.coef.toFixed(2) }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </template>
+        <p v-else-if="ranker && ranker.status === 'INSUFFICIENT_DATA'" class="text-sm text-amber-600">
+          {{ ranker.message || "Data belum cukup untuk melatih ranker." }}
+        </p>
+        <p v-else class="text-sm text-gray-500">
+          Ranker belum dilatih. Klik "Latih Ranker" untuk melatih dari data aktivitas siswa.
+        </p>
+      </div>
+
       <!-- Topics & recommendations -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
         <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
@@ -346,8 +455,31 @@ const data = ref(null);
 const loading = ref(true);
 const training = ref(false);
 const trainResult = ref(null);
+const ranker = ref(null);
+const trainingRanker = ref(false);
 
 const modelVersion = computed(() => (data.value?.model?.model_version || "-"));
+
+const featureLabelMap = {
+  quiz_average: "Rata-rata kuis",
+  interactive_accuracy: "Akurasi interaktif",
+  correct_rate: "Tingkat jawaban benar",
+  learning_minutes: "Waktu belajar",
+  item_difficulty: "Kesulitan materi",
+  item_time_minutes: "Estimasi waktu materi",
+  item_phase: "Fase materi",
+  item_sections: "Jumlah bagian materi",
+  item_completion_rate: "Popularitas penyelesaian materi",
+};
+const featureLabel = (f) => featureLabelMap[f] || f;
+
+// Most influential first - the sign shows direction, the magnitude shows
+// how much the feature moved the ranking in training.
+const sortedCoefs = computed(() => {
+  const list = (ranker.value?.feature_coefficients || []).slice();
+  list.sort((a, b) => Math.abs(b.coef) - Math.abs(a.coef));
+  return list;
+});
 
 const counts = (obj) => {
   if (!obj) return 0;
@@ -391,6 +523,38 @@ const load = async () => {
   }
 };
 
+const loadRanker = async () => {
+  try {
+    ranker.value = await $fetch(`${config.public.backend}/api/ml/evaluation/ranker`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (e) {
+    ranker.value = null;
+  }
+};
+
+const trainRanker = async () => {
+  trainingRanker.value = true;
+  try {
+    const res = await $fetch(`${config.public.backend}/api/ml/train-ranker`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    await loadRanker();
+    const note = res?.evaluation_note || res?.message || "Ranker selesai dilatih.";
+    toast.add({
+      title: res?.deployable ? "Ranker layak dipakai" : "Ranker dilatih (belum melebihi baseline)",
+      description: note,
+      color: res?.deployable ? "green" : "amber",
+    });
+  } catch (e) {
+    const msg = e?.data?.error || e?.data?.message || "Gagal melatih ranker.";
+    toast.add({ title: msg, color: "red" });
+  } finally {
+    trainingRanker.value = false;
+  }
+};
+
 const trainModel = async () => {
   training.value = true;
   trainResult.value = null;
@@ -412,6 +576,7 @@ const trainModel = async () => {
 };
 
 load();
+loadRanker();
 
 definePageMeta({
   layout: "teacher",

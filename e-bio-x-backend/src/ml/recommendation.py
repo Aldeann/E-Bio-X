@@ -14,6 +14,7 @@ from src.services import learning_analytics_service as analytics
 from src.models.material import Material
 from src.models.submission import Submission
 from src.models.practice_answer import PracticeAnswer
+from src.ml import ranker as ranker_mod
 
 
 # ------------------------------------------------------------
@@ -384,24 +385,25 @@ def recommend_sections_for_student(student):
     return results
 
 
-def recommend_for_student(student, student_row=None, model_version=None, fallback_reason=None):
-    """Rank a student's materials by transparent rules (REC_WEIGHTS).
+def recommend_for_student(student, student_row=None, model_version=None,
+                          fallback_reason=None, meta=None):
+    """Rank a student's materials. Try learned ranker if available; else rule-based.
 
-    No trained model is consulted. `model_version` is accepted for
-    backward compatibility but must stay None so the stored ranking is
-    never attributed to the Decision Tree (which only labels the profile).
+    If `meta` is a dict, it is filled with the method that actually produced
+    the returned order (`ranking_method`: 'ml' | 'rule' | 'fallback') so the
+    API can report the truth instead of assuming the rule ran.
     """
     materials = analytics.student_accessible_materials(student)
     results = []
     all_mastered = True
 
+    srow = student_row or {k: 0.0 for k in cfg.FEATURES}
     for material in materials:
-        m = _material_metrics(student, material,
-                              student_row or {k: 0.0 for k in cfg.FEATURES})
+        m = _material_metrics(student, material, srow)
         if m['mastery'] < cfg.HIGH_MASTERY_CUTOFF:
             all_mastered = False
         m['score'] = score_material(m)
-        m['reasons'] = _reasons_for(m, student_row or {})
+        m['reasons'] = _reasons_for(m, srow)
         results.append(m)
 
     if not all_mastered:
@@ -411,20 +413,54 @@ def recommend_for_student(student, student_row=None, model_version=None, fallbac
             r['score'] = round(r['score'] * 0.5, 4)
             r['reasons'] = ['Materi sudah dikuasai. Ini adalah pengulangan untuk mempertahankan penguasaan.']
 
-    results.sort(key=lambda x: (-x['score'], x['material_id']))
-    results = results[:cfg.REC_MAX_RESULTS]
+    # Rekomendasi adaptif: pakai ranker ML bila artifact tersedia dan layak.
+    # Bila tidak, urutkan dengan rule transparan (perilaku lama) - tidak ada
+    # regresi, dan ranking_method melaporkan mana yang benar-benar dipakai.
+    artifact = None
+    try:
+        artifact = ranker_mod.load_ranker()
+    except Exception:
+        artifact = None
 
-    # The ranking is computed by score_material() from transparent rules
-    # (REC_WEIGHTS) - no trained model is consulted here. Labelling it
-    # 'ml' overstated what produced the result; 'rule' is the truth, and
-    # it keeps 'ml' meaningful for anything genuinely model-driven.
-    #
-    # `model_version` is therefore left as the caller supplied it, and the
-    # only caller (the student recommendations endpoint) supplies nothing.
-    # The Decision Tree shaped the student's profile LABEL, not the order
-    # of these materials; stamping its version here would misattribute
-    # the ranking to a model that never ran.
-    _persist(student.id, results, 'fallback' if fallback_reason else 'rule', model_version)
+    material_map = {mat.id: mat for mat in materials}
+    ranking_method = 'rule'
+    if artifact and results:
+        try:
+            ml_scores = ranker_mod.predict_scores(srow, materials, artifact)
+            for r in results:
+                sm = ml_scores.get(r['material_id'])
+                if sm is not None:
+                    r['score_ml'] = sm
+            if any(r.get('score_ml') is not None for r in results):
+                results.sort(key=lambda x: (
+                    -(x.get('score_ml') if x.get('score_ml') is not None else x['score']),
+                    x['material_id']))
+                ranking_method = 'ml'
+                # The stored ranking is now genuinely produced by the ranker,
+                # so it is correct (and required, for honesty) to attribute it
+                # to the ranker's own version.
+                model_version = (artifact.get('_meta') or {}).get('model_version')
+                for r in results:
+                    mat = material_map.get(r['material_id'])
+                    try:
+                        ml_reasons = ranker_mod.explain_ml(srow, mat, artifact)
+                    except Exception:
+                        ml_reasons = None
+                    r['reasons_ml'] = ml_reasons
+                    if ml_reasons:
+                        r['reasons'] = ml_reasons
+        except Exception:
+            # Any failure in the ML path must degrade to the transparent
+            # rule, never to an exception or an unattributed ranking.
+            results.sort(key=lambda x: (-x['score'], x['material_id']))
+            ranking_method = 'rule'
+    else:
+        results.sort(key=lambda x: (-x['score'], x['material_id']))
+
+    results = results[:cfg.REC_MAX_RESULTS]
+    _persist(student.id, results, 'fallback' if fallback_reason else ranking_method, model_version)
+    if meta is not None:
+        meta['ranking_method'] = 'fallback' if fallback_reason else ranking_method
     return results
 
 

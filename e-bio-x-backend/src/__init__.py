@@ -106,6 +106,7 @@ def create_app():
         train_ml, retrain_ml, predict_student,
         get_teacher_ml_mastery, get_teacher_ml_clusters,
         get_recommendation_evaluation,
+        train_ranker_endpoint, get_ranker_evaluation,
     )
     from src.controllers.ai_explanation_controller import (
         generate_question_explanation, generate_bank_explanation, batch_generate_explanations,
@@ -282,6 +283,8 @@ def create_app():
     app.add_url_rule('/api/teacher/analytics/ml/mastery', view_func=get_teacher_ml_mastery, methods=['GET'])
     app.add_url_rule('/api/teacher/analytics/ml/clusters', view_func=get_teacher_ml_clusters, methods=['GET'])
     app.add_url_rule('/api/ml/evaluation/recommendations', view_func=get_recommendation_evaluation, methods=['GET'])
+    app.add_url_rule('/api/ml/train-ranker', view_func=train_ranker_endpoint, methods=['POST'])
+    app.add_url_rule('/api/ml/evaluation/ranker', view_func=get_ranker_evaluation, methods=['GET'])
     app.add_url_rule('/api/ml/train', view_func=train_ml, methods=['POST'])
     app.add_url_rule('/api/ml/retrain', view_func=retrain_ml, methods=['POST'])
     app.add_url_rule('/api/ml/predict/<student_id>', view_func=predict_student, methods=['POST'])
