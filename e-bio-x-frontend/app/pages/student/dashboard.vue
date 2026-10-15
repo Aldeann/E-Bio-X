@@ -277,11 +277,20 @@
               <li
                 v-for="h in hintSectionRecs"
                 :key="`hint-${h.material_id}-${h.section_id}`"
-                class="text-xs text-gray-600 dark:text-gray-300"
+                class="flex items-center justify-between gap-2 text-xs text-gray-600 dark:text-gray-300"
               >
-                {{ h.section_title }}
-                <span class="text-gray-400">· {{ h.material_title }}</span>
-                — {{ h.answered }} jawaban
+                <span class="min-w-0 truncate">
+                  {{ h.section_title }}
+                  <span class="text-gray-400">· {{ h.material_title }}</span>
+                </span>
+                <button
+                  v-if="h.practice_available"
+                  @click="openPractice(h)"
+                  class="shrink-0 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold flex items-center gap-1"
+                >
+                  <Icon name="material-symbols:auto-awesome" class="w-3.5 h-3.5" />
+                  Latihan adaptif
+                </button>
               </li>
             </ul>
           </div>

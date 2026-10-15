@@ -19,6 +19,13 @@ const showCompletion = ref(false);
 const heartbeatTimer = ref(null);
 const viewedContentIds = ref(new Set());
 const hasViewedCompletion = ref(false);
+// Latihan adaptif per bagian: tombol langsung di halaman materi supaya murid
+// tidak perlu kembali ke dashboard setelah selesai membaca.
+const practiceOpen = ref(false);
+const practiceSectionId = ref(null);
+const practiceSectionTitle = ref("");
+// section_id -> jumlah soal latihan yang sudah disetujui guru.
+const practiceAvailable = ref({});
 
 const signalActivity = async (eventType, sectionId = null, contentId = null, data = null) => {
   try {
@@ -69,6 +76,13 @@ const completedSectionIds = computed(
 const progressPct = computed(
   () => studentState.value?.student_progress?.percentage || 0
 );
+const activePracticeTotal = computed(
+  () => practiceAvailable.value[activeSectionId.value] || 0
+);
+// Bagian yang punya soal latihan, untuk tombol di layar "Materi Selesai".
+const practiceSections = computed(() =>
+  sections.value.filter((s) => (practiceAvailable.value[s.id] || 0) > 0)
+);
 
 const noteFor = (contentId) =>
   notes.value.find(
@@ -112,6 +126,37 @@ const refetchLearningData = async (withState = true) => {
   await Promise.all(tasks);
 };
 
+// Ketersediaan soal latihan per bagian (satu request), dipakai tombol
+// "Latihan adaptif". Sumbernya endpoint latihan siswa yang sudah ada.
+const fetchPracticeAvailability = async () => {
+  try {
+    const res = await $fetch(
+      `${config.public.backend}/api/student/practice/${route.params.id}/sections`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const map = {};
+    (res.sections || []).forEach((s) => {
+      if (s.available) map[s.section_id] = s.practice_total || 0;
+    });
+    practiceAvailable.value = map;
+  } catch (e) {
+    practiceAvailable.value = {};
+  }
+};
+
+const openPractice = (sectionId, title = "") => {
+  if (!sectionId) return;
+  practiceSectionId.value = sectionId;
+  practiceSectionTitle.value = title;
+  practiceOpen.value = true;
+};
+
+const closePractice = () => {
+  practiceOpen.value = false;
+  // Segarkan jumlah soal setelah latihan (mis. status bagian berubah).
+  fetchPracticeAvailability();
+};
+
 const fetchDetail = async () => {
   loading.value = true;
   try {
@@ -130,6 +175,8 @@ const fetchDetail = async () => {
     } catch (e) {
       quizzes.value = [];
     }
+
+    await fetchPracticeAvailability();
 
     const listed = [];
     // ?section= dipakai rekomendasi per bagian (Fase 3e): bagian yang
@@ -443,6 +490,26 @@ definePageMeta({
           @restart="restartLearning"
         />
 
+        <div
+          v-if="showCompletion && practiceSections.length"
+          class="max-w-xl mx-auto mt-4"
+        >
+          <p class="text-sm font-semibold text-indigo-700 dark:text-indigo-300 mb-2 flex items-center justify-center gap-1">
+            <Icon name="material-symbols:auto-awesome" class="w-4 h-4" />
+            Latihan adaptif
+          </p>
+          <div class="flex flex-wrap justify-center gap-2">
+            <button
+              v-for="s in practiceSections"
+              :key="s.id"
+              @click="openPractice(s.id, s.title)"
+              class="px-3 py-2 rounded-lg border border-indigo-300 dark:border-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 text-sm font-medium"
+            >
+              {{ s.title }}
+            </button>
+          </div>
+        </div>
+
         <template v-else-if="activeSection">
           <div class="flex flex-wrap items-center gap-3 mb-5">
             <h2 class="text-lg font-bold text-green-700 dark:text-green-400 mr-auto">
@@ -472,6 +539,16 @@ definePageMeta({
                 @saved="refreshNotes"
               />
             </div>
+          </div>
+
+          <div v-if="activePracticeTotal > 0" class="mt-6">
+            <button
+              @click="openPractice(activeSectionId, activeSection.title)"
+              class="w-full sm:w-auto px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold flex items-center justify-center gap-1"
+            >
+              <Icon name="material-symbols:auto-awesome" class="w-4 h-4" />
+              Latihan adaptif ({{ activePracticeTotal }} soal)
+            </button>
           </div>
 
           <div class="flex items-center justify-between mt-8 pt-4 border-t border-gray-100 dark:border-gray-800">
@@ -506,5 +583,13 @@ definePageMeta({
         </template>
       </section>
     </div>
+
+    <StudentSectionPracticeModal
+      :open="practiceOpen"
+      :material-id="route.params.id"
+      :section-id="practiceSectionId"
+      :section-title="practiceSectionTitle"
+      @close="closePractice"
+    />
   </template>
 </template>
