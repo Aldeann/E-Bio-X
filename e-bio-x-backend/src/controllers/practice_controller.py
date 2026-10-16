@@ -327,11 +327,17 @@ def get_student_practice_sections(material_id):
     approved = spractice.approved_count_map([s.id for s in sections])
     diagnostics = spractice.diagnostic_count_map([s.id for s in sections])
     stats = spractice.practice_stats(user.id, material.id)
+    # Jawaban diagnostik siswa ini per bagian (mode='diagnostic'), dipakai UI
+    # untuk gerbang "selesaikan asesmen dulu". Sumbernya satu query yang sama
+    # dengan halaman asesmen, jadi angkanya tidak mungkin berbeda aturan.
+    diag_stats = spractice.diagnostic_stats(user.id, material.id)
 
     rows = []
     for sec in sections:
         st = stats.get(sec.id, {'answered': 0, 'correct': 0, 'attempts': 0})
+        dst = diag_stats.get(sec.id, {'answered': 0, 'correct': 0, 'attempts': 0})
         total = approved.get(sec.id, 0)
+        diag_total = diagnostics.get(sec.id, 0)
         rows.append({
             'section_id': sec.id,
             'title': sec.title,
@@ -345,8 +351,14 @@ def get_student_practice_sections(material_id):
             'available': total > 0,
             # Pool diagnostik berdiri sendiri: 0 berarti bagian ini belum
             # punya soal pengukuran, dan tombol asesmen dimatikan.
-            'diagnostic_total': diagnostics.get(sec.id, 0),
-            'diagnostic_available': diagnostics.get(sec.id, 0) > 0,
+            'diagnostic_total': diag_total,
+            'diagnostic_available': diag_total > 0,
+            # Wajib-sebelum-lanjut: berapa soal yang sudah dijawab siswa ini
+            # dan berapa yang harus diselesaikan. Dibatasi MAX_SERVED karena
+            # itulah jumlah soal yang benar-benar disajikan (sisanya tidak
+            # mungkin dikerjakan, jadi tidak boleh ikut dihitung).
+            'diagnostic_answered': dst['answered'],
+            'diagnostic_required': min(diag_total, spractice.MAX_SERVED),
         })
 
     return jsonify({

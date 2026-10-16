@@ -20,6 +20,9 @@
 #   - sesi latihan menyajikan jendela <= SESSION_SIZE soal (10) dan
 #     MEROTASI soal yang belum pernah dijawab lebih dulu, sehingga bank yang
 #     lebih besar dari satu jendela tetap terpakai lintas sesi
+#   - daftar bagian menyertakan diagnostic_answered/diagnostic_required:
+#     dasar gerbang "selesaikan asesmen dulu". Angkanya dihitung server dari
+#     jawaban mode='diagnostic', jadi tidak bisa digelembungkan jawaban latihan
 #
 # Berjalan pada app + database nyata, membuat lalu menghapus fixture
 # miliknya sendiri. Baris lama hanya dibaca.
@@ -659,6 +662,74 @@ def main():
             check('tanpa riwayat: jendela pertama urut id (perilaku lama)',
                   [b.id for b in plain[:10]] == [b.id for b in win_banks[:10]],
                   str([b.id for b in plain[:10]]))
+
+            # ------------- 15. GERBANG ASESMEN DIAGNOSTIK PER BAGIAN
+            print('\n[15] DAFTAR BAGIAN: diagnostic_answered/required (gerbang)')
+            diag_banks = []
+            for i in range(3):
+                bq = add_bank(teacher, sec_b, 'APPROVED',
+                              f'Soal diagnostik gerbang {i}')
+                bq.purpose = 'diagnostic'
+                diag_banks.append(bq)
+            created['banks'] += diag_banks
+            db.session.commit()
+
+            def section_row(rows, section_id):
+                return next((x for x in rows if x['section_id'] == section_id), {})
+
+            r = client.get(f'/api/student/practice/{material.id}/sections',
+                           headers=h_s)
+            rows = r.get_json()['sections']
+            drow = section_row(rows, sec_b.id)
+            check('bagian diagnostik: available True, total 3',
+                  drow.get('diagnostic_available') is True
+                  and drow.get('diagnostic_total') == 3,
+                  str((drow.get('diagnostic_available'),
+                       drow.get('diagnostic_total'))))
+            check('belum dijawab: required 3, answered 0',
+                  drow.get('diagnostic_required') == 3
+                  and drow.get('diagnostic_answered') == 0,
+                  str((drow.get('diagnostic_required'),
+                       drow.get('diagnostic_answered'))))
+
+            # dua jawaban diagnostik tercatat, tapi belum tuntas
+            for b in diag_banks[:2]:
+                rr = client.post(
+                    f'/api/student/diagnostic/{material.id}/sections/{sec_b.id}/answer',
+                    headers=h_s,
+                    json={'bank_question_id': b.id, 'selected_option': 0})
+                check(f'jawab diagnostik {b.id} 200', rr.status_code == 200,
+                      f'status={rr.status_code}')
+            r2 = client.get(f'/api/student/practice/{material.id}/sections',
+                            headers=h_s)
+            drow2 = section_row(r2.get_json()['sections'], sec_b.id)
+            check('setelah 2 jawaban: answered 2 dari required 3',
+                  drow2.get('diagnostic_answered') == 2
+                  and drow2.get('diagnostic_required') == 3,
+                  str((drow2.get('diagnostic_answered'),
+                       drow2.get('diagnostic_required'))))
+
+            # jawab soal terakhir -> tuntas (answered >= required)
+            client.post(
+                f'/api/student/diagnostic/{material.id}/sections/{sec_b.id}/answer',
+                headers=h_s,
+                json={'bank_question_id': diag_banks[2].id, 'selected_option': 0})
+            r3 = client.get(f'/api/student/practice/{material.id}/sections',
+                            headers=h_s)
+            rows3 = r3.get_json()['sections']
+            drow3 = section_row(rows3, sec_b.id)
+            check('setelah 3 jawaban: tuntas (answered 3 >= required 3)',
+                  drow3.get('diagnostic_answered') == 3
+                  and drow3.get('diagnostic_answered')
+                  >= drow3.get('diagnostic_required', 0),
+                  str((drow3.get('diagnostic_answered'),
+                       drow3.get('diagnostic_required'))))
+            check('bagian tanpa diagnostik: required 0 (tidak digerbang)',
+                  section_row(rows3, sec_a.id).get('diagnostic_required') == 0,
+                  str(section_row(rows3, sec_a.id).get('diagnostic_required')))
+            check('jawaban latihan tidak menambah hitungan diagnostik',
+                  section_row(rows3, sec_a.id).get('diagnostic_answered') == 0,
+                  str(section_row(rows3, sec_a.id).get('diagnostic_answered')))
 
         finally:
             db.session.rollback()

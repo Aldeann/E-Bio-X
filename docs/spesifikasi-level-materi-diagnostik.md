@@ -272,7 +272,9 @@ Unit test mengikuti pola yang sudah ada: `test_ml_difficulty.py`, `test_practice
 2. Setuju memakai **set diagnostik per section**, terpisah dari latihan adaptif?
 3. Ambang **K soal = 3** dan **≥ 20 siswa**?
 4. Soal **interaktif tertanam** ikut dihitung atau tidak? (usul: **tidak**)
-5. "Asesmen Diagnostik" **wajib** atau opsional bagi siswa?
+5. "Asesmen Diagnostik" **wajib** atau opsional bagi siswa? — **DIPUTUSKAN
+   (16 Okt 2026): wajib.** Perpindahan bagian ditahan sampai asesmen bagian itu
+   tuntas; pemberitahuan tampil sebagai modal **tanpa opsi "lewati"**. Lihat §17.
 6. Bila materi belum punya set diagnostik: cukup tampil `INSUFFICIENT_DATA` (tidak mengarang)?
 
 ---
@@ -332,4 +334,53 @@ soal demo yang ada ditandai ulang sebagai diagnostik (lihat di bawah).
 - `student/progress/[material_id].vue` memakai `route.params.id` (selalu
   `undefined`) sehingga halaman kosong. Diperbaiki ke `route.params.material_id`;
   perbandingan before/after halaman ini menjadi bukti nyata (805 px → 2449 px).
+
+---
+
+## 17. Gerbang Asesmen Diagnostik — wajib sebelum pindah bagian (16 Okt 2026)
+
+**Keputusan (menjawab §14 poin 5): asesmen diagnostik WAJIB sebelum lanjut.**
+
+Perilaku UI:
+- Saat siswa mencoba meninggalkan bagian yang punya soal diagnostik belum tuntas
+  — lewat tombol **"Berikutnya"/"Sebelumnya"**, daftar bagian di **sidebar**,
+  atau tombol **"Selesai!"** — muncul modal pemberitahuan
+  `app/components/student/DiagnosticGateModal.vue` yang menampilkan progres
+  (mis. "Progres bagian ini: 1 dari 3 soal terjawab").
+- Modal **tidak punya opsi "lewati"**. Jalan keluar hanya:
+  1. **"Kerjakan Asesmen Diagnostik"** → membuka modal asesmen bagian itu; atau
+  2. **"Tutup"** → **membatalkan perpindahan** (siswa tetap di bagian ini).
+  Navigasi tetap tertahan sampai `answered >= required`.
+- Selama tertahan, di bawah isi bagian muncul catatan kuning kecil
+  (lock + "Selesaikan asesmen diagnostik bagian ini (x/y) sebelum lanjut…").
+- Definisi **tuntas**: jumlah soal diagnostik **unik** yang dijawab siswa minimal
+  sama dengan `diagnostic_required` bagian itu.
+
+Data pendukung (dihitung server, bukan disimpulkan UI):
+- `GET /api/student/practice/<material_id>/sections` kini menambah tiap baris:
+  - `diagnostic_answered` — soal diagnostik unik yang sudah dijawab siswa ini
+    (`student_practice_service.diagnostic_stats`, `mode='diagnostic'`), jadi
+    jawaban latihan adaptif tidak bisa menggelembungkannya.
+  - `diagnostic_required` — `min(diagnostic_total, MAX_SERVED)`: jumlah soal yang
+    benar-benar disajikan, sehingga gerbang tak mungkin mustahil dipenuhi.
+- Bagian tanpa soal diagnostik (`diagnostic_required = 0`) **tidak** digerbang.
+
+Bukti:
+- `test_student_practice.py` blok `[15]` (**+8 check**): `required`/`answered`
+  naik sesuai jawaban diagnostik; jawaban latihan tidak menambah hitungan
+  diagnostik; bagian tanpa diagnostik `required = 0`. Suite menjadi **103/103**.
+- Verifikasi data nyata (Materi 107, siswa 72, baca-saja): bagian
+  "MENGENAL VIRUS DALAM KEHIDUPAN" dan "SEJARAH, CIRI-CIRI, DAN STRUKTUR VIRUS"
+  → `required=3, answered=0` (**gerbang aktif**); bagian 63/64/65/66 →
+  `required=0` (tidak digerbang).
+
+Keterbatasan jujur:
+- Gerbang ini di sisi **UI**. Backend tetap menerima kiriman jawaban apa pun.
+- Buka-tembus yang BELUM ditutup: membuka bagian lewat URL langsung
+  (`/student/materials/107?section=65`) tidak melewati modal, karena gerbang
+  memeriksa **perpindahan dari dalam halaman**. Penegakan server-side (bagian
+  "terkunci") atau penjagaan saat memuat `?section=` belum dibuat.
+- Hanya bagian yang sudah punya soal diagnostik yang bisa digerbang; di Materi
+  107 saat ini baru bagian 48 dan 50. Bagian 63/64/65 perlu ditambahi soal
+  diagnostik lebih dulu bila ingin ikut digerbang.
 

@@ -32,6 +32,11 @@ const diagnosticOpen = ref(false);
 const diagnosticSectionId = ref(null);
 const diagnosticSectionTitle = ref("");
 const diagnosticAvailable = ref({});
+// Gerbang "selesaikan asesmen dulu": berapa soal diagnostik yang sudah dijawab
+// siswa ini per bagian, dan berapa yang wajib diselesaikan. `required` dibatasi
+// jumlah yang benar-benar disajikan server, jadi tak mungkin mustahil dipenuhi.
+const diagnosticAnswered = ref({});
+const diagnosticRequired = ref({});
 // Rekomendasi materi berikutnya, ditampilkan di layar "Materi Selesai".
 const nextMaterials = ref([]);
 // Langkah berikutnya (Fase 5b): SATU aksi yang diprioritaskan server,
@@ -123,6 +128,44 @@ const practiceSections = computed(() =>
 const diagnosticSections = computed(() =>
   sections.value.filter((s) => (diagnosticAvailable.value[s.id] || 0) > 0)
 );
+const activeDiagnosticAnswered = computed(
+  () => diagnosticAnswered.value[activeSectionId.value] || 0
+);
+const activeDiagnosticRequired = computed(
+  () => diagnosticRequired.value[activeSectionId.value] || 0
+);
+// Bagian aktif punya asesmen yang belum tuntas -> perpindahan ditahan.
+const activeDiagnosticPending = computed(
+  () =>
+    activeDiagnosticRequired.value > 0 &&
+    activeDiagnosticAnswered.value < activeDiagnosticRequired.value
+);
+
+// Gerbang perpindahan bagian. Niat berpindah disimpan dulu, baru dijalankan
+// setelah asesmen bagian aktif selesai. TIDAK ada opsi "lewati": satu-satunya
+// jalan keluar adalah mengerjakan asesmen (atau membatalkan perpindahan dan
+// tetap di bagian ini).
+const diagnosticGateOpen = ref(false);
+const diagnosticGateTitle = ref("");
+let pendingNav = null;
+const guardNavigation = (proceed) => {
+  if (activeDiagnosticPending.value) {
+    pendingNav = proceed;
+    diagnosticGateTitle.value = activeSection.value?.title || "";
+    diagnosticGateOpen.value = true;
+    return;
+  }
+  proceed();
+};
+const startGateDiagnostic = () => {
+  diagnosticGateOpen.value = false;
+  pendingNav = null; // tetap di bagian ini; membatalkan perpindahan, bukan melewati asesmen
+  openDiagnostic(activeSectionId.value, activeSection.value?.title || "");
+};
+const dismissGate = () => {
+  diagnosticGateOpen.value = false;
+  pendingNav = null;
+};
 
 const noteFor = (contentId) =>
   notes.value.find(
@@ -176,15 +219,25 @@ const fetchPracticeAvailability = async () => {
     );
     const map = {};
     const diag = {};
+    const diagDone = {};
+    const diagNeed = {};
     (res.sections || []).forEach((s) => {
       if (s.available) map[s.section_id] = s.practice_total || 0;
-      if (s.diagnostic_available) diag[s.section_id] = s.diagnostic_total || 0;
+      if (s.diagnostic_available) {
+        diag[s.section_id] = s.diagnostic_total || 0;
+        diagDone[s.section_id] = s.diagnostic_answered || 0;
+        diagNeed[s.section_id] = s.diagnostic_required || 0;
+      }
     });
     practiceAvailable.value = map;
     diagnosticAvailable.value = diag;
+    diagnosticAnswered.value = diagDone;
+    diagnosticRequired.value = diagNeed;
   } catch (e) {
     practiceAvailable.value = {};
     diagnosticAvailable.value = {};
+    diagnosticAnswered.value = {};
+    diagnosticRequired.value = {};
   }
 };
 
@@ -400,7 +453,7 @@ const persistSection = async (sectionId) => {
 
 const selectSection = (id) => {
   if (id === activeSectionId.value) return;
-  setSection(id);
+  guardNavigation(() => setSection(id));
 };
 
 const setSection = (id) => {
@@ -418,13 +471,19 @@ const setSection = (id) => {
 };
 
 const goTo = (offset) => {
-  const next = activeIndex.value + offset;
-  if (next >= 0 && next < sections.value.length) {
-    setSection(sections.value[next].id);
-  } else if (offset > 0 && activeIndex.value === sections.value.length - 1) {
-    finishMaterial();
-  }
+  guardNavigation(() => {
+    const next = activeIndex.value + offset;
+    if (next >= 0 && next < sections.value.length) {
+      setSection(sections.value[next].id);
+    } else if (offset > 0 && activeIndex.value === sections.value.length - 1) {
+      finishMaterial();
+    }
+  });
 };
+
+// Tombol "Selesai!" juga lewat gerbang yang sama: bagian terakhir pun harus
+// tuntas asesmennya sebelum layar "Materi Selesai" ditampilkan.
+const requestFinish = () => guardNavigation(finishMaterial);
 
 const finishMaterial = async () => {
   try {
@@ -802,6 +861,15 @@ definePageMeta({
             </button>
           </div>
 
+          <p
+            v-if="activeDiagnosticPending"
+            class="mt-3 text-xs text-amber-600 dark:text-amber-400 flex items-start gap-1"
+          >
+            <Icon name="material-symbols:lock" class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            Selesaikan asesmen diagnostik bagian ini ({{ activeDiagnosticAnswered }}/{{ activeDiagnosticRequired }})
+            sebelum lanjut ke bagian berikutnya.
+          </p>
+
           <div class="flex items-center justify-between mt-8 pt-4 border-t border-gray-100 dark:border-gray-800">
             <button
               @click="goTo(-1)"
@@ -824,7 +892,7 @@ definePageMeta({
             </button>
             <button
               v-else
-              @click="finishMaterial"
+              @click="requestFinish"
               class="px-4 py-2 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-700 text-white flex items-center gap-1"
             >
               <Icon name="material-symbols:check-circle" class="w-4 h-4" />
@@ -849,6 +917,15 @@ definePageMeta({
       :section-id="diagnosticSectionId"
       :section-title="diagnosticSectionTitle"
       @close="closeDiagnostic"
+    />
+
+    <StudentDiagnosticGateModal
+      :open="diagnosticGateOpen"
+      :section-title="diagnosticGateTitle"
+      :answered="activeDiagnosticAnswered"
+      :required="activeDiagnosticRequired"
+      @start="startGateDiagnostic"
+      @dismiss="dismissGate"
     />
   </template>
 </template>
