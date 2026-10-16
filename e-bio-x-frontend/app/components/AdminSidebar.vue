@@ -98,6 +98,11 @@ const navbarMenu = [
     icon: "simple-icons:bookstack",
     path: "/admin/materials",
   },
+  {
+    name: "Kata Pengantar",
+    icon: "material-symbols:auto-stories",
+    path: "/admin/settings",
+  },
 ];
 
 const handleLogout = async () => {

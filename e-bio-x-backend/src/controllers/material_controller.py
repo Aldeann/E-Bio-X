@@ -309,6 +309,9 @@ def _serialize_material_detail(material, include_answers=True, include_analytics
         'class_level': material.class_level,
         'topic': material.topic,
         'learning_objectives': material.learning_objectives,
+        'introduction': material.introduction,
+        'learning_guide': material.learning_guide,
+        'learning_needs': material.learning_needs,
         'estimated_time': material.estimated_time,
         'difficulty': material.difficulty,
         'thumbnail_url': storage_service.out_url(material.thumbnail_url),
@@ -457,6 +460,9 @@ def _create_material_json():
             class_level=data.get('class_level') or None,
             topic=data['topic'].strip(),
             learning_objectives=data['learning_objectives'].strip(),
+            introduction=(data.get('introduction') or '').strip() or None,
+            learning_guide=(data.get('learning_guide') or '').strip() or None,
+            learning_needs=(data.get('learning_needs') or '').strip() or None,
             estimated_time=data.get('estimated_time') or None,
             difficulty=data.get('difficulty') or None,
             thumbnail_url=data.get('thumbnail_url') or None,
@@ -694,7 +700,8 @@ def update_material(material_id):
 
     data = request.get_json(silent=True) or {}
     editable = ['title', 'description', 'subject', 'phase', 'class_level', 'topic',
-                'learning_objectives', 'estimated_time', 'difficulty', 'thumbnail_url']
+                'learning_objectives', 'introduction', 'learning_guide',
+                'learning_needs', 'estimated_time', 'difficulty', 'thumbnail_url']
 
     for field in editable:
         if field in data and data[field] is not None:

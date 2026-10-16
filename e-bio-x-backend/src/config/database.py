@@ -61,6 +61,35 @@ _COMPAT_COLUMNS = [
     # purpose: a section always belongs to a material, so relaxing it would
     # only throw away a foreign key we always know.
     ('recommendations', 'section_id', 'ALTER TABLE recommendations ADD COLUMN section_id INT NULL'),
+    # Kartu pembuka pada halaman belajar siswa: pengantar, petunjuk
+    # pembelajaran, dan kebutuhan belajar. Ditulis guru di level materi
+    # (bukan sebagai bagian), jadi murni metadata tampilan - tidak
+    # menambah section sehingga progres, mastery per bagian, gate
+    # diagnostik, dan graph prasyarat tidak terpengaruh. Nullable agar
+    # materi lama cukup menampilkan kartu yang sudah diisi saja.
+    ('materials', 'introduction', 'ALTER TABLE materials ADD COLUMN introduction TEXT NULL'),
+    ('materials', 'learning_guide', 'ALTER TABLE materials ADD COLUMN learning_guide TEXT NULL'),
+    ('materials', 'learning_needs', 'ALTER TABLE materials ADD COLUMN learning_needs TEXT NULL'),
+]
+
+# Tables added after the first release. create_all() runs before the model
+# modules are imported (the controller imports happen later in create_app),
+# so on an existing database a brand-new table would never appear. These are
+# created explicitly and idempotently instead.
+_COMPAT_TABLES = [
+    # Kata pengantar global: satu teks untuk semua materi, ditulis sekali
+    # oleh guru/admin. Dipisah dari materials supaya tidak perlu diisi ulang
+    # di setiap materi.
+    ('app_settings', """
+        CREATE TABLE IF NOT EXISTS app_settings (
+            id INT NOT NULL AUTO_INCREMENT,
+            `key` VARCHAR(60) NOT NULL,
+            value TEXT NULL,
+            updated_at DATETIME NULL,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_app_settings_key (`key`)
+        )
+    """),
 ]
 
 # Foreign keys for the columns added above. `ADD COLUMN section_id INT NULL`
@@ -112,6 +141,15 @@ def ensure_schema_compat():
     """Apply idempotent ALTERs for columns added after the first release."""
     from sqlalchemy import text
     applied, skipped, failed = [], [], []
+    for table, statement in _COMPAT_TABLES:
+        try:
+            db.session.execute(text(statement))
+            db.session.commit()
+            applied.append(f'table:{table}')
+        except Exception:
+            db.session.rollback()
+            failed.append(f'table:{table}')
+
     for table, column, statement in _COMPAT_COLUMNS:
         try:
             row = db.session.execute(text(

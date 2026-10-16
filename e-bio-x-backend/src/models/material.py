@@ -23,6 +23,17 @@ class Material(db.Model):
     class_level = db.Column(db.String(50), nullable=True)
     topic = db.Column(db.String(150), nullable=True)
     learning_objectives = db.Column(db.Text, nullable=True)
+    # Pembuka & panduan belajar (kartu di awal halaman belajar siswa).
+    # Semua opsional: materi lama tidak wajib punya, dan halaman belajar
+    # hanya menampilkan kartu yang benar-benar terisi. Ini metadata
+    # tampilan saja - tidak memengaruhi progres, mastery, atau asesmen
+    # diagnostik karena tidak menambah bagian baru.
+    #   introduction   - pengantar singkat sebelum siswa mulai.
+    #   learning_guide - petunjuk langkah belajar.
+    #   learning_needs - kebutuhan belajar (alat/bahan & prasyarat), ditulis guru.
+    introduction = db.Column(db.Text, nullable=True)
+    learning_guide = db.Column(db.Text, nullable=True)
+    learning_needs = db.Column(db.Text, nullable=True)
     estimated_time = db.Column(db.String(50), nullable=True)
     difficulty = db.Column(db.String(20), nullable=True)
     thumbnail_url = db.Column(db.String(255), nullable=True)

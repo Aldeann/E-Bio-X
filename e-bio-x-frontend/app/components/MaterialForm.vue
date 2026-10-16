@@ -25,6 +25,9 @@ const form = reactive({
   class_level: "",
   topic: "",
   learning_objectives: "",
+  introduction: "",
+  learning_guide: "",
+  learning_needs: "",
   estimated_time: "",
   status: "draft",
   thumbnail_url: "",
@@ -54,6 +57,9 @@ const loadDetail = async () => {
       class_level: res.class_level || "",
       topic: res.topic || "",
       learning_objectives: res.learning_objectives || "",
+      introduction: res.introduction || "",
+      learning_guide: res.learning_guide || "",
+      learning_needs: res.learning_needs || "",
       estimated_time: res.estimated_time || "",
       status: res.status || "draft",
       thumbnail_url: res.thumbnail_url || "",
@@ -209,6 +215,43 @@ onMounted(() => {
                 :class="inputClass"
                 placeholder="Tulis tujuan pembelajaran, pisahkan dengan baris baru..."
               ></textarea>
+            </div>
+
+            <!-- Pembuka & panduan belajar (opsional, tampil di awal halaman
+                 belajar siswa). Satu baris = satu poin. -->
+            <div class="pt-2 border-t border-dashed border-green-200 dark:border-green-900">
+              <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Opsional. Tampil sebagai kartu di awal halaman belajar siswa. Satu baris = satu paragraf/poin.
+              </p>
+              <div class="space-y-4">
+                <div>
+                  <label :class="labelClass">Pengantar</label>
+                  <textarea
+                    v-model="form.introduction"
+                    rows="3"
+                    :class="inputClass"
+                    placeholder="Kata pengantar: kenapa website ini dibuat + gambaran isi materi..."
+                  ></textarea>
+                </div>
+                <div>
+                  <label :class="labelClass">Petunjuk Pembelajaran</label>
+                  <textarea
+                    v-model="form.learning_guide"
+                    rows="3"
+                    :class="inputClass"
+                    placeholder="Petunjuk pakai website: cara pindah bagian, asesmen wajib, catatan, forum..."
+                  ></textarea>
+                </div>
+                <div>
+                  <label :class="labelClass">Kebutuhan Belajar</label>
+                  <textarea
+                    v-model="form.learning_needs"
+                    rows="3"
+                    :class="inputClass"
+                    placeholder="Apa yang diperlukan untuk belajar: buku, internet, prasyarat, waktu..."
+                  ></textarea>
+                </div>
+              </div>
             </div>
           </div>
         </div>

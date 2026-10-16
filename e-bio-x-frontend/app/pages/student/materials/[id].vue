@@ -15,6 +15,14 @@ const bookmarks = ref([]);
 const notes = ref([]);
 const quizzes = ref([]);
 const sidebarOpen = ref(false);
+// Kartu panduan belajar: pengantar selalu terbuka, petunjuk & kebutuhan bisa
+// dilipat supaya halaman tidak terlalu panjang saat dibuka pertama kali.
+const studyGuideOpen = ref(true);
+const learningNeedsOpen = ref(true);
+// Kata Pengantar global (satu teks untuk semua materi) dari pengaturan
+// aplikasi. Sama di setiap materi, jadi tidak disimpan per materi.
+const foreword = ref("");
+const forewordOpen = ref(true);
 const showCompletion = ref(false);
 const heartbeatTimer = ref(null);
 const viewedContentIds = ref(new Set());
@@ -372,6 +380,18 @@ watch(showCompletion, (v) => {
   if (v) loadNextAction();
 });
 
+const fetchForeword = async () => {
+  try {
+    const res = await $fetch(`${config.public.backend}/api/app-settings`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    foreword.value = (res && res.foreword) || "";
+  } catch (e) {
+    // Kata pengantar bersifat pelengkap; kalau gagal, halaman tetap jalan.
+    foreword.value = "";
+  }
+};
+
 const fetchDetail = async () => {
   loading.value = true;
   try {
@@ -560,6 +580,7 @@ const toggleBookmark = async () => {
 const refreshNotes = () => refetchLearningData(false);
 
 onMounted(async () => {
+  await fetchForeword();
   await fetchDetail();
   await pingSession();
   signalActivity("material_opened", activeSectionId.value);
@@ -623,6 +644,53 @@ definePageMeta({
       </div>
     </div>
 
+    <div
+      v-if="foreword"
+      class="mb-6 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/30 overflow-hidden"
+    >
+      <button
+        type="button"
+        class="w-full flex items-center justify-between gap-2 p-4 text-left"
+        @click="forewordOpen = !forewordOpen"
+      >
+        <span class="font-semibold text-sm text-purple-800 dark:text-purple-200 flex items-center gap-1">
+          <Icon name="material-symbols:auto-stories" class="w-4 h-4" />
+          Kata Pengantar
+        </span>
+        <Icon
+          name="material-symbols:expand-more"
+          class="w-5 h-5 text-purple-700 dark:text-purple-300 transition-transform"
+          :class="forewordOpen ? 'rotate-180' : ''"
+        />
+      </button>
+      <div v-show="forewordOpen" class="px-4 pb-4 space-y-1">
+        <p
+          v-for="(line, i) in foreword.split('\n').map((s) => s.trim()).filter(Boolean)"
+          :key="i"
+          class="text-sm text-purple-800 dark:text-purple-200"
+        >
+          {{ line }}
+        </p>
+      </div>
+    </div>
+
+    <div
+      v-if="material.introduction"
+      class="mb-6 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 p-4"
+    >
+      <p class="font-semibold text-sm text-indigo-800 dark:text-indigo-200 flex items-center gap-1">
+        <Icon name="material-symbols:menu-book" class="w-4 h-4" />
+        Pengantar
+      </p>
+      <p
+        v-for="(line, i) in (material.introduction || '').split('\n').map((s) => s.trim()).filter(Boolean)"
+        :key="i"
+        class="text-sm text-indigo-800 dark:text-indigo-200 mt-1"
+      >
+        {{ line }}
+      </p>
+    </div>
+
     <div v-if="material.learning_objectives" class="mb-6 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 p-4">
       <p class="font-semibold text-sm text-blue-800 dark:text-blue-200 flex items-center gap-1">
         <Icon name="material-symbols:flag" class="w-4 h-4" />
@@ -631,6 +699,70 @@ definePageMeta({
       <ul class="list-disc list-inside text-sm text-blue-800 dark:text-blue-200 mt-1 space-y-1">
         <li
           v-for="(line, i) in (material.learning_objectives || '').split('\n').filter(Boolean)"
+          :key="i"
+        >
+          {{ line }}
+        </li>
+      </ul>
+    </div>
+
+    <div
+      v-if="material.learning_guide"
+      class="mb-6 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 overflow-hidden"
+    >
+      <button
+        type="button"
+        class="w-full flex items-center justify-between gap-2 p-4 text-left"
+        @click="studyGuideOpen = !studyGuideOpen"
+      >
+        <span class="font-semibold text-sm text-amber-800 dark:text-amber-200 flex items-center gap-1">
+          <Icon name="material-symbols:list-alt-check" class="w-4 h-4" />
+          Petunjuk Pembelajaran
+        </span>
+        <Icon
+          name="material-symbols:expand-more"
+          class="w-5 h-5 text-amber-700 dark:text-amber-300 transition-transform"
+          :class="studyGuideOpen ? 'rotate-180' : ''"
+        />
+      </button>
+      <ul
+        v-show="studyGuideOpen"
+        class="list-disc list-inside text-sm text-amber-800 dark:text-amber-200 px-4 pb-4 space-y-1"
+      >
+        <li
+          v-for="(line, i) in (material.learning_guide || '').split('\n').map((s) => s.trim()).filter(Boolean)"
+          :key="i"
+        >
+          {{ line }}
+        </li>
+      </ul>
+    </div>
+
+    <div
+      v-if="material.learning_needs"
+      class="mb-6 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 overflow-hidden"
+    >
+      <button
+        type="button"
+        class="w-full flex items-center justify-between gap-2 p-4 text-left"
+        @click="learningNeedsOpen = !learningNeedsOpen"
+      >
+        <span class="font-semibold text-sm text-emerald-800 dark:text-emerald-200 flex items-center gap-1">
+          <Icon name="material-symbols:checklist" class="w-4 h-4" />
+          Kebutuhan Belajar
+        </span>
+        <Icon
+          name="material-symbols:expand-more"
+          class="w-5 h-5 text-emerald-700 dark:text-emerald-300 transition-transform"
+          :class="learningNeedsOpen ? 'rotate-180' : ''"
+        />
+      </button>
+      <ul
+        v-show="learningNeedsOpen"
+        class="list-disc list-inside text-sm text-emerald-800 dark:text-emerald-200 px-4 pb-4 space-y-1"
+      >
+        <li
+          v-for="(line, i) in (material.learning_needs || '').split('\n').map((s) => s.trim()).filter(Boolean)"
           :key="i"
         >
           {{ line }}

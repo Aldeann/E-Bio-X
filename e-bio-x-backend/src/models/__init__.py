@@ -34,3 +34,4 @@ from .recommendation import Recommendation
 from .quiz_explanation import QuizExplanation
 from .topic_knowledge import TopicKnowledge
 from .material_file_text import MaterialFileText
+from .app_setting import AppSetting

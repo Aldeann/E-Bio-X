@@ -100,6 +100,9 @@ def create_app():
         ping_session, log_material_event, post_video_progress,
         get_video_progress, get_content_track,
     )
+    from src.controllers.app_settings_controller import (
+        get_app_settings, update_app_settings,
+    )
     from src.controllers.progress_analytics_controller import (
         get_student_dashboard, get_student_progress_list, get_student_material_detail,
         get_student_section_mastery,
@@ -335,6 +338,8 @@ def create_app():
     app.add_url_rule('/api/student/forum/analytics', view_func=student_forum_analytics, methods=['GET'])
     app.add_url_rule('/api/forum/settings', view_func=get_forum_settings, methods=['GET'])
     app.add_url_rule('/api/forum/settings', view_func=update_forum_settings, methods=['PUT'])
+    app.add_url_rule('/api/app-settings', view_func=get_app_settings, methods=['GET'])
+    app.add_url_rule('/api/app-settings', view_func=update_app_settings, methods=['PUT'])
     app.add_url_rule('/api/forum/mentions/suggest', view_func=suggest_mentions, methods=['GET'])
     app.add_url_rule('/api/notifications', view_func=get_notifications, methods=['GET'])
     app.add_url_rule('/api/notifications/<notification_id>/read', view_func=mark_notification_read, methods=['PUT'])
