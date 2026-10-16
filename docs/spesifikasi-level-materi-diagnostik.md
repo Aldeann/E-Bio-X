@@ -324,9 +324,12 @@ soal demo yang ada ditandai ulang sebagai diagnostik (lihat di bawah).
   `docs/tools/verify_docx.py`.
 
 ### Data demo
-- Materi 107: bagian "MENGENAL VIRUS DALAM KEHIDUPAN" dan "SEJARAH, CIRI-CIRI, DAN
-  STRUKTUR VIRUS" masing-masing kini punya **3 soal diagnostik** (ditandai lewat
-  alur guru asli; pool latihan berkurang sesuai).
+- Materi 107 (per 16 Okt 2026): lima bagian berisi materi — "MENGENAL VIRUS DALAM
+  KEHIDUPAN", "SEJARAH, CIRI-CIRI, DAN STRUKTUR VIRUS", "BENTUK, PENGELOMPOKAN,
+  DAN REPLIKASI VIRUS", "PENYAKIT,PENULARAN,PENCEGAHAN", dan "MANFAAT VIRUS,
+  MUTASI, DAN PANDEMI" — masing-masing punya **10 soal diagnostik** (lihat §18).
+- Bagian "Bahan Ajar Pembelajaran" sengaja tidak diberi soal: isinya hanya penutup
+  tanpa fakta biologi, jadi tidak digerbang.
 - Karena belum ada ≥ 20 siswa yang mengerjakan, level terukur material demo masih
   jujur menampilkan `INSUFFICIENT_DATA` ("Belum cukup data"), bukan label karangan.
 
@@ -346,7 +349,7 @@ Perilaku UI:
   — lewat tombol **"Berikutnya"/"Sebelumnya"**, daftar bagian di **sidebar**,
   atau tombol **"Selesai!"** — muncul modal pemberitahuan
   `app/components/student/DiagnosticGateModal.vue` yang menampilkan progres
-  (mis. "Progres bagian ini: 1 dari 3 soal terjawab").
+  (mis. "Progres bagian ini: 3 dari 10 soal terjawab").
 - Modal **tidak punya opsi "lewati"**. Jalan keluar hanya:
   1. **"Kerjakan Asesmen Diagnostik"** → membuka modal asesmen bagian itu; atau
   2. **"Tutup"** → **membatalkan perpindahan** (siswa tetap di bagian ini).
@@ -369,10 +372,9 @@ Bukti:
 - `test_student_practice.py` blok `[15]` (**+8 check**): `required`/`answered`
   naik sesuai jawaban diagnostik; jawaban latihan tidak menambah hitungan
   diagnostik; bagian tanpa diagnostik `required = 0`. Suite menjadi **103/103**.
-- Verifikasi data nyata (Materi 107, siswa 72, baca-saja): bagian
-  "MENGENAL VIRUS DALAM KEHIDUPAN" dan "SEJARAH, CIRI-CIRI, DAN STRUKTUR VIRUS"
-  → `required=3, answered=0` (**gerbang aktif**); bagian 63/64/65/66 →
-  `required=0` (tidak digerbang).
+- Verifikasi data nyata (Materi 107, siswa 72, baca-saja): bagian 48, 50, 63, 64,
+  dan 65 → `required=10, answered=0` (**gerbang aktif**); bagian 66 →
+  `required=0` (tidak digerbang, karena tidak punya soal diagnostik).
 
 Keterbatasan jujur:
 - Gerbang ini di sisi **UI**. Backend tetap menerima kiriman jawaban apa pun.
@@ -381,6 +383,33 @@ Keterbatasan jujur:
   memeriksa **perpindahan dari dalam halaman**. Penegakan server-side (bagian
   "terkunci") atau penjagaan saat memuat `?section=` belum dibuat.
 - Hanya bagian yang sudah punya soal diagnostik yang bisa digerbang; di Materi
-  107 saat ini baru bagian 48 dan 50. Bagian 63/64/65 perlu ditambahi soal
-  diagnostik lebih dulu bila ingin ikut digerbang.
+  107 saat ini bagian 48, 50, 63, 64, dan 65 (masing-masing 10 soal). Bagian
+  "Bahan Ajar Pembelajaran" (66) sengaja dibiarkan tanpa soal dan tanpa gerbang.
+
+---
+
+## 18. Bank diagnostik Materi 107 diperluas (16 Okt 2026)
+
+Permintaan: 10 soal asesmen diagnostik di setiap bagian Materi 107 "[DEMO] VIRUS"
+(guru 71), **berbeda** dari soal yang sudah ada di bank.
+
+- **50 soal baru** dibuat memakai **AI yang dikonfigurasi aplikasi**
+  (`AI_BASE_URL`/`AI_API_KEY`, model `gemini-3.6-flash`) — bukan ditulis manual —
+  lalu **divalidasi validator aplikasi** (`quiz_controller._validate_question_payload`):
+  tepat satu kunci, opsi tidak kosong/duplikat, dan bukan soal meta.
+- Tiap soal dicek berbeda dari **seluruh 122 soal** milik guru 71: **0 duplikat
+  persis, 0 near-duplikat** (kemiripan token Jaccard < 0,72).
+- Provenance AI dicatat jujur pada tiap baris: `source='ai'`, `generated_by='ai'`,
+  `model_name=<model terkonfigurasi>`, `prompt_version='diag-1'`.
+- Distribusi akhir **tepat 10 soal diagnostik** per bagian berisi materi
+  (48, 50, 63, 64, 65). Tiga soal diagnostik lama di bagian 48 dan 50
+  dinonaktifkan (`status='REJECTED'`) agar jumlahnya seragam.
+- Efek: `diagnostic_required` menjadi **10** untuk kelima bagian, sehingga gerbang
+  §17 aktif di semuanya. Bagian 66 tetap tanpa soal dan tanpa gerbang.
+- Regresi: `test_student_practice` 103/103, `test_material_level_diagnostic`
+  77/77, `test_section_mastery` 50/50, `test_section_recommendations` 63/63.
+
+Catatan jujur: soal disisipkan langsung sebagai `APPROVED` atas permintaan
+pengguna (tidak melewati antrian draf guru), jadi **tidak ada perubahan kode/repo** —
+datanya tersimpan di basis data, sama seperti penambahan soal sebelumnya.
 

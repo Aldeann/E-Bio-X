@@ -127,7 +127,7 @@ Sumber: `docs/spesifikasi-level-materi-diagnostik.md:13-26`.
 
 Gate berurutan (semua harus lolos): `no_questions` → `items` → `students`.
 Pesan jujur contoh: *"Baru 0 soal diagnostik yang terukur (perlu 3);
-6 soal lain belum dijawab cukup banyak siswa."* (`:309-315`).
+soal lainnya belum dijawab cukup banyak siswa."* (`:309-315`).
 
 ### 2.4 Yang penting untuk dosen
 
