@@ -402,10 +402,10 @@ Permintaan: 10 soal asesmen diagnostik di setiap bagian Materi 107 "[DEMO] VIRUS
 - Provenance AI dicatat jujur pada tiap baris: `source='ai'`, `generated_by='ai'`,
   `model_name=<model terkonfigurasi>`, `prompt_version='diag-1'`.
 - Distribusi akhir **tepat 10 soal diagnostik** per bagian berisi materi
-  (48, 50, 63, 64, 65). Tiga soal diagnostik lama di bagian 48 dinonaktifkan
-  (`status='REJECTED'`); tiga soal lama di bagian 50 dikembalikan ke pool
-  latihan (`purpose='practice'`, `status='APPROVED'`) sehingga pool latihan
-  bagian 50 bertambah 23 → 26.
+  (48, 50, 63, 64, 65). Enam soal diagnostik lama (3 di bagian 48, 3 di bagian
+  50) dikembalikan ke pool latihan (`purpose='practice'`, `status='APPROVED'`),
+  sehingga pool latihan bagian 48 bertambah 20 → 23 dan bagian 50 bertambah
+  23 → 26. **Tidak ada soal yang dibuang.**
 - Efek: `diagnostic_required` menjadi **10** untuk kelima bagian, sehingga gerbang
   §17 aktif di semuanya. Bagian 66 tetap tanpa soal dan tanpa gerbang.
 - Regresi: `test_student_practice` 103/103, `test_material_level_diagnostic`
