@@ -100,7 +100,7 @@ const menu = [
   { to: "/teacher/materials", icon: "material-symbols:menu-book", label: "Materi" },
   { to: "/teacher/quizzes", icon: "material-symbols:quiz", label: "Kuis" },
   { to: "/teacher/question-bank", icon: "material-symbols:database", label: "Bank Soal" },
-  { to: "/teacher/practice", icon: "material-symbols:fitness_center", label: "Latihan Bagian" },
+  { to: "/teacher/practice", icon: "material-symbols:fitness-center", label: "Latihan Bagian" },
   // Disembunyikan untuk demo (di luar cakupan proposal):
   // { to: "/teacher/difficulty", icon: "material-symbols:bar-chart", label: "Analisis Tingkat" },
   { to: "/teacher/forum", icon: "mdi:forum-outline", label: "Forum" },

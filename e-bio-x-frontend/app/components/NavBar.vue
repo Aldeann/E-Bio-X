@@ -226,7 +226,7 @@ const navLinks = computed(() => {
   links.push({ to: quizzesLink.value, icon: "material-symbols:quiz", label: "Kuis", desc: "Buat & pantau kuis" });
   if (role.value === "teacher") {
     links.push({ to: "/teacher/question-bank", icon: "material-symbols:database", label: "Bank Soal", desc: "Soal siap dipakai ulang" });
-    links.push({ to: "/teacher/practice", icon: "material-symbols:fitness_center", label: "Latihan Bagian", desc: "Soal latihan tiap bagian" });
+    links.push({ to: "/teacher/practice", icon: "material-symbols:fitness-center", label: "Latihan Bagian", desc: "Soal latihan tiap bagian" });
     links.push({ to: "/teacher/difficulty", icon: "material-symbols:bar-chart", label: "Analisis Tingkat", desc: "Kesulitan soal dari data siswa" });
   }
   links.push({ to: forumLink.value, icon: "mdi:forum-outline", label: "Forum", desc: "Diskusi kelas" });

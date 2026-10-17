@@ -181,7 +181,7 @@ const sections = [
   {
     id: "latihan",
     title: "Latihan per Bagian",
-    icon: "material-symbols:fitness_center",
+    icon: "material-symbols:fitness-center",
     desc: "Soal latihan untuk setiap bagian materi.",
     steps: [
       "Buka tab <b>Bagian</b> untuk melihat tiap materi & bagian beserta jumlah soal disetujui, diagnostik, menunggu review, dan ditolak.",

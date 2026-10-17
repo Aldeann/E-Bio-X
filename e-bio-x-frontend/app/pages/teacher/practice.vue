@@ -47,7 +47,7 @@
       <div v-if="loading" class="text-center py-10 text-gray-500">Memuat bagian materi...</div>
 
       <div v-else-if="groups.length === 0" class="text-center py-16 bg-white dark:bg-gray-900 border border-dashed border-gray-300 dark:border-gray-700 rounded-xl">
-        <Icon name="material-symbols:view_quilt" class="w-14 h-14 text-gray-300 mx-auto mb-3" />
+        <Icon name="material-symbols:view-quilt" class="w-14 h-14 text-gray-300 mx-auto mb-3" />
         <p class="text-gray-500">
           Belum ada bagian materi pada materi Anda. Tambahkan bagian dulu di halaman penyusun materi.
         </p>
