@@ -94,12 +94,14 @@ const menu = [
   { to: "/teacher", icon: "material-symbols:dashboard", label: "Dasbor" },
   { to: "/teacher/analytics", icon: "material-symbols:monitoring", label: "Analitik" },
   { to: "/teacher/analytics/ml", icon: "material-symbols:psychology", label: "ML Insights" },
-  { to: "/teacher/analytics/impact", icon: "material-symbols:ads-click", label: "Dampak Rekomendasi" },
+  // Disembunyikan untuk demo (di luar cakupan proposal):
+  // { to: "/teacher/analytics/impact", icon: "material-symbols:ads-click", label: "Dampak Rekomendasi" },
   { to: "/teacher/materials", icon: "material-symbols:menu-book", label: "Materi" },
   { to: "/teacher/quizzes", icon: "material-symbols:quiz", label: "Kuis" },
   { to: "/teacher/question-bank", icon: "material-symbols:database", label: "Bank Soal" },
   { to: "/teacher/practice", icon: "material-symbols:fitness_center", label: "Latihan Bagian" },
-  { to: "/teacher/difficulty", icon: "material-symbols:bar-chart", label: "Analisis Tingkat" },
+  // Disembunyikan untuk demo (di luar cakupan proposal):
+  // { to: "/teacher/difficulty", icon: "material-symbols:bar-chart", label: "Analisis Tingkat" },
   { to: "/teacher/forum", icon: "mdi:forum-outline", label: "Forum" },
   { to: "/teacher/quiz/explanations", icon: "material-symbols:lightbulb", label: "Pembahasan AI" },
 ];
