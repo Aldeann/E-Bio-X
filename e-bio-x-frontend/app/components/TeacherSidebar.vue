@@ -104,6 +104,7 @@ const menu = [
   // { to: "/teacher/difficulty", icon: "material-symbols:bar-chart", label: "Analisis Tingkat" },
   { to: "/teacher/forum", icon: "mdi:forum-outline", label: "Forum" },
   { to: "/teacher/quiz/explanations", icon: "material-symbols:lightbulb", label: "Pembahasan AI" },
+  { to: "/teacher/panduan", icon: "mdi:book-open-page-variant-outline", label: "Petunjuk Penggunaan" },
 ];
 
 const isActive = (to) => {
