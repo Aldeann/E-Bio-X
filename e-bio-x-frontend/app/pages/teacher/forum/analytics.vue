@@ -65,7 +65,7 @@
       <!-- per-forum table -->
       <section>
         <h2 class="font-semibold text-green-700 dark:text-green-300 mb-3 flex items-center gap-2">
-          <Icon name="mdi:table-outline" /> Detail per Forum
+          <Icon name="mdi:table" /> Detail per Forum
         </h2>
         <div class="bg-white dark:bg-gray-900 rounded-xl border dark:border-gray-700 overflow-hidden shadow-sm">
           <table class="w-full text-sm">

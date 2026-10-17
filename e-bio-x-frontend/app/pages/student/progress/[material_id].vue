@@ -155,7 +155,7 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
               <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
-                <Icon name="material-symbols:question-answer" class="w-5 h-5 text-green-600" />
+                <Icon name="material-symbols:forum" class="w-5 h-5 text-green-600" />
                 Soal Interaktif
               </h4>
               <div class="grid grid-cols-3 text-center gap-2">

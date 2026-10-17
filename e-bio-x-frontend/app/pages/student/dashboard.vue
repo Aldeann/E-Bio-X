@@ -716,7 +716,7 @@ const summaryCards = computed(() => {
     { label: "Kuis Dikerjakan", value: s.quizzes_taken ?? 0, icon: "material-symbols:quiz" },
     { label: "Rata-rata Kuis", value: s.quiz_avg ? s.quiz_avg + "%" : "0%", icon: "material-symbols:monitoring" },
     { label: "Waktu Belajar", value: formatSeconds(s.learning_seconds), icon: "material-symbols:schedule" },
-    { label: "Soal Interaktif", value: s.interactive_answered ?? 0, icon: "material-symbols:question-answer" },
+    { label: "Soal Interaktif", value: s.interactive_answered ?? 0, icon: "material-symbols:forum" },
     { label: "Akurasi Interaktif", value: s.interactive_accuracy ? s.interactive_accuracy + "%" : "0%", icon: "material-symbols:verified" },
     { label: "Materi Diikuti", value: s.materials_started ?? 0, icon: "material-symbols:menu-book" },
   ];

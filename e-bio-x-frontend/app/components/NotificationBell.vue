@@ -25,7 +25,7 @@
           <div v-for="i in 3" :key="i" class="h-10 bg-green-100 dark:bg-gray-700 rounded-lg animate-pulse"></div>
         </div>
         <div v-else-if="items.length === 0" class="p-6 text-center text-gray-400 text-sm">
-          <Icon name="material-symbols:notifications-off-outlined" class="text-3xl mx-auto mb-2 text-gray-300 dark:text-gray-600" />
+          <Icon name="material-symbols:notifications-off" class="text-3xl mx-auto mb-2 text-gray-300 dark:text-gray-600" />
           Belum ada notifikasi.
         </div>
         <button

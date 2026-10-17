@@ -21,7 +21,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <div v-if="myCourses.length === 0" class="col-span-full">
         <EmptyState
-          icon="mdi:class-variant"
+          icon="mdi:account-group"
           title="Belum ada kelas"
           description="Klik 'Buat Kelas Baru' untuk membuat kelas pertama."
         />

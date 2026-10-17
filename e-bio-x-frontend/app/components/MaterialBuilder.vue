@@ -786,7 +786,7 @@ onMounted(() => {
 
         <div class="mt-6">
           <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1 mb-3">
-            <Icon name="material-symbols:template" class="w-5 h-5 text-amber-500" />
+            <Icon name="material-symbols:view-module" class="w-5 h-5 text-amber-500" />
             Template
           </h4>
 
@@ -798,7 +798,7 @@ onMounted(() => {
                 :key="t.key"
                 class="flex items-center gap-2 p-2 rounded-lg border border-gray-200 dark:border-gray-700"
               >
-                <Icon name="material-symbols:template" class="w-5 h-5 text-amber-500 shrink-0" />
+                <Icon name="material-symbols:view-module" class="w-5 h-5 text-amber-500 shrink-0" />
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{{ t.name }}</p>
                   <p class="text-xs text-gray-400">{{ typeLabel(t.type) }}</p>
