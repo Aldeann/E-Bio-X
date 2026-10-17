@@ -214,6 +214,7 @@ const navLinks = computed(() => {
   if (!role.value) return [];
   const links = [];
   if (role.value === "student") {
+    links.push({ to: "/student/panduan", icon: "mdi:book-open-page-variant-outline", label: "Petunjuk Penggunaan", desc: "Panduan memakai E-Bio X" });
     links.push({ to: "/student/dashboard", icon: "material-symbols:dashboard", label: "Dashboard", desc: "Ringkasan belajar kamu" });
   }
   if (role.value === "teacher") {
