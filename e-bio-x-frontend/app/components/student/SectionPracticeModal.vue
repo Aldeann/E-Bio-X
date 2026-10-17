@@ -107,7 +107,7 @@
 
               <div class="space-y-2">
                 <button
-                  v-for="opt in current.options"
+                  v-for="opt in displayOptions"
                   :key="opt.order_index"
                   class="w-full text-left px-3 py-2.5 rounded-lg border text-sm transition disabled:cursor-default"
                   :class="optionClass(opt)"
@@ -314,6 +314,22 @@ const exitNow = computed(() => {
 });
 
 const current = computed(() => questions.value[index.value] || null);
+
+// Opsi yang ditampilkan = opsi soal dari respons pemuatan, digabung dengan
+// kunci jawaban + feedback dari respons penilaian. Kunci jawaban sengaja tidak
+// ikut saat soal dimuat (agar tidak bisa dibaca dari jaringan), jadi tanpa
+// penggabungan ini `opt.is_correct` selalu kosong: ikon opsi yang benar ikut
+// tampil sebagai silang dan feedback per-opsi tidak pernah muncul.
+const displayOptions = computed(() => {
+  const opts = current.value?.options || [];
+  if (!feedback.value) return opts;
+  const graded = Array.isArray(feedback.value.options) ? feedback.value.options : [];
+  if (graded.length) {
+    const byOrder = new Map(graded.map((o) => [o.order_index, o]));
+    return opts.map((o) => ({ ...o, ...(byOrder.get(o.order_index) || {}) }));
+  }
+  return opts.map((o) => ({ ...o, is_correct: o.order_index === feedback.value.correct_option }));
+});
 
 // Kunci kanonik dari backend -> label Indonesia yang dibaca siswa.
 const LABEL_ID = { easy: "mudah", medium: "sedang", hard: "sulit" };
