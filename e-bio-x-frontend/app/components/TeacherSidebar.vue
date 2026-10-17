@@ -91,6 +91,7 @@ const toggleSidebar = () => {
 };
 
 const menu = [
+  { to: "/teacher/panduan", icon: "mdi:book-open-page-variant-outline", label: "Petunjuk Penggunaan" },
   { to: "/teacher", icon: "material-symbols:dashboard", label: "Dasbor" },
   { to: "/teacher/analytics", icon: "material-symbols:monitoring", label: "Analitik" },
   { to: "/teacher/analytics/ml", icon: "material-symbols:psychology", label: "ML Insights" },
@@ -104,7 +105,6 @@ const menu = [
   // { to: "/teacher/difficulty", icon: "material-symbols:bar-chart", label: "Analisis Tingkat" },
   { to: "/teacher/forum", icon: "mdi:forum-outline", label: "Forum" },
   { to: "/teacher/quiz/explanations", icon: "material-symbols:lightbulb", label: "Pembahasan AI" },
-  { to: "/teacher/panduan", icon: "mdi:book-open-page-variant-outline", label: "Petunjuk Penggunaan" },
 ];
 
 const isActive = (to) => {
