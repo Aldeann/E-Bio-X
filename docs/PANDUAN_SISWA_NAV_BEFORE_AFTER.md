@@ -1,63 +1,109 @@
 # Panduan Penggunaan Siswa — Dokumentasi Perubahan Navigasi (Before / After)
 
-Dokumen ini mencatat penambahan menu **Petunjuk Penggunaan** pada navigasi siswa
-beserta bukti tampilan **sebelum (before)** dan **sesudah (after)**.
+Dokumen ini mencatat dua perubahan pada navigasi siswa, beserta bukti tampilan
+**sebelum (before)** dan **sesudah (after)**:
 
-> Catatan: siswa **tidak** memakai sidebar kiri seperti guru. Navigasi siswa berupa
-> **bar atas** (desktop) dan **drawer ☰** (layar sempit/mobile). Karena itu dokumentasi
-> before/after dibuat untuk kedua bentuk tersebut.
+1. Penambahan menu **Petunjuk Penggunaan** (sebelumnya).
+2. Perubahan navigasi dari **bar atas** menjadi **sidebar kiri vertikal** seperti milik guru (terbaru).
 
-## Ringkasan perubahan
+> **Status terkini:** siswa sekarang memakai **sidebar kiri** (`StudentSidebar.vue`),
+> sama seperti sidebar guru — brand, menu vertikal, ToggleDark, Akun, dan Logout.
+> Bar atas (NavBar) tidak lagi ditampilkan pada halaman-halaman siswa.
+
+## Ringkasan perubahan terakhir (bar atas → sidebar kiri)
 
 | Item | Sebelum | Sesudah |
 | --- | --- | --- |
-| Menu navigasi siswa (desktop) | Dashboard · Materi · Kuis · Forum | **Petunjuk Penggunaan** · Dashboard · Materi · Kuis · Forum |
-| Menu drawer (mobile) | E-Bio X · Dashboard · Materi · Kuis · Forum · Akun · Logout | E-Bio X · **Petunjuk Penggunaan** · Dashboard · Materi · Kuis · Forum · Akun · Logout |
-| Halaman baru | — | `/student/panduan` (Panduan Penggunaan Siswa) |
+| Bentuk navigasi siswa | Bar atas (horizontal) + drawer ☰ | **Sidebar kiri vertikal** (256px) |
+| Posisi menu di layar lebar | Di bar hijau atas | Di panel hijau kiri sepanjang layar |
+| Konten halaman | selebar layar (mulai x=0) | digeser ke kanan **256px** (`sm:ml-64`) |
+| Menu pertama | Petunjuk Penggunaan | **Petunjuk Penggunaan** (tetap paling atas) |
+| Bar atas | tampil | **dihilangkan** pada halaman siswa |
+| Layar sempit (< 640px) | tombol ☰ pembuka drawer | tombol ☰ pembuka **sidebar overlay** + tombol tutup ✕ |
 
-Menu **Petunjuk Penggunaan** diletakkan di **posisi pertama**, sebelum *Dashboard*.
+Urutan menu sidebar siswa (dari atas):
+
+`Petunjuk Penggunaan` → `Dasbor` → `Kelas Saya` → `Materi` → `Kuis` → `Riwayat Belajar` → `Forum`
+→ (footer) `ToggleDark` · `Akun` · `Logout`
 
 ## Berkas kode yang diubah
 
-- `e-bio-x-frontend/app/components/NavBar.vue` — menambahkan satu item `navLinks` untuk
-  peran `student` pada posisi pertama.
-- `e-bio-x-frontend/app/pages/student/panduan.vue` — halaman panduan siswa (12 bagian,
-  bergambar).
+**Perubahan terbaru (sidebar):**
 
-## Tampilan bar atas (desktop)
+- `e-bio-x-frontend/app/components/StudentSidebar.vue` — **baru**, sidebar siswa yang meniru
+  `TeacherSidebar.vue` (menu vertikal, tombol ☰ mobile, overlay, tombol ✕, footer akun/logout).
+- `e-bio-x-frontend/app/layouts/student.vue` — **baru**, layout yang me-mount `<StudentSidebar />`
+  dan menggeser konten dengan `sm:ml-64`.
+- 14 halaman `e-bio-x-frontend/app/pages/student/**` — ditambahkan `layout: "student"` di
+  `definePageMeta` agar memakai layout sidebar tersebut.
 
-**Before** — belum ada menu "Petunjuk Penggunaan":
+**Perubahan sebelumnya (menu panduan):**
 
-![Navigasi siswa sebelum](assets/panduan-siswa/before-nav-siswa-crop.png)
+- `e-bio-x-frontend/app/components/NavBar.vue` — item `navLinks` peran `student` posisi pertama
+  (kini hanya relevan untuk halaman ber-layout default, mis. `/account`).
+- `e-bio-x-frontend/app/pages/student/panduan.vue` — halaman panduan siswa (12 bagian, bergambar).
 
-**After** — menu "Petunjuk Penggunaan" muncul paling depan:
+## Perubahan terbaru: bar atas → sidebar kiri
 
-![Navigasi siswa sesudah](assets/panduan-siswa/after-nav-siswa-crop.png)
+**Before** — navigasi berupa bar atas dengan menu *Petunjuk Penggunaan* pertama:
 
-Tampilan bar atas beserta awal halaman (top):
+![Navigasi siswa sebelum (bar atas)](assets/panduan-siswa/after-nav-siswa-crop.png)
+
+**After** — sidebar kiri vertikal, menu *Petunjuk Penggunaan* tetap di posisi pertama:
+
+![Sidebar siswa sesudah (kiri)](assets/panduan-siswa/after-sidebar-crop.png)
+
+Tampilan halaman penuh (sidebar + konten tergeser 256px):
+
+![Halaman siswa dengan sidebar](assets/panduan-siswa/after-sidebar-top.png)
+
+## Layar sempit (mobile)
+
+**Before** — drawer ☰ dari bar atas:
+
+![Drawer siswa sebelum](assets/panduan-siswa/before-drawer-siswa.png)
+
+**After** — sidebar overlay terbuka lewat tombol ☰ (dengan tombol tutup ✕):
+
+![Sidebar siswa mobile terbuka](assets/panduan-siswa/after-drawer-siswa.png)
+
+Keadaan tertutup (hanya tombol ☰ di kiri atas):
+
+![Sidebar siswa mobile tertutup](assets/panduan-siswa/after-hamburger-siswa.png)
+
+## Perubahan sebelumnya: menu panduan di bar atas
+
+Tahap awal (sebelum sidebar), menu **Petunjuk Penggunaan** ditambahkan ke bar atas:
 
 | Before | After |
 | --- | --- |
 | ![Before top](assets/panduan-siswa/before-nav-siswa-top.png) | ![After top](assets/panduan-siswa/after-nav-siswa-top.png) |
 
-## Tampilan drawer (mobile)
-
-**Before** — teks menu: `E-Bio X · Dashboard · Materi · Kuis · Forum · Akun · Logout`
-
-![Drawer siswa sebelum](assets/panduan-siswa/before-drawer-siswa.png)
-
-**After** — teks menu: `E-Bio X · Petunjuk Penggunaan · Dashboard · Materi · Kuis · Forum · Akun · Logout`
-
-![Drawer siswa sesudah](assets/panduan-siswa/after-drawer-siswa.png)
+| Before (crop) | After (crop) |
+| --- | --- |
+| ![Before crop](assets/panduan-siswa/before-nav-siswa-crop.png) | ![After crop](assets/panduan-siswa/after-nav-siswa-crop.png) |
 
 ## Cara memverifikasi
 
 1. Masuk sebagai siswa (contoh: `murid1@ebiox.com`).
-2. Pada layar lebar: bar atas menampilkan **Petunjuk Penggunaan** sebagai menu pertama.
-3. Pada layar sempit: buka menu **☰**, item **Petunjuk Penggunaan** muncul paling atas.
-4. Klik menu tersebut → terbuka halaman `/student/panduan`.
+2. Layar lebar: **sidebar kiri 256px** tampil dengan brand *E-Bio X - Siswa*, menu pertama
+   **Petunjuk Penggunaan**, dan **tidak ada bar atas**.
+3. Klik **Petunjuk Penggunaan** → terbuka `/student/panduan`.
+4. Layar sempit: tombol ☰ di kiri atas membuka sidebar overlay; ✕ menutupnya.
+5. Semua 14 halaman `/student/**` memakai sidebar yang sama (dicek otomatis pada 4 halaman
+   representatif: dashboard, materials, panduan, quizzes — semua `sidebarExists: true`,
+   `topNavGone: true`, `contentMarginLeft: 256px`).
 
 ## Tangkapan layar panduan fitur
 
 Gambar panduan di aplikasi tersimpan di `e-bio-x-frontend/public/panduan-siswa/`
-(12 berkas, `01-login.png` … `12-akun.png`).
+(12 berkas, `01-login.png` … `12-akun.png`) — **diambil dari situs produksi**
+(`https://e-bio-x-nine.vercel.app`) setelah sidebar baru ter-deploy.
+
+Salinan berkas tersebut juga tersedia di `docs/screenshots/` dengan prefiks
+`panduan-siswa-01-login.png` … `panduan-siswa-12-akun.png`.
+
+Bukti navigasi (before/after) tersimpan di:
+
+- `docs/assets/panduan-siswa/` — dipakai oleh dokumen ini.
+- `docs/screenshots/navigasi-siswa-*.png` — salinan untuk lampiran.
