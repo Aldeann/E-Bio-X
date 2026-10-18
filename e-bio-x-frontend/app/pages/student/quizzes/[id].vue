@@ -98,6 +98,7 @@ const backToList = () => {
 load();
 
 definePageMeta({
+  layout: "student",
   middleware: "auth",
   role: "student",
 });

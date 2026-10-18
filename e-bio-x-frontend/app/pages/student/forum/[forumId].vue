@@ -5,7 +5,7 @@
 </template>
 
 <script setup>
-definePageMeta({ middleware: "auth", role: "student" });
+definePageMeta({ layout: "student", middleware: "auth", role: "student" });
 const route = useRoute();
 const forumId = route.params.forumId;
 </script>

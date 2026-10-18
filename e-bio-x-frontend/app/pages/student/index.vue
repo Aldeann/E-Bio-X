@@ -141,6 +141,7 @@ const outClass = async (code) => {
 await fetchCoursesData();
 
 definePageMeta({
+  layout: "student",
   middleware: "auth",
   role: "student",
 });

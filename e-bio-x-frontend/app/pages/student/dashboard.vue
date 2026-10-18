@@ -760,6 +760,7 @@ loadRecs();
 loadNextAction();
 
 definePageMeta({
+  layout: "student",
   middleware: "auth",
   role: "student",
 });

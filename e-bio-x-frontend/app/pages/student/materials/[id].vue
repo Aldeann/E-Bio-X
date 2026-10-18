@@ -593,6 +593,7 @@ onUnmounted(() => {
 });
 
 definePageMeta({
+  layout: "student",
   middleware: "auth",
   role: "student",
 });

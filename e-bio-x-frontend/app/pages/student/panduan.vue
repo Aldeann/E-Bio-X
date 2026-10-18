@@ -258,6 +258,7 @@ const onImgError = (e) => {
 };
 
 definePageMeta({
+  layout: "student",
   middleware: "auth",
   role: "student",
 });

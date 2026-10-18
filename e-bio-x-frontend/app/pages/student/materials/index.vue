@@ -102,6 +102,7 @@ const resetFilters = () => {
 onMounted(fetchData);
 
 definePageMeta({
+  layout: "student",
   middleware: "auth",
   role: "student",
 });
