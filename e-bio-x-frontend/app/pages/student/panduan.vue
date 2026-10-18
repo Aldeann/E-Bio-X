@@ -20,7 +20,8 @@
         Panduan ini menjelaskan semua menu pada navigasi siswa beserta cara memakainya.
         Alurnya: <b>Masuk</b> → <b>Kelas Saya</b> → <b>Dashboard</b> → <b>Materi</b> →
         <b>Belajar Materi</b> → <b>Latihan Adaptif</b> → <b>Asesmen Diagnostik</b> →
-        <b>Kuis</b> → <b>Riwayat Belajar</b> → <b>Forum</b> → <b>Akun</b>. Klik gambar untuk memperbesar.
+        <b>Kuis</b> → <b>Riwayat Belajar</b> → <b>Forum</b> → <b>Akun</b>. Semua gambar
+        ditampilkan penuh langsung di halaman, tidak perlu membukanya terlebih dahulu.
       </p>
     </div>
 
@@ -67,11 +68,11 @@
       <figure v-if="s.image" class="mt-4">
         <a :href="s.image" target="_blank" rel="noopener" :title="'Perbesar: ' + s.title">
           <img :src="s.image" :alt="'Tangkapan layar: ' + s.title" loading="lazy"
-            class="w-full h-64 sm:h-80 object-cover object-top rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition"
+            class="w-full h-auto rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition"
             @error="onImgError" />
         </a>
         <figcaption class="mt-1.5 text-[11px] text-gray-400 text-center">
-          Gambar {{ i + 1 }} — {{ s.title }} · klik untuk memperbesar
+          Gambar {{ i + 1 }} — {{ s.title }}
         </figcaption>
       </figure>
     </section>
