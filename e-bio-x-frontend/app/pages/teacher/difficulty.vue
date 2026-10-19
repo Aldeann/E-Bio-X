@@ -62,7 +62,7 @@
       </div>
 
       <div v-if="!data.items.length" class="text-center py-12 text-gray-500 text-sm">
-        Belum ada soal latihan atau soal interaktif pada materi Anda.
+        Belum ada soal latihan pada materi Anda.
       </div>
 
       <div v-else-if="!filtered.length" class="text-center py-12 text-gray-500 text-sm">
@@ -72,21 +72,15 @@
       <div v-else class="space-y-3">
         <div
           v-for="(it, idx) in filtered"
-          :key="it.kind + '-' + (it.question_id || (it.content_id + '-' + it.question_index)) + '-' + idx"
+          :key="it.question_id + '-' + idx"
           class="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900"
         >
           <div class="flex flex-wrap items-center gap-2 mb-2 text-xs">
-            <span
-              class="px-1.5 py-0.5 rounded font-medium"
-              :class="it.kind === 'bank'
-                ? 'bg-indigo-100 text-indigo-700'
-                : 'bg-teal-100 text-teal-700'"
-            >
-              {{ it.kind === 'bank' ? 'Soal bank' : 'Soal interaktif' }}
+            <span class="px-1.5 py-0.5 rounded font-medium bg-indigo-100 text-indigo-700">
+              Soal bank
             </span>
             <span class="text-gray-500">{{ it.material_title }} · {{ it.section_title }}</span>
             <span
-              v-if="it.kind === 'bank'"
               class="px-1.5 py-0.5 rounded"
               :class="it.status === 'APPROVED'
                 ? 'bg-green-50 text-green-700'
@@ -94,11 +88,10 @@
             >{{ it.status }}</span>
           </div>
 
+          <!-- Tanpa fallback "(soal interaktif)": kanal itu sudah dihapus, jadi
+               teks soal selalu ada dan fallback hanya menutupi kesalahan data. -->
           <p class="text-sm text-gray-800 dark:text-gray-100 mb-3">
-            {{ it.question_text || '(soal interaktif)' }}
-            <span v-if="it.kind === 'interactive' && it.question_index != null" class="text-gray-400">
-              (bagian ke-{{ it.question_index + 1 }})
-            </span>
+            {{ it.question_text }}
           </p>
 
           <div class="grid sm:grid-cols-2 gap-2 text-xs">

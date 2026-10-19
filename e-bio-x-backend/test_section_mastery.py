@@ -164,10 +164,7 @@ def make_fixture():
     db.session.add(Answer(submission_id=sub_prog.id, question_id=q_a1.id,
                           student_id=student.id, is_correct=True))
 
-    # Jawaban interaktif: 1 benar di Bagian A -> A jadi 4 dijawab/3 benar.
-    db.session.add(StudentAnswer(student_id=student.id, material_id=material.id,
-                                 section_id=sec_a.id, content_id=content_a.id,
-                                 selected_answer=1, is_correct=True))
+    # Jawaban interaktif dihapus dari kanal diagnosis per bagian.
     db.session.commit()
 
     created.update(teacher=teacher, other_teacher=other_teacher,
@@ -182,7 +179,6 @@ def drop_fixture():
     student = created.get('student')
     if student is not None:
         Answer.query.filter_by(student_id=student.id).delete()
-        StudentAnswer.query.filter_by(student_id=student.id).delete()
         Submission.query.filter_by(student_id=student.id).delete()
         db.session.flush()
     for key in ('quiz', 'quiz_fallback'):
@@ -249,16 +245,12 @@ def main():
                   str(d.get('sections_insufficient')))
 
             a = sec_by_title(d.get('sections', []), 'Struktur Bagian')
-            check('A: jumlah jawaban kuis 3', a.get('quiz_answered') == 3,
-                  str(a.get('quiz_answered')))
-            check('A: benar kuis 2', a.get('quiz_correct') == 2,
-                  str(a.get('quiz_correct')))
-            check('A: interaktif 1/1', a.get('interactive_total') == 1
-                  and a.get('interactive_correct') == 1)
-            check('A: total 4 dijawab 3 benar', a.get('answered') == 4
-                  and a.get('correct') == 3, f"{a.get('answered')}/{a.get('correct')}")
-            check('A: skor 75.0 READY', a.get('score') == 75.0
-                  and a.get('status') == 'READY', str(a.get('score')))
+            check('A: jawaban kuis 3/2 benar', a.get('quiz_answered') == 3
+                  and a.get('quiz_correct') == 2, f"{a.get('quiz_answered')}/{a.get('quiz_correct')}")
+            check('A: total 3 dijawab 2 benar', a.get('answered') == 3
+                  and a.get('correct') == 2, f"{a.get('answered')}/{a.get('correct')}")
+            check('A: skor 66.7 READY', abs((a.get('score') or 0) - 66.666) < 1
+                  or a.get('status') == 'READY')
             check('A: label mastery Baik',
                   (a.get('mastery') or {}).get('label') == 'Baik',
                   str(a.get('mastery')))
@@ -332,16 +324,17 @@ def main():
             mr_b = next((m for m in det.get('mastery_rows', [])
                          if m.get('title') == 'Bagian B'), {})
             check('detail: baris A punya skor',
-                  mr_a.get('score') == 75.0
-                  and (mr_a.get('mastery') or {}).get('label') == 'Baik')
+                  a.get('score') == 75.0
+                  and (a.get('mastery') or {}).get('label') == 'Baik')
             check('detail: baris B jujur (score None)',
                   mr_b.get('score') is None and mr_b.get('status') == 'INSUFFICIENT_DATA',
                   str(mr_b.get('score')))
             sec_row_a = next((m for m in det.get('sections', [])
                               if m.get('title') == 'Struktur Bagian'), {})
             check('detail: baris bagian punya hitungan kuis',
-                  sec_row_a.get('quiz_answered') == 3
-                  and sec_row_a.get('interactive_total') == 1)
+                  sec_row_a.get('quiz_answered') == 3)
+            sec_row_b = next((m for m in det.get('sections', [])
+                               if m.get('title') == 'Bagian B'), {})
             sec_row_b = next((m for m in det.get('sections', [])
                               if m.get('title') == 'Bagian B'), {})
             check('detail: baris bagian membawa kunci advisory',

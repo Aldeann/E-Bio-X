@@ -8,10 +8,15 @@ import os
 
 # --- Feature engineering (per-student aggregate) -------------
 # Order MUST never change between training and prediction.
+#
+# `interactive_accuracy` was removed in feature_version 1.1. Soal interaktif
+# adalah tipe yang FUNGSINYA ganda dengan latihan adaptif, dan sebelum
+# dihapus tercatat 0 jawaban dari seluruh siswa - jadi fitur ini selalu 0.0,
+# menekan 30% bobot label penguasaan tanpa pernah diisi siapa pun. Sumber
+# akurasi per tingkat (easy/medium/hard) ikut dipindah ke jawaban latihan.
 FEATURES = [
     'material_completion_rate',
     'section_completion_rate',
-    'interactive_accuracy',
     'quiz_average',
     'quiz_best_score',
     'easy_accuracy',
@@ -33,7 +38,6 @@ FEATURES = [
 KMEANS_FEATURES = [
     'material_completion_rate',
     'learning_minutes',
-    'interactive_accuracy',
     'quiz_average',
     'quiz_best_score',
     'easy_accuracy',
@@ -54,14 +58,18 @@ ID_COLUMN = 'student_id'
 #
 # The fix keeps the rule-based definition of "mastery" (it is the
 # product requirement, not something ML should invent) and removes
-# those three columns from the model's INPUT. The tree must then find
+# those columns from the model's INPUT. The tree must then find
 # INDEPENDENT evidence for the same judgement - from quiz_best_score,
 # section_completion_rate, difficulty accuracies, forum activity and
 # so on. The accuracy that results is finally a real number.
+#
+# feature_version 1.1: daftarnya tinggal dua, sejak `interactive_accuracy`
+# dihapus dari BASELINE_WEIGHTS. Jumlah kolom LABEL_DEFINING_FEATURES tidak
+# boleh dihitung dari panjang daftar ini - baca BASELINE_WEIGHTS langsung
+# bila perlu, sebab bobotlah yang menentukan label, bukan daftar di sini.
 LABEL_DEFINING_FEATURES = (
     'quiz_average',
     'material_completion_rate',
-    'interactive_accuracy',
 )
 
 # What the Decision Tree actually sees. Kept derived from FEATURES so
@@ -89,14 +97,18 @@ MASTERY_UI = {
 
 # Baseline composite that produces a 0..100 mastery score used ONLY for
 # labelling. Weights are documented, not learned from ML.
+#
+# feature_version 1.1: `interactive_accuracy` (0.30) dihapus dan bobotnya
+# dibagi ulang ke dua sumber yang benar-benar terisi - kuis (nilai resmi)
+# dan progres baca. Total sengaja tetap 1.0 supaya ambang
+# MASTERY_TRUTH_ORDER di atas tidak berubah makna.
 BASELINE_WEIGHTS = {
-    'quiz_average': 0.40,
-    'material_completion_rate': 0.30,
-    'interactive_accuracy': 0.30,
+    'quiz_average': 0.55,
+    'material_completion_rate': 0.45,
 }
 
 # --- Data quality -------------------------------------------------
-MIN_SIGNALS_FOR_STUDENT = 3     # unique signals: answered q + quiz attempts + completed sections
+MIN_SIGNALS_FOR_STUDENT = 3     # unique signals: practice answers + quiz attempts + completed sections
 MIN_SAMPLES_DT = 15             # below this: cannot train Decision Tree -> INSUFFICIENT_DATA
 MIN_SAMPLES_CV = 20             # below this: cannot evaluate reliably -> metrics withheld
 SPLIT_TEST_SIZE = 0.25          # kept for backwards compatibility only
@@ -326,7 +338,15 @@ AUTO_RETRAIN_THRESHOLD = 50   # new activities since last training to trigger au
 _BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MODEL_DIR = os.path.join(_BACKEND_ROOT, 'models')
 
-DEFAULT_FEATURE_VERSION = '1.0'
+DEFAULT_FEATURE_VERSION = '1.1'
+
+# v1.1: `interactive_accuracy` dihapus dari FEATURES/KMEANS/RANKER dan
+# bobotnya dibagi ulang ke quiz_average (0.55) + material_completion_rate
+# (0.45); easy/medium/hard_accuracy kini bersumber dari jawaban latihan
+# (practice_answers), bukan StudentAnswer. Artefak v1.0 tetap AMAN dimuat:
+# predict_row memakai feature_order yang tersimpan di artefak, dan kolom yang
+# hilang dibaca 0.0 - persis nilai yang selama ini mereka lihat, karena
+# jawaban soal interaktif memang nol.
 
 # How many past versions to keep per (model_type, teacher_id).
 #
@@ -346,7 +366,6 @@ KEEP_VERSIONS_PER_SCOPE = 5
 # (the same leakage guard as decision_tree's LABEL_DEFINING_FEATURES).
 RANKER_FEATURES = [
     'quiz_average',          # student ability (student-level)
-    'interactive_accuracy',  # student ability
     'correct_rate',          # student ability
     'learning_minutes',      # student effort
     'item_difficulty',       # material attribute (0/1/2)

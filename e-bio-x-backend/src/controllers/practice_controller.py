@@ -27,10 +27,8 @@ from datetime import datetime
 from src.config.database import db
 from src.models.material import Material
 from src.models.material_section import MaterialSection
-from src.models.material_content import MaterialContent
 from src.models.question_bank import QuestionBank
 from src.models.question_bank_option import QuestionBankOption
-from src.models.student_answer import StudentAnswer
 from src.services import practice_bank_service as practice
 from src.services import student_practice_service as spractice
 from src.services import question_difficulty_service as qds
@@ -608,9 +606,10 @@ def get_teacher_difficulty_observed():
     dipakai. Soal dengan n < MIN_DIFFICULTY_SAMPLE berstatus
     INSUFFICIENT_DATA: tidak ada label yang diklaim.
 
-    Dua jenis soal yang dianalisis: soal bank (question_bank) dan soal
-    interaktif (student_answers per content + question_index). Keduanya
-    diukur dari data yang benar-benar ada, bukan dari teks soalnya.
+    Jenis soal yang dianalisis: soal bank (question_bank). Sumber kedua yang
+    dulu ada, "soal interaktif" (student_answers per content + question_index),
+    sudah dihapus bersama kanalnya. Semua label diukur dari data yang
+    benar-benar ada, bukan dari teks soalnya.
     """
     user = _cur_user()
     if not _is_teacher(user):
@@ -673,49 +672,17 @@ def get_teacher_difficulty_observed():
             'observed_note': qds.observed_note(obs),
         })
 
-    # --- 2. soal interaktif (student_answers per content + question_index) ---
-    ia_rows = StudentAnswer.query.filter(
-        StudentAnswer.section_id.in_(section_ids)).all()
-    if ia_rows:
-        ia_observed = qds.interactive_batch(ia_rows)
-        content_ids = {r.content_id for r in ia_rows}
-        contents = {c.id: c for c in MaterialContent.query.filter(
-            MaterialContent.id.in_(content_ids)).all()}
-        counts_by_slot = {}
-        for r in ia_rows:
-            slot = qds.interactive_slot_key(r)
-            counts_by_slot.setdefault(slot, 0)
-            counts_by_slot[slot] += 1
-        for slot, obs in ia_observed.items():
-            section_id, content_id, q_index = slot
-            section = section_by_id.get(section_id)
-            material = material_by_id.get(section.material_id) if section else None
-            content = contents.get(content_id)
-            data = content.data if content and isinstance(content.data, dict) else {}
-            declared_canon = normalize_difficulty(data.get('difficulty'))
-            preview = (data.get('question') or data.get('text') or data.get('prompt')
-                       or (content.type if content else None) or '')
-            items.append({
-                'kind': 'interactive',
-                'content_id': content_id,
-                'question_index': q_index,
-                'status': 'ANSWERED',
-                'question_text': str(preview)[:200],
-                'section_id': section_id,
-                'section_title': section.title if section else None,
-                'material_id': material.id if material else None,
-                'material_title': material.title if material else None,
-                'declared_difficulty': (data.get('difficulty')
-                                        if isinstance(data, dict) else None),
-                'declared_label': difficulty_label(declared_canon) if declared_canon else '',
-                'observed': obs,
-                'observed_note': qds.observed_note(obs),
-                'answered_rows': counts_by_slot.get(slot, 0),
-            })
-
+    # --- 2. soal interaktif: DIHAPUS ----------------------------------------
+    # Kanal jawaban ini dihapus karena tidak pernah dijawab siapa pun (0 baris
+    # `student_answers` dari 123 siswa). Blok soalnya sendiri ikut dihapus dari
+    # materi, jadi tidak ada lagi butir yang bisa dilaporkan di sini. Menyisakan
+    # cabangnya hanya mempertahankan query mati yang tiap halaman dibaca guru.
+    #
+    # `kind` sekarang selalu 'bank'. Urutan sort pun disederhanakan agar tidak
+    # lagi mengandaikan ada dua jenis butir.
     items.sort(key=lambda it: (
         it.get('material_id') or 0, it.get('section_id') or 0,
-        0 if it['kind'] == 'bank' else 1, it.get('question_id') or 0))
+        it.get('question_id') or 0))
 
     ready = sum(1 for it in items if it['observed'].get('status') == 'READY')
     insufficient = len(items) - ready
@@ -727,7 +694,6 @@ def get_teacher_difficulty_observed():
             'observed_ready': ready,
             'observed_insufficient': insufficient,
             'bank': sum(1 for it in items if it['kind'] == 'bank'),
-            'interactive': sum(1 for it in items if it['kind'] == 'interactive'),
         },
         'rules': _difficulty_rules(),
     }), 200

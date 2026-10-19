@@ -27,18 +27,23 @@ DESCRIPTIONS = {
 def _composite(means):
     """Group performance score used ONLY to rank and name clusters.
 
-    These are the same three features that baseline_label() uses to build
-    the Decision Tree's training label (cfg.BASELINE_WEIGHTS). That is
-    deliberate for NAMING - a cluster really should be called
-    "High Achievement" according to the same yardstick the product uses
-    everywhere else.
+    These are the same features that baseline_label() uses to build the
+    Decision Tree's training label (cfg.BASELINE_WEIGHTS). That is deliberate
+    for NAMING - a cluster really should be called "High Achievement"
+    according to the same yardstick the product uses everywhere else.
+
+    feature_version 1.1: `interactive_accuracy` tidak lagi ikut, jadi dua
+    fitur tersisa. Sebelumnya ada tiga, tapi yang ketiga selalu 0.0 untuk
+    semua siswa - menurunkan komposit tiap cluster dengan cara yang tidak
+    berbeda antar cluster, sehingga ia tidak pernah membantu membedakan
+    mana "High Achievement" dan mana "Needs Support".
 
     It does mean a cluster name and a DT label are not independent
-    evidence about the same student: both trace back to these three
+    evidence about the same student: both trace back to these
     features. Anywhere the two are presented side by side, that
     correlation must be stated rather than read as corroboration.
     """
-    parts = [means.get(f, 0.0) for f in ('material_completion_rate', 'quiz_average', 'interactive_accuracy')]
+    parts = [means.get(f, 0.0) for f in ('material_completion_rate', 'quiz_average')]
     return float(sum(parts) / len(parts)) if parts else 0.0
 
 
@@ -97,11 +102,17 @@ def interpret_clusters(artifact):
 def _characteristics(means, label):
     comp_pct = round(_composite(means) * 100, 1)
     quiz_pct = round((means.get('quiz_average') or 0.0) * 100, 1)
-    acc_pct = round((means.get('interactive_accuracy') or 0.0) * 100, 1)
+    # Akurasi per tingkat, kini bersumber dari jawaban LATIHAN (fitur
+    # easy/medium/hard_accuracy). Dulu baris ini menampilkan akurasi soal
+    # interaktif yang selalu 0% untuk semua cluster, sehingga tidak pernah
+    # membedakan apa pun.
+    easy_pct = round((means.get('easy_accuracy') or 0.0) * 100, 1)
+    medium_pct = round((means.get('medium_accuracy') or 0.0) * 100, 1)
+    hard_pct = round((means.get('hard_accuracy') or 0.0) * 100, 1)
     learning_minutes = round(means.get('learning_minutes') or 0.0, 1)
     return [
         f'Penguasaan komposit: {comp_pct}%',
         f'Rata-rata kuis: {quiz_pct}%',
-        f'Akurasi soal: {acc_pct}%',
+        f'Akurasi latihan (mudah/sedang/sulit): {easy_pct}% / {medium_pct}% / {hard_pct}%',
         f'Waktu belajar: {learning_minutes} menit',
     ]

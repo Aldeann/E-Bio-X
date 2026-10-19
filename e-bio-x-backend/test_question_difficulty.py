@@ -13,7 +13,7 @@
 #
 #   INTEGRASI (app + DB nyata, fixture milik sendiri, dihapus lagi):
 #     - endpoint guru /api/teacher/practice/difficulty: 403 untuk siswa,
-#       200 untuk guru, dua sumber berdampingan (deklarasi vs terukur),
+#       200 untuk guru, hanya soal bank (kanal interaktif dihapus),
 #       soal ber-n<20 -> INSUFFICIENT_DATA (bukan 'sedang')
 #     - soal siswa menyertakan difficulty (terukur bila ada) + declared_difficulty
 #       + difficulty_basis; label guru tidak pernah ditimpa diam-diam
@@ -137,11 +137,8 @@ def run_unit_tests():
                              exclude_student_id=1, min_sample=2)[5]['status']
           == 'INSUFFICIENT_DATA')
 
-    print('\n[U6] interactive_slot_key + observed_note')
-    key = qds.interactive_slot_key(type('R', (), {
-        'section_id': 67, 'content_id': 209, 'question_index': 1})())
-    check('slot key = (section, content, question_index)', key == (67, 209, 1),
-          f'got {key}')
+    print('\n[U6] observed_note')
+    # interactive_slot_key dihapus: kanal soal interaktif sudah tidak ada.
 
     ready = qds.classify(63, 46)          # p=0.73, dekat batas
     note = qds.observed_note(ready)

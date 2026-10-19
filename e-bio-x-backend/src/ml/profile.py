@@ -17,11 +17,23 @@ from src.ml import cluster_interpreter
 
 
 def _readable_summary(row):
+    # `accuracy` dulu berisi akurasi soal interaktif, yang selalu 0 untuk
+    # semua siswa karena tipe soal itu tidak pernah dijawab siapa pun.
+    # Sekarang diambil dari akurasi per tingkat pada JAWABAN LATIHAN.
+    # Rata-ratanya sengaja dihitung HANYA dari tingkat yang benar-benar
+    # pernah dijawab: tingkat yang belum disentuh tidak boleh menarik
+    # angka ini ke 0, karena "belum mencoba" dan "mencoba lalu gagal"
+    # adalah dua keadaan yang berbeda.
+    level_pairs = (('easy_accuracy', 'easy_attempted'),
+                   ('medium_accuracy', 'medium_attempted'),
+                   ('hard_accuracy', 'hard_attempted'))
+    tried = [row.get(acc) for acc, cnt in level_pairs if (row.get(cnt) or 0) > 0]
+    accuracy = round((sum(tried) / len(tried)) * 100, 1) if tried else 0.0
     return {
         'progress_percent': round((row.get('material_completion_rate') or 0.0) * 100, 1),
         'quiz_average': round((row.get('quiz_average') or 0.0) * 100, 1),
         'quiz_best': round((row.get('quiz_best_score') or 0.0) * 100, 1),
-        'accuracy': round((row.get('interactive_accuracy') or 0.0) * 100, 1),
+        'accuracy': accuracy,
         'learning_minutes': round(row.get('learning_minutes') or 0.0, 1),
         'quiz_attempts': row.get('quiz_attempts') or 0,
         'correct_rate': round((row.get('correct_rate') or 0.0) * 100, 1),

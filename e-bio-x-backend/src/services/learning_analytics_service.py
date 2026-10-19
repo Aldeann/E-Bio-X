@@ -5,7 +5,6 @@ from src.models.material_section import MaterialSection
 from src.models.material_content import MaterialContent
 from src.models.material_progress import MaterialProgress
 from src.models.material_student_state import MaterialStudentState
-from src.models.student_answer import StudentAnswer
 from src.models.student_content_track import StudentContentTrack
 from src.models.video_progress import VideoProgress
 from src.models.learning_session import LearningSession
@@ -86,7 +85,6 @@ ALLOWED_EVENT_TYPES = {
     'video_paused',
     'video_completed',
     'pdf_opened',
-    'interactive_started',
     'question_answered',
     'quiz_started',
     'quiz_submitted',
@@ -329,16 +327,11 @@ def section_content_count(section_id):
     return MaterialContent.query.filter_by(section_id=section_id).count()
 
 
-def interactive_stats(student_id, material_id):
-    rows = StudentAnswer.query.filter_by(student_id=student_id, material_id=material_id).all()
-    total = len(rows)
-    correct = sum(1 for r in rows if r.is_correct)
-    return {
-        'interactive_total': total,
-        'interactive_correct': correct,
-        'interactive_accuracy': round(correct / total * 100, 1) if total else 0.0,
-        'difficulty_accuracy': _difficulty_accuracy_material(student_id, material_id),
-    }
+# `interactive_stats` DIHAPUS. Fungsinya melaporkan akurasi jawaban
+# `student_answers` per materi; kanal jawaban itu sudah dilepas bersama blok
+# soalnya karena tidak pernah dijawab siapa pun. Semua pemanggilnya
+# (recommendation, progress_analytics_controller, build_student_features) sudah
+# dipindahkan ke sumber yang benar-benar terisi: kuis dan latihan.
 
 
 # ============================================================
@@ -346,14 +339,15 @@ def interactive_stats(student_id, material_id):
 # ============================================================
 #
 # "Bagian" = MaterialSection. Jawaban salah harus bisa ditelusuri per
-# bagian, bukan hanya per materi. Diagnosis di bawah menggabungkan tiga
+# bagian, bukan hanya per materi. Diagnosis di bawah menggabungkan DUA
 # sumber jawaban yang benar-benar tercatat bagiannya:
 #   1. jawaban kuis (Answer) yang SOAL-nya bertag `Question.section_id`
-#      (atau soal tanpa tag pada kuis yang section_id-nya eksplisit),
-#   2. jawaban soal interaktif (StudentAnswer.section_id), dan
-#   3. jawaban latihan (PracticeAnswer.section_id), satu baris per soal
+#      (atau soal tanpa tag pada kuis yang section_id-nya eksplisit), dan
+#   2. jawaban latihan (PracticeAnswer.section_id), satu baris per soal
 #      memakai jawaban TERAKHIR (lihat student_practice_service).
-# Ketiganya melaporkan ANGKA MEREKA SENDIRI di baris yang sama, jadi gabungan
+# Sumber ketiga, "soal interaktif" (StudentAnswer), DIHAPUS: kanal itu tidak
+# pernah dijawab siapa pun dan blok soalnya sudah dilepas dari materi.
+# Keduanya melaporkan ANGKA MEREKA SENDIRI di baris yang sama, jadi gabungan
 # tidak pernah menutupi asal-usulnya.
 # Bila jawaban sebuah bagian belum mencapai ambang minimum, skor TIDAK
 # dikarang: statusnya INSUFFICIENT_DATA dan hanya hitungan mentah yang
@@ -400,18 +394,10 @@ def _section_quiz_stats(student_id, material_id):
     return out
 
 
-def _section_interactive_stats(student_id, material_id):
-    """Hitungan jawaban soal interaktif per bagian untuk satu siswa."""
-    rows = db.session.query(
-        StudentAnswer.section_id,
-        func.count(StudentAnswer.id),
-        func.sum(case((StudentAnswer.is_correct.is_(True), 1), else_=0)),
-    ).filter(
-        StudentAnswer.student_id == student_id,
-        StudentAnswer.material_id == material_id,
-    ).group_by(StudentAnswer.section_id).all()
-    return {int(sid): {'answered': int(total or 0), 'correct': int(correct or 0)}
-            for sid, total, correct in rows}
+# `_section_interactive_stats` DIHAPUS. Fungsi itu menghitung jawaban
+# `student_answers` per bagian; kanalnya sudah dihapus karena tidak pernah
+# dijawab siapa pun. Skor bagian kini hanya dua sumber: kuis dan latihan
+# (lihat `score_sources` di `_section_rows_core`).
 
 
 def _section_practice_stats(material_id, student_ids):
@@ -508,32 +494,28 @@ def _section_rows_core(student_id, material_id):
     sections = MaterialSection.query.filter_by(
         material_id=material_id).order_by(MaterialSection.position).all()
     quiz_stats = _section_quiz_stats(student_id, material_id)
-    ia_stats = _section_interactive_stats(student_id, material_id)
     practice = _section_practice_stats(material_id, student_id)
     rows = []
     for sec in sections:
         q = quiz_stats.get(sec.id, {'answered': 0, 'correct': 0})
-        i = ia_stats.get(sec.id, {'answered': 0, 'correct': 0})
         p = practice.get(sec.id, {
             'answered': 0, 'correct': 0, 'attempts': 0})
-        answered = q['answered'] + i['answered'] + p['answered']
-        correct = q['correct'] + i['correct'] + p['correct']
+        answered = q['answered'] + p['answered']
+        correct = q['correct'] + p['correct']
         row = _section_mastery_row(sec, answered, correct)
         row['material_id'] = material_id
         row.update({
             'quiz_answered': q['answered'],
             'quiz_correct': q['correct'],
-            'interactive_total': i['answered'],
-            'interactive_correct': i['correct'],
             'practice_answered': p['answered'],
             'practice_correct': p['correct'],
             'practice_attempts': p['attempts'],
             # Sumber mana saja yang menyumbang angka di baris ini.
-            # Disajikan terbuka supaya gabungan tiga sumber tidak pernah
-            # dibaca sebagai satu sumber tunggal.
+            # Disajikan terbuka supaya gabungan sumber tidak pernah
+            # dibaca sebagai satu sumber tunggal. Kanal "interaktif" sudah
+            # dihapus (0 jawaban dari 123 siswa), jadi tinggal dua sumber.
             'score_sources': [name for name, count in (
                 ('kuis', q['answered']),
-                ('interaktif', i['answered']),
                 ('latihan', p['answered']),
             ) if count],
         })
@@ -718,21 +700,9 @@ def section_mastery_class(material_id, teacher_id, student_ids=None):
                 b['correct'] += 1
             b['students'].add(stid)
 
-        ia_rows = db.session.query(
-            StudentAnswer.section_id, StudentAnswer.student_id,
-            StudentAnswer.is_correct,
-        ).filter(
-            StudentAnswer.material_id == material_id,
-            StudentAnswer.student_id.in_(student_ids),
-        ).all()
-        for sid, stid, ok in ia_rows:
-            if sid is None:
-                continue
-            b = _bucket(sid)
-            b['answered'] += 1
-            if ok:
-                b['correct'] += 1
-            b['students'].add(stid)
+        # Catatan: blok jawaban "soal interaktif" (student_answers per bagian)
+        # DIHAPUS di sini. Kanal itu tidak pernah dijawab siapa pun, jadi ia
+        # hanya menambah query sekelas tanpa satu pun angka.
 
         # Latihan: satu baris per (siswa, soal) berisi jawaban terakhir, jadi
         # kelas yang mengerjakan ulang soal yang sama tidak menambah bukti.
@@ -790,7 +760,6 @@ def section_mastery_matrix(material_id, teacher_id, student_ids=None):
     def _cell(stid, sid):
         return cells.setdefault((int(stid), int(sid)), {
             'quiz_answered': 0, 'quiz_correct': 0,
-            'interactive_total': 0, 'interactive_correct': 0,
             'practice_answered': 0, 'practice_correct': 0,
         })
 
@@ -816,20 +785,8 @@ def section_mastery_matrix(material_id, teacher_id, student_ids=None):
         if ok:
             c['quiz_correct'] += 1
 
-    ia_rows = db.session.query(
-        StudentAnswer.section_id, StudentAnswer.student_id,
-        StudentAnswer.is_correct,
-    ).filter(
-        StudentAnswer.material_id == material_id,
-        StudentAnswer.student_id.in_(student_ids),
-    ).all()
-    for sid, stid, ok in ia_rows:
-        if sid is None:
-            continue
-        c = _cell(stid, sid)
-        c['interactive_total'] += 1
-        if ok:
-            c['interactive_correct'] += 1
+    # Blok "soal interaktif" (student_answers) DIHAPUS: kanalnya tidak pernah
+    # dijawab, jadi sel matriks kini hanya kuis + latihan.
 
     for sid, stid, _bqid, ok, _attempts in latest_attempts(material_id, student_ids):
         c = _cell(stid, sid)
@@ -856,10 +813,8 @@ def section_mastery_matrix(material_id, teacher_id, student_ids=None):
                     'score': None, 'mastery': None, 'sources': [],
                 }
                 continue
-            answered = (c['quiz_answered'] + c['interactive_total']
-                        + c['practice_answered'])
-            correct = (c['quiz_correct'] + c['interactive_correct']
-                       + c['practice_correct'])
+            answered = (c['quiz_answered'] + c['practice_answered'])
+            correct = (c['quiz_correct'] + c['practice_correct'])
             base = _section_mastery_row(sec, answered, correct)
             row_cells[str(sec.id)] = {
                 'answered': answered,
@@ -869,7 +824,6 @@ def section_mastery_matrix(material_id, teacher_id, student_ids=None):
                 'mastery': base['mastery'],
                 'sources': [name for name, count in (
                     ('kuis', c['quiz_answered']),
-                    ('interaktif', c['interactive_total']),
                     ('latihan', c['practice_answered']),
                 ) if count],
             }
@@ -910,61 +864,12 @@ def difficulty_label(canonical):
     return _DIFFICULTY_LABELS.get(canonical, canonical or '')
 
 
-def _difficulty_accuracy_material(student_id, material_id):
-    """Akurasi per tingkat dari TINGKAT TERUKUR, bukan label guru.
-
-    Tingkat tiap soal interaktif diukur dari performa SEMUA siswa yang
-    mengerjakannya (p-value), dengan jawaban siswa yang sedang dinilai
-    dikeluarkan dari hitungan (leave-one-out). Jawaban pada soal yang
-    belum cukup bukti (n < MIN_DIFFICULTY_SAMPLE) TIDAK masuk bucket
-    tingkat mana pun - dihitung terpisah di `unmeasured`.
-
-    Tidak ada lagi default 'medium' untuk konten tanpa label: angka ini
-    tidak pernah mengarang tingkat kesulitan.
-    """
-    mine = StudentAnswer.query.filter_by(
-        student_id=student_id, material_id=material_id).all()
-    if not mine:
-        return {}
-
-    from src.services import question_difficulty_service as qds
-    all_rows = StudentAnswer.query.filter(
-        StudentAnswer.material_id == material_id).all()
-    observed = qds.interactive_batch(all_rows, exclude_student_id=student_id)
-
-    buckets = {level: {'total': 0, 'correct': 0}
-               for level in ('easy', 'medium', 'hard')}
-    unmeasured = {'total': 0, 'correct': 0}
-    for r in mine:
-        obs = observed.get(qds.interactive_slot_key(r)) or {}
-        label = obs.get('label') if obs.get('status') == 'READY' else None
-        if label in buckets:
-            buckets[label]['total'] += 1
-            if r.is_correct:
-                buckets[label]['correct'] += 1
-        else:
-            unmeasured['total'] += 1
-            if r.is_correct:
-                unmeasured['correct'] += 1
-
-    result = {}
-    for level in ('easy', 'medium', 'hard'):
-        b = buckets[level]
-        if b['total']:
-            result[level] = {
-                'total': b['total'],
-                'correct': b['correct'],
-                'accuracy': round(b['correct'] / b['total'] * 100, 1),
-                'basis': 'terukur',
-            }
-    if unmeasured['total']:
-        result['unmeasured'] = {
-            'total': unmeasured['total'],
-            'correct': unmeasured['correct'],
-            'accuracy': round(unmeasured['correct'] / unmeasured['total'] * 100, 1),
-            'basis': 'belum-cukup-bukti',
-        }
-    return result
+# `_difficulty_accuracy_material` DIHAPUS. Fungsinya menghitung akurasi siswa
+# per tingkat HANYA dari jawaban `student_answers`, dan satu-satunya pemanggil
+# adalah `interactive_stats` di bawah (juga dihapus). Karena kanal interaktif
+# tidak pernah dijawab siapa pun, fungsinya selalu mengembalikan {} — angka per
+# tingkat yang berarti sudah ada di `_diagnose` (latihan) dan `difficulty_analytics`
+# (kuis), jadi tidak ada kemampuan yang hilang.
 
 
 def quiz_performance_for(student_id, quiz_ids=None):
@@ -1118,8 +1023,6 @@ def student_dashboard(student):
     learning_seconds = sum(r['learning_seconds'] for r in rows)
     quiz_rows = Submission.query.filter_by(student_id=student.id, status='submitted').all()
     quiz_scores = [r.percentage for r in quiz_rows if r.percentage is not None]
-    ia = StudentAnswer.query.filter_by(student_id=student.id).count()
-    iac = StudentAnswer.query.filter_by(student_id=student.id, is_correct=True).count()
     summary = {
         'materials_total': len(rows),
         'materials_started': len(started),
@@ -1130,9 +1033,8 @@ def student_dashboard(student):
         'quizzes_taken': len(quiz_rows),
         'quiz_avg': round(sum(quiz_scores) / len(quiz_scores), 1) if quiz_scores else 0.0,
         'quiz_best': round(max(quiz_scores), 1) if quiz_scores else 0.0,
-        'interactive_answered': ia,
-        'interactive_correct': iac,
-        'interactive_accuracy': round(iac / ia * 100, 1) if ia else 0.0,
+        # `interactive_answered/correct/accuracy` dihapus: kanalnya sudah tidak
+        # ada, jadi ketiganya selalu 0 dan hanya menampilkan keadaan kosong.
     }
     pending = [r for r in started if r['status'] in ('dimulai', 'sedang_belajar')]
     pending.sort(key=lambda r: (r['last_accessed'] or ''), reverse=True)
@@ -1249,8 +1151,7 @@ def _material_level_observed(material_id):
     """Pembungkus tipis: level materi diukur dari set diagnostik.
 
     Diimpor di dalam fungsi supaya modul analitik tidak menyeret service
-    kesulitan soal (dan model PracticeAnswer) ke saat import - pola yang sama
-    dipakai `_difficulty_accuracy_material` di atas.
+    kesulitan soal (dan model PracticeAnswer) ke saat import.
     """
     from src.services import question_difficulty_service as qds
     return qds.material_level_observed(material_id)
@@ -1316,14 +1217,8 @@ def material_analytics(material, teacher_id):
             'diagnostic_count': diag_total_map.get(sec.id, 0),
         })
 
-    interactive_rows = StudentAnswer.query.filter(StudentAnswer.material_id == material.id,
-                                                  StudentAnswer.student_id.in_(student_ids)).all()
-    interactive = {
-        'total': len(interactive_rows),
-        'students_active': len({r.student_id for r in interactive_rows}),
-        'correct': sum(1 for r in interactive_rows if r.is_correct),
-        'accuracy': round(sum(1 for r in interactive_rows if r.is_correct) / len(interactive_rows) * 100, 1) if interactive_rows else 0.0,
-    }
+    # Blok ringkasan `interactive` (student_answers per materi) DIHAPUS:
+    # kanalnya tidak pernah dijawab, jadi selalu {'total': 0, ...}.
 
     quizzes = material_quizzes(material.id)
     quiz_ids = [q.id for q in quizzes]
@@ -1373,7 +1268,6 @@ def material_analytics(material, teacher_id):
         'students_completed': sum(1 for p in per_student if p['completed']),
         'average_progress': avg_progress,
         'average_learning_seconds': round(sum(p['learning_seconds'] for p in per_student) / len(per_student), 1) if per_student else 0,
-        'interactive': interactive,
         'quiz': quiz_totals,
         'section_completion': section_completion,
         'section_mastery': section_mastery,
@@ -1398,30 +1292,13 @@ def difficulty_analytics(material_id, teacher_id, quiz_ids=None, student_ids=Non
     if student_ids is None:
         student_ids = teacher_student_ids(teacher_id)
     if not student_ids:
-        return {'interactive': {}, 'quiz': {}}
+        return {'quiz': {}}
 
-    ia = {}
-    unclassified = 0
-    rows = StudentAnswer.query.filter(StudentAnswer.material_id == material_id,
-                                      StudentAnswer.student_id.in_(student_ids)).all()
-    for r in rows:
-        content = MaterialContent.query.get(r.content_id)
-        diff = None
-        if content and isinstance(content.data, dict):
-            # Hanya field `difficulty` yang dihitung. `level` TIDAK dipakai:
-            # itu level heading HTML (1-6), bukan tingkat soal (bug lama).
-            diff = normalize_difficulty(content.data.get('difficulty'))
-        if not diff:
-            # Tanpa deklarasi tingkat, jangan mengarang 'medium'. Dihitung
-            # terpisah sebagai tak bertingkat, bukan dimasukkan ke bucket.
-            unclassified += 1
-            continue
-        bucket = ia.setdefault(diff, {'total': 0, 'correct': 0, 'accuracy': 0.0})
-        bucket['total'] += 1
-        if r.is_correct:
-            bucket['correct'] += 1
-    for b in ia.values():
-        b['accuracy'] = round(b['correct'] / b['total'] * 100, 1) if b['total'] else 0.0
+    # Bucket "interactive" DIHAPUS. Ia bahkan mustahil terisi: labelnya dibaca
+    # dari field `difficulty` pada data BLOK MATERI, padahal blok soal tidak
+    # pernah membawa field itu — semua jawaban akan jatuh ke `unclassified`.
+    # Ditambah kanal jawabannya sendiri sudah dihapus. Bucket kuis di bawah
+    # tetap apa adanya dan itu satu-satunya sumber angka per tingkat kesulitan.
 
     qd = {}
     unclassified_quiz = 0
@@ -1444,8 +1321,7 @@ def difficulty_analytics(material_id, teacher_id, quiz_ids=None, student_ids=Non
         for b in qd.values():
             b['accuracy'] = round(b['correct'] / b['answered'] * 100, 1) if b.get('answered') else 0.0
 
-    return {'interactive': ia, 'quiz': qd,
-            'unclassified_interactive': unclassified,
+    return {'quiz': qd,
             'unclassified_quiz': unclassified_quiz}
 
 
@@ -1550,10 +1426,6 @@ def teacher_students_table(teacher_id, filters=None, page=1, per_page=20):
         for s in subs:
             if s.percentage is not None:
                 q_scores.append(s.percentage)
-        ia_rows = StudentAnswer.query.filter(StudentAnswer.student_id == u.id,
-                                             StudentAnswer.material_id.in_(material_ids)).all()
-        ia_total = len(ia_rows)
-        ia_correct = sum(1 for r in ia_rows if r.is_correct)
         avg_pct = round(sum(pcts) / len(pcts), 1) if pcts else 0.0
         overall_mastery = round(sum(q_scores) / len(q_scores), 1) if q_scores else avg_pct
         sl = 'belum_dimulai'
@@ -1570,8 +1442,6 @@ def teacher_students_table(teacher_id, filters=None, page=1, per_page=20):
             'average_progress': avg_pct,
             'quiz_attempts': q_attempts,
             'quiz_avg': round(sum(q_scores) / len(q_scores), 1) if q_scores else 0.0,
-            'interactive_answered': ia_total,
-            'interactive_accuracy': round(ia_correct / ia_total * 100, 1) if ia_total else 0.0,
             'learning_seconds': learn_secs,
             'status_learning': sl,
             'mastery_score': overall_mastery,
@@ -1605,8 +1475,6 @@ def teacher_material_summaries(teacher_id, filters=None):
         states = MaterialStudentState.query.filter(MaterialStudentState.material_id == m.id,
                                                    (MaterialStudentState.student_id.in_(sids) if sids else db.true())).all()
         completed = sum(1 for st in states if st.completed)
-        ia = StudentAnswer.query.filter(StudentAnswer.material_id == m.id,
-                                        (StudentAnswer.student_id.in_(sids) if sids else db.true())).all()
         qids = [q.id for q in material_quizzes(m.id)]
         subs = []
         if qids:
@@ -1622,10 +1490,6 @@ def teacher_material_summaries(teacher_id, filters=None):
             'students_started': len(states),
             'students_completed': completed,
             'average_progress': avg_progress,
-            'interactive': {
-                'total': len(ia),
-                'accuracy': round(sum(1 for a in ia if a.is_correct) / len(ia) * 100, 1) if ia else 0.0,
-            },
             'quiz': {'attempts': len(subs)},
             'average_learning_seconds': round(sum((st.total_learning_seconds or 0) for st in states) / len(sids), 1) if sids else 0,
         })
@@ -1640,7 +1504,7 @@ def teacher_overview(teacher_id, filters=None):
         return {'materials': 0, 'students': 0, 'total_learning_seconds': 0,
                 'mastery_distribution': {'Baik Sekali': 0, 'Baik': 0, 'Cukup': 0, 'Kurang': 0},
                 'status_distribution': {'belum_dimulai': 0, 'dimulai': 0, 'sedang_belajar': 0, 'selesai': 0},
-                'average_progress': 0.0, 'interactive': 0, 'quiz_attempts': 0}
+                'average_progress': 0.0, 'quiz_attempts': 0}
     students = teacher_student_users(teacher_id)
     student_ids = [u.id for u in students]
     material_ids = [m.id for m in materials]
@@ -1663,11 +1527,6 @@ def teacher_overview(teacher_id, filters=None):
         sl = status_learning(pct, started, comp)
         status_dist[sl] = status_dist.get(sl, 0) + 1
 
-    ia_rows = StudentAnswer.query.filter(StudentAnswer.material_id.in_(material_ids)).all()
-    if student_ids:
-        ia_rows = [r for r in ia_rows if r.student_id in student_ids]
-    ia_correct = sum(1 for r in ia_rows if r.is_correct)
-
     quiz_ids = set(Quiz.query.filter(Quiz.material_id.in_(material_ids)).with_entities(Quiz.id).all())
     subs = Submission.query.filter(Submission.quiz_id.in_(quiz_ids) if quiz_ids else db.true()).all() if quiz_ids else []
     subs = [s for s in subs if s.status == 'submitted' and (s.student_id in student_ids or not student_ids)]
@@ -1689,9 +1548,6 @@ def teacher_overview(teacher_id, filters=None):
         'average_progress': round(sum(pcts) / len(pcts), 1) if pcts else 0.0,
         'total_learning_seconds': total_secs,
         'learning_hours': round(total_secs / 3600, 1),
-        'interactive_total': len(ia_rows),
-        'interactive_correct': ia_correct,
-        'interactive_accuracy': round(ia_correct / len(ia_rows) * 100, 1) if ia_rows else 0.0,
         'quiz_attempts': len(subs),
         'quiz_avg': round(sum(scores) / len(scores), 1) if scores else 0.0,
         'quiz_pass_rate': round(sum(1 for s in scores if s >= 75) / len(scores) * 100, 1) if scores else 0.0,
@@ -1754,7 +1610,6 @@ def teacher_topics(teacher_id, filters=None):
 
 FEATURE_FIELDS = [
     'student_id', 'material_id', 'progress_percentage', 'learning_seconds',
-    'interactive_answered', 'interactive_correct', 'interactive_accuracy',
     'content_viewed', 'content_total', 'view_ratio',
     'video_completion_avg', 'videos_completed',
     'quiz_attempts', 'quiz_average', 'quiz_best',
@@ -1772,7 +1627,6 @@ def build_student_features(student_id, material, state=None):
     if state is None:
         state = MaterialStudentState.query.filter_by(student_id=student_id, material_id=material.id).first()
     pct = progress_percentage(material.id, student_id)
-    ia = interactive_stats(student_id, material.id)
     viewed = StudentContentTrack.query.filter_by(student_id=student_id, material_id=material.id).count()
     total_content = content_count_of(material.id)
     vs = video_stats(student_id, material.id)
@@ -1785,9 +1639,6 @@ def build_student_features(student_id, material, state=None):
         'material_id': material.id,
         'progress_percentage': pct,
         'learning_seconds': state.total_learning_seconds if state else 0,
-        'interactive_answered': ia['interactive_total'],
-        'interactive_correct': ia['interactive_correct'],
-        'interactive_accuracy': ia['interactive_accuracy'],
         'content_viewed': viewed,
         'content_total': total_content,
         'view_ratio': round(viewed / total_content, 3) if total_content else 0.0,

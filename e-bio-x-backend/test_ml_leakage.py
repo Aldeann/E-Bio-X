@@ -35,7 +35,7 @@ def make_rows(n, seed=1):
             'student_id': i,
             'material_completion_rate': round(m, 4),
             'section_completion_rate': round(m * 0.9, 4),
-            'interactive_accuracy': round(ia, 4),
+
             'quiz_average': round(q, 4),
             'quiz_best_score': round(min(1.0, q + 0.12), 4),
             'easy_accuracy': round(min(1.0, ia + 0.10), 4),

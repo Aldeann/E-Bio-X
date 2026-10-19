@@ -88,7 +88,7 @@
                     {{ s.content_count }} konten · {{ s.content_viewed }}/{{ s.content_count }} dibuka
                   </p>
                   <p class="text-xs text-gray-400 mt-0.5">
-                    {{ s.quiz_answered || 0 }} jawaban kuis · {{ s.interactive_total || 0 }} soal interaktif
+                    {{ s.quiz_answered || 0 }} jawaban kuis
                     <template v-if="s.practice_answered">
                       · {{ s.practice_answered }} soal latihan
                     </template>
@@ -151,36 +151,38 @@
             </p>
           </div>
 
-          <!-- Interactive & video -->
+          <!-- Latihan & video -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
               <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
-                <Icon name="material-symbols:forum" class="w-5 h-5 text-green-600" />
-                Soal Interaktif
+                <Icon name="material-symbols:auto-awesome" class="w-5 h-5 text-green-600" />
+                Latihan Adaptif
               </h4>
+              <!-- Kartu ini dulu berjudul "Soal Interaktif" dan selalu menampilkan
+                   0 / 0 / 0%: tipe soal itu tidak pernah dijawab siapa pun dari
+                   123 siswa, jadi ia hanya memperlihatkan keadaan kosong. Angkanya
+                   kini dijumlahkan dari `section_mastery` pada payload yang sama,
+                   jadi tidak ada permintaan tambahan. -->
               <div class="grid grid-cols-3 text-center gap-2">
                 <div>
-                  <p class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ detail.interactive.interactive_total }}</p>
+                  <p class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ practiceTotals.answered }}</p>
                   <p class="text-xs text-gray-500">Dijawab</p>
                 </div>
                 <div>
-                  <p class="text-xl font-bold text-green-600">{{ detail.interactive.interactive_correct }}</p>
+                  <p class="text-xl font-bold text-green-600">{{ practiceTotals.correct }}</p>
                   <p class="text-xs text-gray-500">Benar</p>
                 </div>
                 <div>
-                  <p class="text-xl font-bold text-blue-600">{{ detail.interactive.interactive_accuracy }}%</p>
+                  <p class="text-xl font-bold text-blue-600">{{ practiceTotals.accuracy }}%</p>
                   <p class="text-xs text-gray-500">Akurasi</p>
                 </div>
               </div>
-              <div v-if="Object.keys(detail.interactive.difficulty_accuracy || {}).length" class="mt-3 space-y-1.5">
-                <div v-for="(v, k) in detail.interactive.difficulty_accuracy" :key="k" class="flex items-center gap-2 text-xs">
-                  <span class="w-14 capitalize text-gray-500">{{ k }}</span>
-                  <div class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div class="h-full bg-green-600 rounded-full" :style="{ width: v.accuracy + '%' }"></div>
-                  </div>
-                  <span class="font-semibold w-10 text-right">{{ v.accuracy }}%</span>
-                </div>
-              </div>
+              <p v-if="practiceTotals.answered === 0" class="text-xs text-gray-400 mt-3">
+                Belum ada latihan yang dijawab pada materi ini.
+              </p>
+              <p v-else class="text-[11px] text-gray-400 mt-3">
+                Dihitung dari seluruh latihan di bagian materi ini.
+              </p>
             </div>
             <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
               <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
@@ -308,6 +310,24 @@ const toast = useToast();
 
 const detail = ref(null);
 const loading = ref(true);
+
+// Jumlah latihan seluruh bagian pada materi ini, untuk kartu "Latihan
+// Adaptif". Semua sudah ada di `detail.section_mastery`, jadi tidak ada
+// permintaan tambahan ke server.
+const practiceTotals = computed(() => {
+  let answered = 0;
+  let correct = 0;
+  for (const s of detail.value?.section_mastery || []) {
+    answered += s.practice_answered || 0;
+    correct += s.practice_correct || 0;
+  }
+  return {
+    answered,
+    correct,
+    accuracy: answered ? Math.round((correct / answered) * 100) : 0,
+  };
+});
+
 const practiceOpen = ref(false);
 const practiceSection = ref(null);
 const diagnosticOpen = ref(false);
@@ -396,8 +416,8 @@ const activityLabel = (t) => {
     section_opened: "Membuka bagian", section_completed: "Menyelesaikan bagian",
     content_viewed: "Melihat konten", video_played: "Memutar video",
     video_paused: "Menjeda video", video_completed: "Video selesai ditonton",
-    pdf_opened: "Membuka PDF", interactive_started: "Mulai soal interaktif",
-    question_answered: "Menjawab soal interaktif", quiz_started: "Mulai kuis",
+    pdf_opened: "Membuka PDF",
+    question_answered: "Menjawab soal", quiz_started: "Mulai kuis",
     quiz_submitted: "Mengumpulkan kuis", material_completed: "Menyelesaikan materi",
     note_created: "Membuat catatan", bookmark_created: "Menandai bookmark",
   };

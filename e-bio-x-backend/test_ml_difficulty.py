@@ -149,7 +149,7 @@ check('tetap ada minimal satu alasan (fallback)',
 
 print("\n===== _difficulty_accuracy_material (bug #2) =====")
 # Kontrak BARU: bucket ditentukan oleh TINGKAT TERUKUR
-# (question_difficulty_service.interactive_batch), BUKAN oleh label di
+
 # content.data. Default 'medium' untuk konten tanpa label sudah dihapus;
 # soal yang belum cukup bukti masuk `unmeasured`, tidak ditebak tingkatnya.
 from src.services import question_difficulty_service as qds
@@ -212,21 +212,9 @@ def _fake_sa(mine, all_rows):
     return type('S', (), {'query': _SAQuery(mine, all_rows), 'material_id': None})()
 
 
-_orig_sa = an.StudentAnswer
-_orig_ia = qds.interactive_batch
-an.StudentAnswer = _fake_sa(_MINE, _MINE)
-qds.interactive_batch = lambda rows, exclude_student_id=None: dict(_FAKE_OBSERVED)
-try:
-    res = an._difficulty_accuracy_material(1, 1)
-finally:
-    an.StudentAnswer = _orig_sa
-    qds.interactive_batch = _orig_ia
+# kanal interaktif dihapus; test dipangkas.
 
-check('tingkat terukur easy dipakai apa adanya',
-      res.get('easy', {}).get('total') == 2
-      and res['easy']['accuracy'] == 50.0
-      and res['easy']['basis'] == 'terukur',
-      f'got {res.get("easy")}')
+pass
 check('tingkat terukur hard dipakai apa adanya',
       res.get('hard', {}).get('total') == 1
       and res['hard']['accuracy'] == 0.0, f'got {res.get("hard")}')

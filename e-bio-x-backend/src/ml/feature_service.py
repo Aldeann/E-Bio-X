@@ -7,13 +7,12 @@
 # Mapping DB field -> ML feature:
 #   MDone/materials                              -> material_completion_rate
 #   completed sections / total sections          -> section_completion_rate
-#   student_answers (correct/total)              -> interactive_accuracy
 #   submissions.percentage (mean)                -> quiz_average
 #   submissions.percentage (max)                 -> quiz_best_score
-#   student_answers by content difficulty        -> easy/medium/hard_accuracy
+#   practice_answers by effective difficulty     -> easy/medium/hard_accuracy
 #   learning_sessions / state total seconds      -> learning_minutes
 #   submissions count                            -> quiz_attempts
-#   (interactive + quiz) correct / answered      -> correct_rate
+#   quiz correct / answered                      -> correct_rate
 #   forum_posts (no parent)                      -> forum_posts_count
 #   forum_posts (with parent)                    -> forum_replies_count
 #   forum_questions (questioner)                 -> forum_questions_asked
@@ -21,11 +20,25 @@
 #   forum_reactions on student posts             -> forum_reactions_received
 #   quiz_explanations (viewable statuses)        -> ai_explanations_viewed
 #   quiz_explanations (feedback.helpful=true)    -> ai_explanations_helpful
+#
+# feature_version 1.1: dua perubahan sumber, keduanya karena soal interaktif
+# dihapus dari produk.
+#
+#   1. `interactive_accuracy` (dulu dari student_answers) DIHAPUS. Seluruh
+#      jawaban soal interaktif yang tercatat berjumlah nol, jadi fitur ini
+#      selalu 0.0 - bukan pengukur, melainkan pemangkas bobot label.
+#
+#   2. easy/medium/hard_accuracy kini dari `practice_answers`, bukan
+#      `student_answers`. Aturannya sengaja DIAMBIL PERSIS dari
+#      student_practice_service._diagnose (jawaban TERAKHIR per soal bank,
+#      tingkat terukur leave-one-out bila cukup bukti, selain itu deklarasi
+#      guru, tanpa soal yang mengarang tingkat) supaya tidak ada dua
+#      definisi "akurasi per tingkat" yang saling bertentangan.
 # ============================================================
 from src.models.material_section import MaterialSection
 from src.models.material_progress import MaterialProgress
 from src.models.material_student_state import MaterialStudentState
-from src.models.student_answer import StudentAnswer
+from src.models.practice_answer import PracticeAnswer
 from src.models.learning_activity import LearningActivity
 from src.models.submission import Submission
 from src.services import learning_analytics_service as analytics
@@ -43,15 +56,37 @@ def _started_material_ids(student):
     return ids
 
 
-def _aggregate_difficulty(student, started_materials):
-    by_diff = {}
-    for m in started_materials:
-        bucket = analytics._difficulty_accuracy_material(student.id, m.id)
-        for diff, b in bucket.items():
-            target = by_diff.setdefault(diff, {'total': 0, 'correct': 0})
-            target['total'] += b['total']
-            target['correct'] += b['correct']
-    return by_diff
+def _aggregate_difficulty(student):
+    """Akurasi siswa per tingkat kesulitan, seluruh materi, dari jawaban latihan.
+
+    Sumbernya bukan lagi `student_answers` (soal interaktif) - tipe itu dihapus
+    karena seluruh jawabannya berjumlah nol, sehingga fitur ini dulu selalu 0.0
+    untuk semua siswa. Sekarang bersumber dari `practice_answers`.
+
+    Aturannya DIAMBIL PERSIS dari student_practice_service._diagnose (jawaban
+    TERAKHIR per soal bank, tingkat terukur leave-one-out bila cukup bukti,
+    selain itu deklarasi guru) - bukan ditulis ulang - supaya tampilan siswa
+    dan fitur ML tidak pernah berbeda pendapat tentang tingkat mana yang lemah.
+
+    Cakupannya seluruh materi, persis seperti sebelumnya: tingkat kesulitan
+    tidak terikat topik, jadi "siswa lemah di soal sulit" berlaku umum.
+
+    BIAYA: leave-one-out menuntut seluruh jawaban SEMUA siswa atas soal-soal
+    itu, sehingga fungsi ini memindai `practice_answers` per pemanggilan -
+    persis seperti yang sudah dilakukan student_practice_service._diagnose di
+    endpoint sesi latihan. Sebelumnya fungsi ini membaca `student_answers`
+    yang isinya nol, jadi praktis gratis. Konsistensi metodologi dipilih di
+    atas kecepatan: menulis ulang aturannya hanya untuk memangkas biaya akan
+    menghasilkan dua definisi "akurasi per tingkat" yang bisa berbeda jawaban
+    untuk siswa yang sama. Bila latensi dashboard terasa, yang perlu ditambah
+    adalah cache hasil ukur per kumpulan soal, BUKAN versi aturan kedua.
+
+    Mengembalikan {level: {'total': n, 'correct': n}}.
+    """
+    from src.services import student_practice_service as sps
+    per_level, _basis, _notes, _counts = sps._diagnose(
+        student, {})
+    return per_level
 
 
 def aggregate_student_features(student):
@@ -67,9 +102,14 @@ def aggregate_student_features(student):
     # ---- signal count -------------------------------------------
     quiz_rows = Submission.query.filter_by(
         student_id=student.id, status='submitted').all()
-    interactive_rows = StudentAnswer.query.filter_by(student_id=student.id).all()
+    # Jawaban latihan kini dihitung sebagai sinyal. Dulu slot ini diisi
+    # jumlah jawaban soal interaktif yang selalu nol, jadi seorang siswa
+    # dengan puluhan jawaban latihan bisa gugur sebagai sampel ML hanya
+    # karena ia tidak pernah menyentuh tipe soal yang bahkan tidak pernah
+    # ditawarkan kepadanya.
+    practice_count = PracticeAnswer.query.filter_by(student_id=student.id).count()
     completed_sections = MaterialProgress.query.filter_by(student_id=student.id).count()
-    signals = len(interactive_rows) + len([s for s in quiz_rows if s.percentage is not None]) + completed_sections
+    signals = practice_count + len([s for s in quiz_rows if s.percentage is not None]) + completed_sections
     if signals < cfg.MIN_SIGNALS_FOR_STUDENT:
         return None
 
@@ -86,13 +126,10 @@ def aggregate_student_features(student):
         completed_sections_total += len(analytics.completed_section_ids(student.id, m.id) & sid_set)
     section_completion_rate = (completed_sections_total / total_sections) if total_sections else 0.0
 
-    # ---- interactive accuracy -----------------------------------
-    ia_total = len(interactive_rows)
-    ia_correct = sum(1 for r in interactive_rows if r.is_correct)
-    interactive_accuracy = (ia_correct / ia_total) if ia_total else 0.0
-
     # ---- difficulty accuracy -------------------------------------
-    diff = _aggregate_difficulty(student, started)
+    # Bersumber dari jawaban latihan; `started` tidak dipakai di sini karena
+    # cakupannya seluruh materi (tingkat kesulitan tidak terikat topik).
+    diff = _aggregate_difficulty(student)
 
     def diff_acc(level):
         b = diff.get(level)
@@ -118,10 +155,13 @@ def aggregate_student_features(student):
     learning_minutes = analytics.student_total_seconds(student.id) / 60.0
 
     # ---- overall correct rate ------------------------------------
+    # Kuis saja sekarang. Jawaban soal interaktif tidak lagi menjadi bagian
+    # dari kanal ini (tipe itu dihapus), dan angkanya memang selalu nol -
+    # jadi ini bukan perubahan nilai, hanya penghapusan sumber mati.
     quiz_correct = sum(r.correct_count or 0 for r in quiz_rows)
     quiz_wrong = sum(r.wrong_count or 0 for r in quiz_rows)
-    answered_total = ia_total + quiz_correct + quiz_wrong
-    answered_correct = ia_correct + quiz_correct
+    answered_total = quiz_correct + quiz_wrong
+    answered_correct = quiz_correct
     correct_rate = (answered_correct / answered_total) if answered_total else 0.0
 
     # ---- forum activity ------------------------------------------
@@ -156,7 +196,6 @@ def aggregate_student_features(student):
         cfg.ID_COLUMN: student.id,
         'material_completion_rate': round(material_completion_rate, 4),
         'section_completion_rate': round(section_completion_rate, 4),
-        'interactive_accuracy': round(interactive_accuracy, 4),
         'quiz_average': round(quiz_average, 4),
         'quiz_best_score': round(quiz_best_score, 4),
         'easy_accuracy': round(diff_acc('easy'), 4),

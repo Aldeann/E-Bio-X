@@ -126,7 +126,7 @@ print("===== FEATURE EXTRACTION =====")
 r = requests.post(f"{BASE}/api/analytics/features/{MATERIAL}", headers=auth(T["murid1@ebiox.com"]), timeout=10)
 check("features 200", r.status_code == 200, r.text[:200])
 f = r.json()["features"]
-for col in ["progress_percentage", "learning_seconds", "interactive_answered", "interactive_accuracy",
+for col in ["progress_percentage", "learning_seconds",
             "content_viewed", "content_total", "view_ratio", "video_completion_avg", "quiz_attempts",
             "quiz_average", "quiz_best", "mastery_score", "mastery_label", "status_learning",
             "days_since_first_access", "active_days", "activity_count"]:
@@ -148,12 +148,12 @@ check("options 200 + courses/materials", r.status_code == 200 and len(r.json()["
 
 r = requests.get(f"{BASE}/api/teacher/analytics/materials", headers=auth(T["guru1@ebiox.com"]), timeout=20)
 check("materials summary 200", r.status_code == 200 and isinstance(r.json(), list) and len(r.json()) >= 1, r.text[:120])
-check("materials summary fields", bool(r.json()) and "interactive" in r.json()[0] and "quiz" in r.json()[0])
+check("materials summary fields", bool(r.json()) and "quiz" in r.json()[0])
 
 r = requests.get(f"{BASE}/api/teacher/analytics/materials/{MATERIAL}", headers=auth(T["guru1@ebiox.com"]), timeout=20)
 check("material analytics 200", r.status_code == 200, r.text[:200])
 ma = r.json()
-for k in ["section_completion", "per_student", "interactive", "quiz", "mastery_distribution", "status_distribution", "difficulty"]:
+for k in ["section_completion", "per_student", "quiz", "mastery_distribution", "status_distribution", "difficulty"]:
     check(f"material analytics has {k}", k in ma)
 
 r = requests.get(f"{BASE}/api/teacher/analytics/students", headers=auth(T["guru1@ebiox.com"]), timeout=20)
@@ -185,7 +185,7 @@ r = requests.get(f"{BASE}/api/teacher/analytics/topics", headers=auth(T["guru1@e
 check("topics 200", r.status_code == 200 and isinstance(r.json(), list))
 
 r = requests.get(f"{BASE}/api/teacher/analytics/difficulty", headers=auth(T["guru1@ebiox.com"]), timeout=20)
-check("difficulty 200", r.status_code == 200 and "interactive" in r.json() and "quiz" in r.json())
+check("difficulty 200", r.status_code == 200 and "quiz" in r.json())
 
 print("===== TEACHER SECURITY =====")
 r = requests.get(f"{BASE}/api/teacher/analytics/materials/{MATERIAL}", headers=auth(T["guru2test@ebiox.com"]), timeout=15)

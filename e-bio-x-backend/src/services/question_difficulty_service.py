@@ -26,7 +26,6 @@ from datetime import datetime
 
 from src.ml import ml_config as cfg
 from src.models.practice_answer import PracticeAnswer
-from src.models.student_answer import StudentAnswer
 
 # Tingkat terukur -> kunci label Indonesia untuk tampilan.
 LABEL_TEXT = {'easy': 'mudah', 'medium': 'sedang', 'hard': 'sulit'}
@@ -97,18 +96,10 @@ def _empty(slot):
     }
 
 
-def interactive_slot_key(row):
-    """Kunci satu soal interaktif: (section_id, content_id, question_index)."""
-    return (
-        int(row.section_id) if row.section_id is not None else None,
-        int(row.content_id) if row.content_id is not None else None,
-        int(row.question_index) if row.question_index is not None else None,
-    )
-
-
 def _slot_of(row):
-    if hasattr(row, 'question_index'):
-        return interactive_slot_key(row)
+    """Kunci satu soal. Semua baris yang sampai ke sini adalah PracticeAnswer,
+    jadi kuncinya selalu id soal bank. Cabang `question_index` yang dulu ada di
+    sini melayani soal interaktif dan sudah dihapus bersama kanalnya."""
     return int(row.bank_question_id)
 
 
@@ -178,12 +169,6 @@ def observed_bank_batch(bank_ids, exclude_student_id=None):
     rows = PracticeAnswer.query.filter(
         PracticeAnswer.bank_question_id.in_(ids)).all()
     return aggregate_rows(rows, exclude_student_id=exclude_student_id)
-
-
-def interactive_batch(rows, exclude_student_id=None):
-    """Hasil terukur sekumpulan baris StudentAnswer yang sudah dimuat."""
-    return aggregate_rows(rows, exclude_student_id=exclude_student_id,
-                          key_fn=interactive_slot_key)
 
 
 # ------------------------------------------------------------

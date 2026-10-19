@@ -22,7 +22,7 @@ def make_row(i, base):
     return {'student_id': i,
             'material_completion_rate': round(base, 3),
             'section_completion_rate': round(base * 0.9, 3),
-            'interactive_accuracy': round(base, 3),
+            # 'interactive_accuracy' dihapus pada feature_version 1.1
             'quiz_average': round(base, 3),
             'quiz_best_score': round(min(1.0, base + 0.15), 3),
             'easy_accuracy': round(min(1.0, base + 0.10), 3),

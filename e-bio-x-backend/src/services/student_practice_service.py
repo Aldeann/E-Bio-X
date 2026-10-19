@@ -22,8 +22,6 @@ from datetime import datetime
 from src.config.database import db
 from src.models.question_bank import QuestionBank
 from src.models.practice_answer import PracticeAnswer
-from src.models.student_answer import StudentAnswer
-from src.models.material_content import MaterialContent
 from src.services import storage_service
 from src.services import question_difficulty_service as qds
 from src.ml import ml_config as cfg
@@ -381,12 +379,10 @@ def _effective_levels(approved, observed):
 
 
 def _diagnose(student, bank_effective_current, max_questions=400):
-    """Akurasi siswa per tingkat dari SELURUH riwayat jawabannya.
+    """Akurasi siswa per tingkat dari SELURUH riwayat jawaban latihannya.
 
-    Sumbernya dua hal yang benar-benar tercatat:
-
-    - jawaban latihan TERAKHIR per soal bank, dan
-    - jawaban TERAKHIR per slot soal interaktif,
+    Sumbernya satu hal yang benar-benar tercatat: jawaban latihan TERAKHIR per
+    soal bank.
 
     Tiap soal diberi tingkat terukur (leave-one-out) bila cukup data, selain
     itu deklarasi guru. Cakupannya seluruh materi, bukan hanya bagian ini -
@@ -394,6 +390,11 @@ def _diagnose(student, bank_effective_current, max_questions=400):
     akurasi per tingkat lintas materi untuk memilih sasaran belajar. Tingkat
     kesulitan tidak terikat topik, jadi "siswa lemah di soal sulit" berlaku
     umum; yang dibatasi tetap soalnya (hanya soal bagian ini yang disajikan).
+
+    Sumber kedua yang dulu ada di sini, "jawaban soal interaktif", DIHAPUS
+    bersama kanalnya (tidak pernah dijawab siapa pun) dan parameter
+    `include_interactive` ikut hilang: sekarang tidak ada lagi dua definisi
+    "akurasi per tingkat" yang perlu dijaga agar sama.
 
     `bank_effective_current` dipakai agar jawaban latihan pada bagian ini
     memakai label yang sama dengan yang dipakai menyusun sesi (tidak dihitung
@@ -404,7 +405,7 @@ def _diagnose(student, bank_effective_current, max_questions=400):
     from src.services.learning_analytics_service import normalize_difficulty
 
     per_level, basis_by_level, notes_by_level = {}, {}, {}
-    counts = {'practice': 0, 'interactive': 0}
+    counts = {'practice': 0}
     current_ids = set(bank_effective_current.keys())
 
     def record(level, basis, correct, note):
@@ -438,33 +439,9 @@ def _diagnose(student, bank_effective_current, max_questions=400):
             counts['practice'] += 1
             record(entry['label'], entry['basis'], ok, entry.get('note'))
 
-    # --- 2) soal interaktif: jawaban terakhir per slot, seluruh materi ---
-    ia_rows = StudentAnswer.query.filter_by(student_id=student.id).all()
-    if ia_rows:
-        latest_ia = {}
-        for r in sorted(ia_rows, key=lambda x: (x.answered_at or datetime.min, x.id or 0)):
-            latest_ia[qds.interactive_slot_key(r)] = bool(r.is_correct)
-        latest_ia = dict(list(latest_ia.items())[:max_questions])
-        content_ids = {slot[1] for slot in latest_ia if slot[1] is not None}
-        contents = {c.id: c for c in MaterialContent.query.filter(
-            MaterialContent.id.in_(content_ids)).all()} if content_ids else {}
-        observed_ia = {}
-        if content_ids:
-            all_rows = StudentAnswer.query.filter(
-                StudentAnswer.content_id.in_(content_ids)).all()
-            observed_ia = qds.interactive_batch(all_rows, exclude_student_id=student.id)
-        for slot, ok in latest_ia.items():
-            obs = observed_ia.get(slot)
-            if obs and obs.get('status') == 'READY' and obs.get('label'):
-                counts['interactive'] += 1
-                record(obs['label'], 'observed', ok, qds.observed_note(obs))
-                continue
-            content = contents.get(slot[1])
-            data = content.data if content and isinstance(content.data, dict) else {}
-            declared = normalize_difficulty(data.get('difficulty'))
-            if declared:
-                counts['interactive'] += 1
-                record(declared, 'declared', ok, None)
+    # Blok "soal interaktif" (jawaban terakhir per slot) DIHAPUS di sini:
+    # kanalnya tidak pernah dijawab siapa pun, jadi `counts['interactive']`
+    # selalu 0 dan tidak ada satu angka pun yang hilang.
 
     return per_level, basis_by_level, notes_by_level, counts
 
@@ -704,9 +681,8 @@ def session_for_section(material_id, section_id, student):
         }
 
     # --- basis: bagaimana sasaran itu terbentuk ---
-    answered_total = counts['practice'] + counts['interactive']
-    answered_txt = (f"{answered_total} jawabanmu ({counts['practice']} latihan + "
-                    f"{counts['interactive']} interaktif) di semua materi")
+    answered_total = counts['practice']
+    answered_txt = f"{answered_total} jawaban latihanmu di semua materi"
     if target is None:
         basis = 'sequential'
         if answered_total:
@@ -799,7 +775,6 @@ def session_for_section(material_id, section_id, student):
                             if target else None),
         'target_answered': (per_level[target]['total'] if target else 0),
         'answered_practice': counts['practice'],
-        'answered_interactive': counts['interactive'],
         'mix': mix,
         'total': total,
         'served': window_served,

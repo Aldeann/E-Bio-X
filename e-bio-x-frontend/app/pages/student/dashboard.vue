@@ -497,7 +497,9 @@ const clusterLabel = (label) => clusterLabelMap[label] || label;
 const featureLabelMap = {
   material_completion_rate: "Penyelesaian materi",
   section_completion_rate: "Penyelesaian bagian materi",
-  interactive_accuracy: "Akurasi soal interaktif",
+  // "interactive_accuracy" tidak lagi ada: fitur itu dihapus dari backend
+  // bersama tipe soal interaktifnya. Kunci mati di peta label hanya membiarkan
+  // fitur lama tampil sebagai kunci mentah, karena fallback-nya `f`.
   quiz_average: "Rata-rata kuis",
   quiz_best_score: "Nilai kuis terbaik",
   easy_accuracy: "Akurasi soal mudah",
@@ -519,7 +521,9 @@ const featureLabel = (f) => featureLabelMap[f] || f;
 const RATIO_FEATURES = new Set([
   "material_completion_rate",
   "section_completion_rate",
-  "interactive_accuracy",
+  // "interactive_accuracy" sengaja tidak ikut: kolomnya sudah tidak dikirim
+  // backend (feature_version 1.1). Kini easy/medium/hard_accuracy berasal dari
+  // jawaban latihan, bukan soal interaktif.
   "quiz_average",
   "quiz_best_score",
   "easy_accuracy",
@@ -716,8 +720,10 @@ const summaryCards = computed(() => {
     { label: "Kuis Dikerjakan", value: s.quizzes_taken ?? 0, icon: "material-symbols:quiz" },
     { label: "Rata-rata Kuis", value: s.quiz_avg ? s.quiz_avg + "%" : "0%", icon: "material-symbols:monitoring" },
     { label: "Waktu Belajar", value: formatSeconds(s.learning_seconds), icon: "material-symbols:schedule" },
-    { label: "Soal Interaktif", value: s.interactive_answered ?? 0, icon: "material-symbols:forum" },
-    { label: "Akurasi Interaktif", value: s.interactive_accuracy ? s.interactive_accuracy + "%" : "0%", icon: "material-symbols:verified" },
+    // Dua kartu "Soal Interaktif" dan "Akurasi Interaktif" dihapus: tipe soal
+    // itu sudah tidak ada di produk dan angkanya selalu 0, jadi ia hanya
+    // menampilkan keadaan kosong kepada siswa yang tidak bisa berbuat apa-apa
+    // atasnya.
     { label: "Materi Diikuti", value: s.materials_started ?? 0, icon: "material-symbols:menu-book" },
   ];
 });

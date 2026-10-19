@@ -109,7 +109,8 @@ const summaryCards = computed(() => {
     { label: "Waktu Belajar", value: minutesOf(s.learning_seconds) },
     { label: "Kuis Dikerjakan", value: s.quiz_attempts ?? 0 },
     { label: "Rata-rata Kuis", value: s.quiz_avg ? s.quiz_avg + "%" : "0%" },
-    { label: "Akurasi Interaktif", value: s.interactive_accuracy ? s.interactive_accuracy + "%" : "0%" },
+    // Kartu "Akurasi Interaktif" dihapus: kanal jawabannya sudah tidak ada,
+    // jadi angkanya selalu 0 dan hanya memperlihatkan keadaan kosong.
   ];
 });
 

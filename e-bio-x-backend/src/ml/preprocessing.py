@@ -23,9 +23,24 @@ def normalize_row(row):
 
 
 def normalize_subset(row, subset):
-    """Normalize for a feature subset (e.g. K-Means) keeping order stable."""
+    """Normalize for a feature subset (e.g. K-Means) keeping order stable.
+
+    Sebuah fitur yang tercatat di artefak LAMA tapi sudah tidak ada di
+    cfg.FEATURES saat ini dibaca sebagai 0.0, bukan membuat KeyError.
+    Artefak yang dilatih sebelum feature_version 1.1 masih membawa
+    `interactive_accuracy` di subset tersimpannya; kolom itu kini sudah tidak
+    ada di baris mana pun, dan nilainya memang 0.0 untuk semua siswa, jadi
+    0.0 mereproduksi persis apa yang selalu dilihat model itu. Ini sejalan
+    dengan decision_tree._vector yang sejak awal membaca fitur yang hilang
+    sebagai 0.0.
+
+    Tanpa pengaman ini, assign_cluster melempar KeyError pada artefak v1.0
+    dan meruntuhkan halaman profil siswa - kegagalan yang tidak terlihat
+    sampai deploy, dan bukan gejala "model perlu dilatih ulang" yang bisa
+    dimengerti pengguna.
+    """
     r = impute_row(row)
-    return [float(r[f]) for f in subset]
+    return [float(r.get(f, 0.0)) for f in subset]
 
 
 class Preprocessor:

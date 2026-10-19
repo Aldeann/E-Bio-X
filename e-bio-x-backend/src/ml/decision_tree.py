@@ -25,12 +25,17 @@ from src.ml import ml_config as cfg
 
 
 def baseline_mastery_score(row):
-    """Composite 0..1 mastery score used ONLY for baseline labelling."""
+    """Composite 0..1 mastery score used ONLY for baseline labelling.
+
+    feature_version 1.1: hanya dua sumber yang benar-benar terisi. `interactive_accuracy`
+    dulu ikut di sini dengan bobot 0.30 tapi selalu 0.0 untuk semua siswa, jadi ia bukan
+    pengukur melainkan pemangkas: setiap siswa kehilangan 30% skornya tanpa pernah
+    diberi kesempatan mengisinya.
+    """
     w = cfg.BASELINE_WEIGHTS
     quiz = row.get('quiz_average') or 0.0
     comp = row.get('material_completion_rate') or 0.0
-    acc = row.get('interactive_accuracy') or 0.0
-    return quiz * w['quiz_average'] + comp * w['material_completion_rate'] + acc * w['interactive_accuracy']
+    return quiz * w['quiz_average'] + comp * w['material_completion_rate']
 
 
 def baseline_label(row):

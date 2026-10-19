@@ -111,22 +111,12 @@
 
         <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
           <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-3">Kinerja per Tingkat Kesulitan</h4>
+          <!-- Bagian "Soal Interaktif" dihapus: bucketnya tak mungkin terisi.
+               Ia meminta field `difficulty` pada data BLOK MATERI, padahal blok
+               soal tidak pernah membawa field itu, dan jawabannya sendiri sudah
+               tidak ada sejak tipe soal dihapus. Slot "sedang" tetap ada di
+               bucket kuis/latihan berikutnya — hanya sumbernya yang berbeda. -->
           <div class="space-y-4">
-            <div>
-              <p class="text-xs font-semibold text-gray-500 mb-2">Soal Interaktif</p>
-              <div v-for="(v, k) in difficulty.interactive" :key="'i-' + k" class="flex items-center gap-3 mb-1.5">
-                <span class="w-16 text-sm text-gray-600 dark:text-gray-300">{{ diffLabel(k) }}</span>
-                <div class="flex-1 h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                  <div class="h-full rounded-full bg-amber-500" :style="{ width: (v.accuracy || 0) + '%' }"></div>
-                </div>
-                <span class="text-xs font-semibold w-10 text-right">{{ v.accuracy || 0 }}%</span>
-              </div>
-              <p v-if="Object.keys(difficulty.interactive || {}).length === 0" class="text-xs text-gray-400">Belum ada.</p>
-              <p v-if="difficulty.unclassified_interactive" class="text-[11px] text-gray-400 mt-1">
-                {{ difficulty.unclassified_interactive }} jawaban interaktif tanpa tingkat tidak dihitung —
-                tidak diberi tingkat "sedang" secara diam-diam.
-              </p>
-            </div>
             <div>
               <p class="text-xs font-semibold text-gray-500 mb-2">Kuis</p>
               <div v-for="(v, k) in difficulty.quiz" :key="'q-' + k" class="flex items-center gap-3 mb-1.5">
@@ -155,7 +145,6 @@
                 <th class="px-4 py-2">Fase/Topik</th>
                 <th class="px-4 py-2 text-right">Progres Rata-rata</th>
                 <th class="px-4 py-2 text-right">Siswa Selesai</th>
-                <th class="px-4 py-2 text-right">Akurasi Interaktif</th>
                 <th class="px-4 py-2 text-right">Kuis</th>
                 <th class="px-4 py-2 text-right">Waktu Rata-rata</th>
               </tr>
@@ -171,15 +160,14 @@
                 <td class="px-4 py-2.5 text-gray-500">{{ m.phase ? 'Fase ' + m.phase : '-' }} / {{ m.topic || '-' }}</td>
                 <td class="px-4 py-2.5 text-right font-semibold">{{ m.students_completed ? ((m.students_completed / m.total_students) * 100).toFixed(0) : 0 }}%</td>
                 <td class="px-4 py-2.5 text-right">{{ m.students_completed }}/{{ m.total_students }}</td>
-                <td class="px-4 py-2.5 text-right">{{ m.interactive.accuracy }}%</td>
                 <td class="px-4 py-2.5 text-right">{{ m.quiz.attempts }} percobaan</td>
                 <td class="px-4 py-2.5 text-right">{{ (m.average_learning_seconds / 60).toFixed(1) }} mnt</td>
               </tr>
               <tr v-if="materialSummary.length === 0">
-                <td colspan="7" class="px-4 py-10 text-center text-gray-500">Belum ada data materi.</td>
+                <td colspan="6" class="px-4 py-10 text-center text-gray-500">Belum ada data materi.</td>
               </tr>
               <tr v-if="materialDetail" class="bg-green-50/50 dark:bg-green-900/10">
-                <td colspan="7" class="p-4">
+                <td colspan="6" class="p-4">
                   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div>
                       <p class="text-xs font-semibold text-gray-500 mb-2">Penyelesaian Bagian</p>
@@ -246,7 +234,7 @@
                     <p class="text-xs font-semibold text-gray-500 mb-2">
                       Peta Penguasaan: Siswa × Bagian
                       <span class="font-normal text-gray-400">
-                        · skor per bagian dari kuis + interaktif + latihan · minimal {{ sectionMatrix.min_sample }} jawaban
+                        · skor per bagian dari kuis + latihan · minimal {{ sectionMatrix.min_sample }} jawaban
                       </span>
                     </p>
                     <p class="text-[11px] text-gray-400 mb-2">
@@ -318,7 +306,6 @@
                 <th class="px-4 py-2">Nama</th>
                 <th class="px-4 py-2 text-right">Progres</th>
                 <th class="px-4 py-2 text-right">Kuis</th>
-                <th class="px-4 py-2 text-right">Interaktif</th>
                 <th class="px-4 py-2 text-right">Waktu</th>
                 <th class="px-4 py-2">Status</th>
                 <th class="px-4 py-2 text-right">Penguasaan</th>
@@ -334,7 +321,6 @@
                 </td>
                 <td class="px-4 py-2.5 text-right font-semibold">{{ s.average_progress }}%</td>
                 <td class="px-4 py-2.5 text-right">{{ s.quiz_attempts }} ({{ s.quiz_avg }}%)</td>
-                <td class="px-4 py-2.5 text-right">{{ s.interactive_answered }} ({{ s.interactive_accuracy }}%)</td>
                 <td class="px-4 py-2.5 text-right">{{ minutesOf(s.learning_seconds) }}</td>
                 <td class="px-4 py-2.5">
                   <span class="text-xs px-2 py-1 rounded-full font-medium" :class="statusClass(s.status_learning)">{{ statusLabel(s.status_learning) }}</span>
@@ -345,7 +331,7 @@
                 </td>
               </tr>
               <tr v-if="students.students.length === 0">
-                <td colspan="7" class="px-4 py-10 text-center text-gray-500">Tidak ada siswa yang cocok.</td>
+                <td colspan="6" class="px-4 py-10 text-center text-gray-500">Tidak ada siswa yang cocok.</td>
               </tr>
             </tbody>
           </table>
@@ -369,7 +355,7 @@ const loading = ref(true);
 const overview = ref({ mastery_distribution: {}, status_distribution: {} });
 const options = ref({ courses: [], phases: [], topics: [], materials: [], mastery_statuses: [], status_learnings: [] });
 const topics = ref([]);
-const difficulty = ref({ interactive: {}, quiz: {} });
+const difficulty = ref({ quiz: {} });
 const materialSummary = ref([]);
 const students = ref({ students: [], page: 1, total_pages: 1, total: 0 });
 const page = ref(1);
@@ -400,7 +386,9 @@ const overviewCards = computed(() => {
     { label: "Waktu Belajar", value: o.learning_hours ? o.learning_hours + " jam" : "0 jam", icon: "material-symbols:schedule" },
     { label: "Percobaan Kuis", value: o.quiz_attempts ?? 0, icon: "material-symbols:quiz" },
     { label: "Rata-rata Kuis", value: o.quiz_avg ? o.quiz_avg + "%" : "0%", icon: "material-symbols:monitoring" },
-    { label: "Akurasi Interaktif", value: o.interactive_accuracy ? o.interactive_accuracy + "%" : "0%", icon: "material-symbols:verified" },
+    // Kartu "Akurasi Interaktif" dihapus: akurasinya selalu 0 karena kanal
+    // jawaban itu sudah tidak diisi. "Percobaan Kuis" dan "Rata-rata Kuis"
+    // tetap menutup kebutuhan angka jawaban siswa di baris ini.
   ];
 });
 
@@ -427,8 +415,8 @@ const statusClass = (s) => {
   };
   return map[s] || map.belum_dimulai;
 };
-// Kunci tingkat datang sebagai kunci kanonik (easy/medium/hard) untuk soal
-// interaktif dan bisa tetap mentah untuk kuis. Tampilkan selalu Indonesia.
+// Kunci tingkat bisa datang sebagai kunci kanonik (easy/medium/hard) atau
+// tetap mentah. Tampilkan selalu Indonesia.
 const diffLabel = (k) => {
   const map = { easy: "Mudah", mudah: "Mudah", medium: "Sedang", sedang: "Sedang", hard: "Sulit", sulit: "Sulit" };
   return map[String(k).toLowerCase()] || k;
@@ -521,7 +509,9 @@ const toggleMaterial = async (materialId) => {
         ...materialSummary.value[idx],
         total_students: materialDetail.value.total_students,
         students_completed: materialDetail.value.students_completed,
-        interactive: materialDetail.value.interactive,
+        // Kunci `interactive` tidak lagi disalin ke baris ringkasan: kolom
+        // "Akurasi Interaktif" di tabel Per Materi sudah dihapus, jadi tak ada
+        // lagi yang membacanya.
         quiz: materialDetail.value.quiz,
         average_learning_seconds: materialDetail.value.average_learning_seconds,
       };

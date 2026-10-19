@@ -5,7 +5,6 @@ from src.models.material import Material
 from src.models.material_section import MaterialSection
 from src.models.material_content import MaterialContent
 from src.models.material_progress import MaterialProgress
-from src.models.student_answer import StudentAnswer
 from src.models.learning_activity import LearningActivity
 from src.models.learning_session import LearningSession
 from src.models.quiz import Quiz
@@ -106,9 +105,6 @@ def _enrich_material_detail(user, material):
             MaterialContent, analytics.StudentContentTrack.content_id == MaterialContent.id
         ).filter(MaterialContent.section_id == sid,
                  analytics.StudentContentTrack.student_id == user.id).count()
-        sec_interactive = StudentAnswer.query.filter_by(student_id=user.id, section_id=sid).all()
-        sec_ia_total = len(sec_interactive)
-        sec_ia_correct = sum(1 for a in sec_interactive if a.is_correct)
         sec_quizzes = Quiz.query.filter_by(section_id=sid).all()
         sm = sec_mastery_map.get(sid, {})
         section_rows.append({
@@ -120,8 +116,6 @@ def _enrich_material_detail(user, material):
             'content_count': sc,
             'content_viewed': viewed_in,
             'quiz_count': len(sec_quizzes),
-            'interactive_total': sec_ia_total,
-            'interactive_correct': sec_ia_correct,
             'quiz_answered': sm.get('quiz_answered', 0),
             'quiz_correct': sm.get('quiz_correct', 0),
             'practice_answered': sm.get('practice_answered', 0),
@@ -183,7 +177,6 @@ def _enrich_material_detail(user, material):
         overall_mastery = None
         overall_info = None
         mastery_status = 'INSUFFICIENT_DATA'
-    interactive = analytics.interactive_stats(user.id, material.id)
     video = analytics.video_stats(user.id, material.id)
     activities = LearningActivity.query.filter_by(
         student_id=user.id, material_id=material.id
@@ -199,7 +192,6 @@ def _enrich_material_detail(user, material):
         'quiz_performance': quiz_rows,
         'sections': section_rows,
         'mastery_rows': mastery_rows,
-        'interactive': interactive,
         'video': video,
         'activities': [{
             'id': a.id,
@@ -595,7 +587,6 @@ def get_teacher_analytics_student(student_id):
         (Submission.quiz_id.in_(quiz_ids) if quiz_ids else db.true())
     ).all()
     qperf = analytics.quiz_performance_for(target.id, quiz_ids)
-    interactive = StudentAnswer.query.filter_by(student_id=target.id).all()
     learning_seconds = 0
     for mrow in material_rows:
         learning_seconds += mrow['learning_seconds']
@@ -614,8 +605,6 @@ def get_teacher_analytics_student(student_id):
             'quiz_attempts': qperf['attempts'],
             'quiz_avg': qperf['average'],
             'quiz_best': qperf['best'],
-            'interactive_answered': len(interactive),
-            'interactive_accuracy': round(sum(1 for a in interactive if a.is_correct) / len(interactive) * 100, 1) if interactive else 0.0,
         },
         'materials': material_rows,
         'quizzes': [{
@@ -653,22 +642,15 @@ def get_teacher_analytics_difficulty():
     filters = _filters_from_args()
     materials = analytics.teacher_materials(filters, teacher_id=teacher.id)
     student_ids = analytics.teacher_student_ids(teacher.id)
-    agg = {'interactive': {}, 'quiz': {}, 'unclassified_interactive': 0}
+    agg = {'quiz': {}}
     for m in materials:
         quiz_ids = [q.id for q in analytics.material_quizzes(m.id)]
         diff = analytics.difficulty_analytics(m.id, teacher.id, quiz_ids=quiz_ids, student_ids=student_ids)
-        agg['unclassified_interactive'] += diff.get('unclassified_interactive', 0)
-        for level, bucket in diff['interactive'].items():
-            b = agg['interactive'].setdefault(level, {'total': 0, 'correct': 0})
-            b['total'] += bucket['total']
-            b['correct'] += bucket['correct']
         for level, bucket in diff['quiz'].items():
             b = agg['quiz'].setdefault(level, {'total': 0, 'answered': 0, 'correct': 0})
             b['total'] += bucket['total']
             b['answered'] += bucket['answered']
             b['correct'] += bucket['correct']
-    for b in agg['interactive'].values():
-        b['accuracy'] = round(b['correct'] / b['total'] * 100, 1) if b['total'] else 0.0
     for b in agg['quiz'].values():
         b['accuracy'] = round(b['correct'] / b['answered'] * 100, 1) if b.get('answered') else 0.0
     return jsonify(agg), 200

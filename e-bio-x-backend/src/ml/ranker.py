@@ -105,7 +105,6 @@ def _vectorize_row(student_row, material, cohort):
     vec = {
         # student ability (independent, student-level)
         'quiz_average': float(r.get('quiz_average') or 0.0),
-        'interactive_accuracy': float(r.get('interactive_accuracy') or 0.0),
         'correct_rate': float(r.get('correct_rate') or 0.0),
         'learning_minutes': float(r.get('learning_minutes') or 0.0),
         # item attributes (same for every student)
@@ -559,7 +558,6 @@ def explain_ml(student_row, material, artifact, cohort=None):
 
 _FEAT_LABEL = {
     'quiz_average': 'Rata-rata kuis',
-    'interactive_accuracy': 'Akurasi interaktif',
     'correct_rate': 'Tingkat jawaban benar',
     'learning_minutes': 'Waktu belajar',
     'item_difficulty': 'Tingkat kesulitan materi',

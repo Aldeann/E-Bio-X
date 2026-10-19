@@ -108,12 +108,12 @@ def _material_metrics(student, material, student_row):
     base = analytics.material_row_for(student.id, material)
     mastery = base['mastery_score'] or 0.0
 
-    # interactive errors on this material
-    ia = analytics.interactive_stats(student.id, material.id)
-    ia_total = ia['interactive_total']
-    ia_wrong = ia_total - ia['interactive_correct']
-
-    # quiz errors on this material's quizzes (submitted attempts)
+    # Quiz errors on this material's quizzes (submitted attempts).
+    #
+    # Kanal "soal interaktif" yang dulu ikut dijumlahkan di sini sudah dihapus:
+    # tidak pernah dijawab siapa pun, jadi sumbungannya selalu nol dan
+    # `question_error_rate` kini murni dari kuis — angkanya identik dengan
+    # sebelumnya, hanya tanpa satu query mati per material.
     quiz_ids = [q.id for q in analytics.material_quizzes(material.id)]
     subs = Submission.query.filter(
         Submission.student_id == student.id, Submission.status == 'submitted',
@@ -122,8 +122,8 @@ def _material_metrics(student, material, student_row):
     quiz_answered = sum((s.correct_count or 0) + (s.wrong_count or 0) for s in subs)
     quiz_wrong = sum(s.wrong_count or 0 for s in subs)
 
-    answered = ia_total + quiz_answered
-    wrong = ia_wrong + quiz_wrong
+    answered = quiz_answered
+    wrong = quiz_wrong
     error_rate = (wrong / answered) if answered else 0.0
 
     topic = material.topic
