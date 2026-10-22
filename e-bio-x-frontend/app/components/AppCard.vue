@@ -1,8 +1,8 @@
 <template>
-  <div class="rounded-xl border bg-white dark:bg-gray-900 transition"
+  <div class="rounded-xl border bg-surface transition"
        :class="[
-         withShadow ? 'shadow-md shadow-green-300/20 hover:shadow-green-300/40' : 'shadow-sm',
-         borderClass || 'border-gray-200 dark:border-gray-700'
+         withShadow ? 'shadow-md shadow-slate-900/5 hover:shadow-slate-900/10' : 'shadow-sm',
+         borderClass || 'border-line'
        ]">
     <slot />
   </div>

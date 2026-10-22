@@ -131,7 +131,7 @@
                 </NuxtLink>
                 <NuxtLink
                   :to="`/teacher/quizzes/${quiz.quiz_id}`"
-                  class="bg-amber-400 hover:bg-amber-500 text-white text-[10px] sm:text-xs px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center transition flex items-center justify-center gap-1"
+                  class="bg-amber-700 hover:bg-amber-800 text-white text-[10px] sm:text-xs px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center transition flex items-center justify-center gap-1"
                 >
                   <Icon name="material-symbols:edit-square" class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   Edit

@@ -3,7 +3,7 @@
     v-if="!isSidebarOpen"
     @click="toggleSidebar"
     type="button"
-    class="fixed top-2 left-2 z-30 items-center p-2 text-sm text-white bg-green-600 dark:bg-green-700 rounded-lg sm:hidden hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-green-500">
+    class="fixed top-2 left-2 z-30 items-center p-2 text-sm text-white bg-siswa-700 rounded-lg sm:hidden hover:bg-siswa-800 focus:outline-none focus:ring-2 focus:ring-siswa-500">
     <span class="sr-only">Buka sidebar siswa</span>
     <Icon name="material-symbols:menu-rounded" class="w-6 h-6" />
   </button>
@@ -22,7 +22,7 @@
       'sm:translate-x-0',
     ]"
     aria-label="Sidebar siswa">
-    <div class="h-full px-3 py-4 overflow-y-auto bg-gradient-to-b from-green-600 to-emerald-700 dark:from-green-700 dark:to-emerald-800 flex flex-col">
+    <div class="h-full px-3 py-4 overflow-y-auto bg-gradient-to-b from-siswa-700 to-siswa-900 flex flex-col">
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-2 px-1">
           <Icon name="mdi:leaf" class="w-5 h-5" />
@@ -43,7 +43,7 @@
               :to="item.to"
               :class="[
                 'flex items-center gap-2 p-2 rounded-lg group transition',
-                isActive(item.to) ? 'bg-white/25' : 'hover:bg-white/15',
+                isActive(item.to) ? 'bg-white/20 ring-1 ring-inset ring-white/25' : 'hover:bg-white/10',
               ]"
               @click="isSidebarOpen = false">
               <Icon :name="item.icon" class="w-5 h-5 shrink-0" />
@@ -59,7 +59,7 @@
           to="/account"
           :class="[
             'flex items-center gap-2 p-2 rounded-lg group',
-            route.path === '/account' ? 'bg-white/25' : 'hover:bg-white/15',
+            route.path === '/account' ? 'bg-white/20 ring-1 ring-inset ring-white/25' : 'hover:bg-white/10',
           ]">
           <Icon name="mdi:cog" class="w-5 h-5 shrink-0" />
           <span class="text-sm">Akun</span>

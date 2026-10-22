@@ -3,7 +3,7 @@
     <button @click.stop="togglePanel" class="relative p-1.5 rounded-lg hover:bg-white/15 transition flex items-center" title="Notifikasi">
       <Icon name="material-symbols:notifications-outline" class="w-5 h-5" />
       <span v-if="unread > 0"
-        class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+        class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center">
         {{ unread > 99 ? "99+" : unread }}
       </span>
     </button>

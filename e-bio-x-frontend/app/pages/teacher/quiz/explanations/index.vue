@@ -100,7 +100,7 @@
             </button>
             <button
               v-if="item.status === 'AI_GENERATED'"
-              class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs bg-red-500 hover:bg-red-600 text-white transition"
+              class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs bg-red-600 hover:bg-red-700 text-white transition"
               @click="reject(item)"
             >
               <Icon name="material-symbols:close" class="w-4 h-4" /> Tolak

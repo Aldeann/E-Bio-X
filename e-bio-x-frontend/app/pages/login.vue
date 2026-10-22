@@ -2,8 +2,8 @@
   <div class="px-4 max-w-4xl mx-auto w-full flex items-center justify-center">
     <div class="w-full max-w-md">
       <div
-        class="bg-white dark:bg-gray-800 dark:text-gray-200 shadow-md rounded-xl overflow-hidden">
-        <div class="relative bg-green-600 dark:bg-green-700 text-white text-center py-4">
+        class="bg-surface text-body shadow-md rounded-xl overflow-hidden">
+        <div class="relative bg-brand-700 text-white text-center py-4">
           <h4 class="text-xl font-semibold">Login E Bio X</h4>
           <div class="absolute top-0 right-0 pr-4 pt-5">
             <ToggleDark />
@@ -18,7 +18,7 @@
                 id="email"
                 v-model="email"
                 required
-                class="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700" />
+                class="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-brand-500 dark:bg-slate-700 dark:text-white" />
             </div>
             <div>
               <label for="password" class="block font-medium mb-1">Password</label>
@@ -28,7 +28,7 @@
                   id="password"
                   v-model="password"
                   required
-                  class="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700" />
+                  class="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-brand-500 dark:bg-slate-700 dark:text-white" />
                 <Icon
                   :name="showPassword ? 'fluent:eye-20-filled' : 'fluent:eye-hide-20-filled'"
                   class="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-500 h-5 w-5"
@@ -37,7 +37,7 @@
             </div>
             <button
               type="submit"
-              class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-2 rounded">
+              class="w-full bg-brand-700 hover:bg-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 text-white font-semibold py-2 rounded transition-colors">
               Login
             </button>
           </form>

@@ -439,9 +439,9 @@ const heatClass = (cell) => {
   }
   const map = {
     "Baik Sekali": "bg-green-600 text-white",
-    "Baik": "bg-emerald-500 text-white",
+    "Baik": "bg-emerald-700 text-white",
     "Cukup": "bg-amber-400 text-gray-900",
-    "Kurang": "bg-red-500 text-white",
+    "Kurang": "bg-red-600 text-white",
   };
   return map[cell.mastery.label] || "bg-gray-400 text-white";
 };

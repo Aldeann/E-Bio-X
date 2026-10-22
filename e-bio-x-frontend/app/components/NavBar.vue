@@ -1,5 +1,5 @@
 <template>
-  <nav v-if="showSidebar !== false" class="bg-gradient-to-br from-green-500 to-emerald-600 dark:from-green-600 dark:to-emerald-700 text-white shadow relative z-40">
+  <nav v-if="showSidebar !== false" class="bg-gradient-to-br from-brand-700 to-brand-900 text-white shadow relative z-40">
     <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center space-x-3 min-w-0">
         <button
@@ -57,7 +57,7 @@
           <span class="font-medium text-white dark:text-gray-100 hidden min-[380px]:inline truncate max-w-[120px]">{{ username }}</span>
           <button @click.stop="toggleDropdown" class="focus:outline-none p-0.5" aria-label="Menu akun">
             <div
-              class="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mx-auto border-2 border-green-800 dark:border-green-500"
+              class="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mx-auto border-2 border-brand-200 dark:border-brand-400"
             >
               <UAvatar :alt="username" size="64" class="text-gray-400 dark:text-gray-300" />
             </div>
@@ -67,7 +67,7 @@
           v-if="dropdownOpen"
           ref="dropdown"
           @click.stop
-          class="absolute right-0 top-full mt-2 w-40 bg-white dark:bg-gray-800 text-black dark:text-gray-100 rounded-md shadow-lg py-2 z-50"
+          class="absolute right-0 top-full mt-2 w-40 bg-surface text-black dark:text-gray-100 rounded-md shadow-lg py-2 z-50"
         >
           <NuxtLink
             to="/account"
@@ -92,7 +92,7 @@
       v-if="teacherMenuOpen && role === 'teacher'"
       ref="teacherMenu"
       @click.stop
-      class="absolute left-0 top-full mt-1 w-64 max-w-[85vw] max-h-[80vh] overflow-y-auto bg-white dark:bg-gray-800 text-black dark:text-gray-100 rounded-md shadow-lg py-2 z-50"
+      class="absolute left-0 top-full mt-1 w-64 max-w-[85vw] max-h-[80vh] overflow-y-auto bg-surface text-black dark:text-gray-100 rounded-md shadow-lg py-2 z-50"
     >
       <p class="px-4 pb-1 pt-1 text-[11px] uppercase tracking-wide text-gray-400 font-semibold">
         Fitur Guru
@@ -103,7 +103,7 @@
         :to="link.to"
         class="flex items-start gap-3 px-4 py-2.5 transition"
         :class="isActive(link)
-          ? 'bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400'
+          ? 'bg-guru-50 dark:bg-guru-900/40 text-guru-700 dark:text-guru-300'
           : 'hover:bg-gray-100 dark:hover:bg-gray-700'"
         @click="teacherMenuOpen = false"
       >
@@ -118,7 +118,7 @@
     <!-- Mobile drawer navigation -->
     <div v-if="mobileOpen" class="fixed inset-0 z-[60] sm:hidden">
       <div class="absolute inset-0 bg-black/50" @click="mobileOpen = false"></div>
-      <div class="absolute top-0 left-0 h-full w-72 max-w-[85vw] overflow-y-auto bg-gradient-to-b from-green-600 to-emerald-700 shadow-xl">
+      <div class="absolute top-0 left-0 h-full w-72 max-w-[85vw] overflow-y-auto bg-gradient-to-b from-brand-700 to-brand-900 shadow-xl">
         <div class="flex items-center justify-between px-4 py-3 border-b border-white/20">
           <span class="font-semibold flex items-center gap-2">
             <Icon name="mdi:leaf" class="w-5 h-5" /> E-Bio X

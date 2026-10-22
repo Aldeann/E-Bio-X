@@ -4,7 +4,7 @@
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <span v-if="icon" class="w-8 h-8 rounded-lg flex items-center justify-center"
-                :class="iconWrapClass || 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400'">
+                :class="iconWrapClass || 'bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300'">
             <Icon :name="icon" class="w-5 h-5" />
           </span>
           <div>

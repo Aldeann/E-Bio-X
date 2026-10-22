@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col min-h-screen dark:bg-gray-800 dark:text-white bg-white transition-colors duration-300">
+  <div class="flex flex-col min-h-screen bg-canvas text-body transition-colors duration-300">
     <NavBar />
 
     <!-- Main Content -->

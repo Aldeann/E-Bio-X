@@ -205,7 +205,7 @@ const badgeClass = (i) => {
   const isPicked = qtype.value === "multi_select" ? multiSel.value.includes(i) : selected.value === i;
   if (feedbackShown.value && isPicked && isCorrect.value)
     return "bg-green-500 text-white";
-  if (feedbackShown.value && isPicked) return "bg-red-500 text-white";
+  if (feedbackShown.value && isPicked) return "bg-red-600 text-white";
   if (isPicked) return "bg-green-600 text-white";
   return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300";
 };

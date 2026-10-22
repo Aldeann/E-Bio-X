@@ -1,13 +1,101 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
-/* Guard horizontal overflow di mobile tanpa merusak position:sticky */
-html, body {
-  overflow-x: clip;
+/* ============================================================
+   Palet E-Bio X
+   ------------------------------------------------------------
+   Tiga lapis warna:
+   1. Netral (canvas/surface/line/teks) - 60-70% layar
+   2. Brand & peran (brand/guru/siswa) - chrome & aksi utama
+   3. Semantik (sukses/peringatan/bahaya/info) - status saja
+
+   Aturan kontras (WCAG AA, teks normal >= 4.5:1):
+   - Label putih hanya di atas brand/guru/siswa 700 ke atas.
+   - Amber/pending: pakai 700 + teks putih, atau 500 + teks gelap.
+   ============================================================ */
+
+@theme static {
+  /* --- Brand: hijau daun E-Bio --- */
+  --color-brand-50: #ecfdf5;
+  --color-brand-100: #d1fae5;
+  --color-brand-200: #a7f3d0;
+  --color-brand-300: #6ee7b7;
+  --color-brand-400: #34d399;
+  --color-brand-500: #10b981;
+  --color-brand-600: #059669;
+  --color-brand-700: #047857;
+  --color-brand-800: #065f46;
+  --color-brand-900: #064e3b;
+  --color-brand-950: #022c22;
+
+  /* --- Peran guru: indigo (tenang, analitis) --- */
+  --color-guru-50: #eef2ff;
+  --color-guru-100: #e0e7ff;
+  --color-guru-200: #c7d2fe;
+  --color-guru-300: #a5b4fc;
+  --color-guru-400: #818cf8;
+  --color-guru-500: #6366f1;
+  --color-guru-600: #4f46e5;
+  --color-guru-700: #4338ca;
+  --color-guru-800: #3730a3;
+  --color-guru-900: #312e81;
+
+  /* --- Peran murid: emerald (tumbuh, hangat) --- */
+  --color-siswa-50: #ecfdf5;
+  --color-siswa-100: #d1fae5;
+  --color-siswa-200: #a7f3d0;
+  --color-siswa-300: #6ee7b7;
+  --color-siswa-400: #34d399;
+  --color-siswa-500: #10b981;
+  --color-siswa-600: #059669;
+  --color-siswa-700: #047857;
+  --color-siswa-800: #065f46;
+  --color-siswa-900: #064e3b;
+
+  /* --- Perbaikan kontras skala hijau bawaan Tailwind ---
+     Dipakai oleh sisa kelas bg-green-600/text-green-600 yang belum
+     dimigrasikan ke brand-*. 500/600/700 digelapkan satu tingkat agar
+     teks putih lolos WCAG AA. 100 ke bawah tidak diubah. */
+  --color-green-500: #059669;
+  --color-green-600: #047857;
+  --color-green-700: #065f46;
+}
+
+/* --- Permukaan & teks: nilai berbeda per tema --- */
+:root {
+  --canvas: #f8fafc;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --line: #e2e8f0;
+  --text-strong: #0f172a;
+  --text-body: #334155;
+  --text-muted: #64748b;
+}
+
+.dark {
+  --canvas: #0f172a;
+  --surface: #1e293b;
+  --surface-muted: #273449;
+  --line: #334155;
+  --text-strong: #f1f5f9;
+  --text-body: #cbd5e1;
+  --text-muted: #94a3b8;
+}
+
+/* @theme inline = utilitas Tailwind mengikuti variabel runtime di atas,
+   sehingga bg-canvas / bg-surface otomatis berubah saat .dark aktif. */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-line: var(--line);
+  --color-strong: var(--text-strong);
+  --color-body: var(--text-body);
+  --color-muted: var(--text-muted);
 }
 
 html.dark .swal2-popup {
-  background-color: #1f2937 !important; /* bg-gray-800 */
+  background-color: #1e293b !important; /* slate-800 */
   color: #fff !important;
 }
 
@@ -20,7 +108,7 @@ html.dark .swal2-content {
 }
 
 html.dark .swal2-input {
-  background-color: #374151 !important;
+  background-color: #334155 !important;
   color: #fff !important;
-  border: 1px solid #4b5563 !important;
+  border: 1px solid #475569 !important;
 }

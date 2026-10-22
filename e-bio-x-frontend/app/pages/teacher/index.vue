@@ -5,13 +5,13 @@
       :subtitle="username ? `Halo, ${username}!` : 'Ringkasan aktivitas kelas Anda'"
     >
       <button
-        class="bg-green-600 hover:bg-green-700 hover:shadow hover:shadow-green-300 text-white px-4 py-2 rounded"
+        class="bg-guru-700 hover:bg-guru-800 hover:shadow hover:shadow-guru-300 text-white px-4 py-2 rounded"
         @click="showCreateClassSwal">
         + Buat Kelas Baru
       </button>
       <NuxtLink
         to="/teacher/materials"
-        class="bg-white dark:bg-gray-900 border border-green-600 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-gray-800 px-4 py-2 rounded flex items-center gap-1">
+        class="bg-surface border border-guru-300 text-guru-700 dark:text-guru-300 hover:bg-guru-50 dark:hover:bg-guru-900/30 px-4 py-2 rounded flex items-center gap-1">
         <Icon name="material-symbols:menu-book" class="w-4 h-4" />
         Materi Pembelajaran
       </NuxtLink>
@@ -36,7 +36,7 @@
           </button>
           <div class="flex justify-between items-start mb-2 pr-8">
             <h5 class="text-lg font-semibold truncate">{{ kelas.name }}</h5>
-            <span class="bg-green-100 text-green-600 text-sm px-2 py-1 rounded flex items-center gap-1">
+            <span class="bg-guru-100 dark:bg-guru-900/40 text-guru-700 dark:text-guru-300 text-sm px-2 py-1 rounded flex items-center gap-1">
               <Icon name="mdi:account-multiple" />
               {{ kelas.students }}
             </span>
@@ -47,7 +47,7 @@
               <span class="text-sm text-gray-600 dark:text-gray-200">Kode: {{ kelas.code }}</span>
               <button
                 @click="copyToClipboard(kelas.code)"
-                class="text-green-500 hover:text-green-800 p-1.5 -m-1.5 rounded transition duration-200"
+                class="text-guru-600 hover:text-guru-800 p-1.5 -m-1.5 rounded transition duration-200"
                 aria-label="Salin kode kelas">
                 <Icon name="material-symbols:content-copy" class="w-5 h-5" />
               </button>
@@ -55,7 +55,7 @@
 
             <NuxtLink
               :to="'/teacher/course/' + kelas.id"
-              class="inline-flex items-center gap-1 bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-500 hover:shadow hover:shadow-green-300  transition">
+              class="inline-flex items-center gap-1 bg-guru-700 text-white px-3 py-1.5 rounded hover:bg-guru-800 hover:shadow hover:shadow-guru-300  transition">
               <Icon name="material-symbols:login" class="w-4 h-4" />
               Kelola
             </NuxtLink>

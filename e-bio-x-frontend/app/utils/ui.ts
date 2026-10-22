@@ -82,7 +82,7 @@ export const statusLearningClass = (key: AnyKey): string => {
     belum_dimulai: "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
     dimulai: "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-400",
     sedang_belajar: "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-400",
-    selesai: "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-400",
+    selesai: "bg-brand-100 dark:bg-brand-900/40 text-brand-800 dark:text-brand-200",
   };
   return map[norm(key)] || map.belum_dimulai;
 };
@@ -101,10 +101,10 @@ const masteryKey = (label: AnyKey): string => {
 /** Kelas teks warna untuk label penguasaan bagian. */
 export const masteryTextClass = (label: AnyKey): string => {
   const map: Record<string, string> = {
-    "Baik Sekali": "text-green-600",
-    Baik: "text-emerald-600",
-    Cukup: "text-amber-500",
-    Kurang: "text-red-500",
+    "Baik Sekali": "text-green-700 dark:text-green-300",
+    Baik: "text-emerald-700 dark:text-emerald-300",
+    Cukup: "text-amber-700 dark:text-amber-300",
+    Kurang: "text-red-600 dark:text-red-400",
   };
   return map[masteryKey(label)] || "text-gray-500";
 };
@@ -123,10 +123,10 @@ export const masteryBarClass = (label: AnyKey): string => {
 /** Kelas sel heatmap penguasaan bagian (latar penuh + teks kontras). */
 export const masteryHeatClass = (label: AnyKey): string => {
   const map: Record<string, string> = {
-    "Baik Sekali": "bg-green-600 text-white",
-    Baik: "bg-emerald-500 text-white",
+    "Baik Sekali": "bg-brand-700 text-white",
+    Baik: "bg-emerald-700 text-white",
     Cukup: "bg-amber-400 text-gray-900",
-    Kurang: "bg-red-500 text-white",
+    Kurang: "bg-red-600 text-white",
   };
   return map[masteryKey(label)] || "bg-gray-400 text-white";
 };

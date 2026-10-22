@@ -1,5 +1,5 @@
 <template>
-  <div class="flex min-h-screen dark:bg-gray-800 dark:text-white bg-gray-50 transition-colors duration-300">
+  <div class="flex min-h-screen bg-canvas text-body transition-colors duration-300">
     <TeacherSidebar />
     <div class="flex-1 flex flex-col sm:ml-64">
       <NavBar :showSidebar="false" />
