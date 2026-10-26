@@ -56,6 +56,15 @@
       <div class="mt-3 space-y-1">
         <ToggleDark />
         <NuxtLink
+          to="/tentang"
+          :class="[
+            'flex items-center gap-2 p-2 rounded-lg group',
+            route.path === '/tentang' ? 'bg-guru-500/25 ring-1 ring-inset ring-guru-400/40' : 'hover:bg-white/10',
+          ]">
+          <Icon name="material-symbols:info" class="w-5 h-5 shrink-0" />
+          <span class="text-sm">Tentang Pengembang</span>
+        </NuxtLink>
+        <NuxtLink
           to="/account"
           :class="[
             'flex items-center gap-2 p-2 rounded-lg group',

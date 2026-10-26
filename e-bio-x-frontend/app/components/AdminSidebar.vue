@@ -38,7 +38,17 @@
           </RouterLink>
         </li>
       </ul>
-      
+
+      <RouterLink
+        to="/tentang"
+        :class="[
+          'flex items-center p-2 rounded-lg group',
+          route.path === '/tentang' ? 'bg-green-500' : 'hover:bg-green-600',
+        ]">
+        <Icon name="material-symbols:info" />
+        <span class="ms-3">Tentang Pengembang</span>
+      </RouterLink>
+
       <hr class="my-3">
       <RouterLink
         to="/account"

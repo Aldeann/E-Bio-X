@@ -1,6 +1,6 @@
 # Flask REST API dengan MySQL
 Aplikasi REST API sederhana menggunakan Flask dan MySQL dengan implementasi konsep MVC (Model-View-Controller) untuk backend aplikasi e-learning E-Bio X.
-#### By *Baghaztra Van Ril*
+#### By *Muhammad Ghazali Alhakim*
 ---
 
 ## Struktur Proyek

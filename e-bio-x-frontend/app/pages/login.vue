@@ -55,6 +55,17 @@
           </div>
         </div>
       </div>
+
+      <p class="mt-4 text-center text-xs leading-relaxed text-muted">
+        Dikembangkan oleh
+        <NuxtLink
+          to="/tentang"
+          class="font-medium text-body transition hover:text-brand-700 hover:underline dark:hover:text-brand-300">
+          Muhammad Ghazali Alhakim
+        </NuxtLink>
+        <br />
+        Universitas Negeri Padang &middot; v1.0.0
+      </p>
     </div>
   </div>
 </template>
