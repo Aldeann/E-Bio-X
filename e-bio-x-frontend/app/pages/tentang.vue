@@ -129,9 +129,18 @@
           v-for="person in supervisors"
           :key="person.name"
           class="flex items-center gap-3 rounded-xl border border-line bg-surface-muted p-4">
-          <!-- Ganti blok inisial ini dengan <img> foto dosen setelah memperoleh izin. -->
+          <!-- Gunakan foto bila tersedia; jika belum, tampilkan inisial. -->
+          <img
+            v-if="person.photo"
+            :src="person.photo"
+            :alt="`Foto ${person.name}`"
+            width="144"
+            height="192"
+            loading="lazy"
+            class="h-16 w-12 shrink-0 rounded-xl object-cover object-top ring-1 ring-guru-200 dark:ring-guru-800" />
           <div
-            class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-guru-50 text-sm font-bold text-guru-700 ring-1 ring-guru-200 dark:bg-guru-900/40 dark:text-guru-200 dark:ring-guru-800"
+            v-else
+            class="flex h-16 w-12 shrink-0 items-center justify-center rounded-xl bg-guru-50 text-sm font-bold text-guru-700 ring-1 ring-guru-200 dark:bg-guru-900/40 dark:text-guru-200 dark:ring-guru-800"
             aria-hidden="true">
             {{ person.initials }}
           </div>
@@ -275,7 +284,12 @@ const features = [
 const supervisors = [
   { name: "Relsas Yogica, S.Pd., M.Pd.", role: "Dosen Pembimbing", initials: "RY" },
   { name: "Dr. Heffi Alberida, S.Pd., M.Si.", role: "Dosen Penanggap 1", initials: "HA" },
-  { name: "Fitri Olvia Rahmi, S.Pd., M.Pd.", role: "Dosen Penanggap 2", initials: "FR" },
+  {
+    name: "Fitri Olvia Rahmi, S.Pd., M.Pd.",
+    role: "Dosen Penanggap 2",
+    initials: "FR",
+    photo: "/images/pengembang/fitri-olvia-rahmi.jpg",
+  },
 ];
 
 const systemInfo = [
