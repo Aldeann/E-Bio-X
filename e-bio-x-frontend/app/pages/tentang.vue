@@ -3,12 +3,13 @@
     <!-- Identitas pengembang -->
     <section class="rounded-2xl border border-line bg-surface p-6 shadow-sm sm:p-8">
       <div class="flex flex-col gap-6 sm:flex-row sm:items-center">
-        <!-- Ganti blok inisial ini dengan <img> foto profesional saat tersedia. -->
-        <div
-          class="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-700 to-brand-900 text-3xl font-bold text-white ring-4 ring-brand-100 dark:ring-brand-900/50"
-          aria-hidden="true">
-          {{ developer.initials }}
-        </div>
+        <img
+          src="/images/pengembang/muhammad-ghazali-alhakim.jpg"
+          alt="Foto Muhammad Ghazali Alhakim"
+          width="144"
+          height="192"
+          loading="eager"
+          class="h-48 w-36 shrink-0 rounded-2xl object-cover object-top ring-4 ring-brand-100 dark:ring-brand-900/50 sm:h-56 sm:w-44" />
 
         <div class="min-w-0">
           <p class="text-xs font-semibold uppercase tracking-wider text-brand-700 dark:text-brand-300">
@@ -243,7 +244,6 @@ useHead({
 
 const developer = {
   name: "Muhammad Ghazali Alhakim",
-  initials: "MG",
   role: "Pengembang Website · Peneliti",
   email: "ghazalialhakim@student.unp.ac.id",
 };
