@@ -25,7 +25,9 @@
 
           <div class="mt-4 flex flex-wrap gap-2">
             <a
-              :href="`mailto:${developer.email}`"
+              :href="emailLink"
+              target="_blank"
+              rel="noopener noreferrer"
               class="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-body transition hover:border-brand-300 hover:text-brand-700 dark:hover:border-brand-700 dark:hover:text-brand-300">
               <Icon name="material-symbols:mail" class="h-4 w-4" aria-hidden="true" />
               Email
@@ -184,18 +186,37 @@
 
       <div class="mt-4 flex flex-wrap gap-2">
         <a
-          :href="`mailto:${developer.email}`"
+          :href="emailLink"
+          target="_blank"
+          rel="noopener noreferrer"
           class="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-body transition hover:border-brand-300 hover:text-brand-700 dark:hover:border-brand-700 dark:hover:text-brand-300">
           <Icon name="material-symbols:mail" class="h-4 w-4" aria-hidden="true" />
-          {{ developer.email }}
+          Email
         </a>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-body transition hover:border-brand-300 hover:text-brand-700 dark:hover:border-brand-700 dark:hover:text-brand-300"
+          @click="copyEmail">
+          <Icon
+            :name="copied ? 'material-symbols:check' : 'material-symbols:content-copy'"
+            class="h-4 w-4"
+            aria-hidden="true" />
+          {{ copied ? "Tersalin" : "Salin email" }}
+        </button>
         <a
           :href="demoLink"
+          target="_blank"
+          rel="noopener noreferrer"
           class="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-800">
           <Icon name="material-symbols:open-in-new" class="h-4 w-4" aria-hidden="true" />
           Minta akses demo
         </a>
       </div>
+
+      <p class="mt-2 text-xs text-muted">
+        Tautan email membuka Gmail di tab baru. Jika belum punya akun Gmail, gunakan tombol
+        “Salin email” lalu kirim dari aplikasi email Anda.
+      </p>
     </section>
 
     <!-- Kredit -->
@@ -308,7 +329,66 @@ const systemInfo = [
   { label: "Terakhir diperbarui", value: "Oktober 2026" },
 ];
 
-const demoLink =
-  "mailto:ghazalialhakim@student.unp.ac.id?subject=" +
-  encodeURIComponent("Permintaan akses demo E-Bio X");
+// mailto: bergantung pada aplikasi email bawaan sistem. Bila tidak ada yang
+// terdaftar, Chrome hanya membuka tab kosong. Karena itu tautan email diarahkan
+// ke Gmail versi web, dengan tombol "Salin email" sebagai cadangan.
+const gmailCompose = (subject = "", body = "") => {
+  const params = new URLSearchParams({ view: "cm", fs: "1", to: developer.email });
+  if (subject) params.set("su", subject);
+  if (body) params.set("body", body);
+  return `https://mail.google.com/mail/?${params.toString()}`;
+};
+
+const emailLink = gmailCompose();
+
+const demoLink = gmailCompose(
+  "Permintaan akses demo E-Bio X",
+  [
+    "Halo Muhammad Ghazali Alhakim,",
+    "",
+    "Saya ingin meminta akses demo E-Bio X.",
+    "",
+    "Nama:",
+    "Institusi/Jabatan:",
+    "Keperluan:",
+    "",
+    "Terima kasih.",
+  ].join("\n"),
+);
+
+const copied = ref(false);
+let copyTimer;
+
+function fallbackCopy(text) {
+  const el = document.createElement("textarea");
+  el.value = text;
+  el.setAttribute("readonly", "");
+  el.style.position = "fixed";
+  el.style.opacity = "0";
+  document.body.appendChild(el);
+  el.select();
+  try {
+    document.execCommand("copy");
+  } finally {
+    el.remove();
+  }
+}
+
+function copyEmail() {
+  const text = developer.email;
+
+  // Beri umpan balik segera; penulisan ke clipboard bisa menunggu izin browser.
+  copied.value = true;
+  clearTimeout(copyTimer);
+  copyTimer = setTimeout(() => (copied.value = false), 2000);
+
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+    return;
+  }
+
+  fallbackCopy(text);
+}
+
+onBeforeUnmount(() => clearTimeout(copyTimer));
 </script>

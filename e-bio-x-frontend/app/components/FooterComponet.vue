@@ -20,7 +20,9 @@
         </NuxtLink>
         <span aria-hidden="true">&middot;</span>
         <a
-          :href="`mailto:${email}`"
+          :href="emailLink"
+          target="_blank"
+          rel="noopener noreferrer"
           class="transition hover:text-brand-700 hover:underline dark:hover:text-brand-300">
           Email
         </a>
@@ -32,4 +34,5 @@
 <script setup>
 const year = new Date().getFullYear();
 const email = "ghazalialhakim@student.unp.ac.id";
+const emailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}`;
 </script>
