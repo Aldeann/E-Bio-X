@@ -76,7 +76,7 @@ const fetchData = async () => {
     data.value = res;
     prereq.value = peta;
   } catch (e) {
-    toast.add({ title: "Gagal memuat analitik.", color: "red" });
+    toast.add({ title: "Gagal memuat analisis materi.", color: "red" });
   } finally {
     loading.value = false;
   }
@@ -102,7 +102,7 @@ definePageMeta({
         <Icon name="material-symbols:arrow-back" class="w-4 h-4" />
         Kembali ke Materi
       </NuxtLink>
-      <h1 class="text-2xl font-bold text-green-700 dark:text-green-400">Analitik Materi</h1>
+      <h1 class="text-2xl font-bold text-green-700 dark:text-green-400">Analisis Materi</h1>
       <p v-if="data" class="text-sm text-gray-500">{{ data.title }}</p>
     </div>
 

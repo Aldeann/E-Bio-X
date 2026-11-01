@@ -219,7 +219,7 @@ const navLinks = computed(() => {
   }
   if (role.value === "teacher") {
     links.push({ to: "/teacher", icon: "material-symbols:dashboard", label: "Dasbor", desc: "Ringkasan & pintasan fitur" });
-    links.push({ to: "/teacher/analytics", icon: "material-symbols:monitoring", label: "Analitik", desc: "Progres, penguasaan & topik" });
+    links.push({ to: "/teacher/analytics", icon: "material-symbols:monitoring", label: "Analisis Hasil Belajar", desc: "Progres, penguasaan & topik" });
     links.push({ to: "/teacher/analytics/ml", icon: "material-symbols:psychology", label: "ML Insights", desc: "Profil belajar & rekomendasi" });
     links.push({ to: "/teacher/analytics/impact", icon: "material-symbols:ads-click", label: "Dampak Rekomendasi", desc: "CTR, funnel & perbaikan latihan" });
   }

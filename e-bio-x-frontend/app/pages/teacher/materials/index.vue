@@ -276,7 +276,7 @@ definePageMeta({
                 class="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs rounded-lg font-semibold bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-100 flex items-center gap-1"
               >
                 <Icon name="material-symbols:monitoring" class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                Analitik
+                Analisis
               </NuxtLink>
               <button
                 @click="publishToggle(m)"

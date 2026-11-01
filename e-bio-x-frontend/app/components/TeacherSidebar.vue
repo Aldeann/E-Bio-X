@@ -102,7 +102,7 @@ const toggleSidebar = () => {
 const menu = [
   { to: "/teacher/panduan", icon: "mdi:book-open-page-variant-outline", label: "Petunjuk Penggunaan" },
   { to: "/teacher", icon: "material-symbols:dashboard", label: "Dasbor" },
-  { to: "/teacher/analytics", icon: "material-symbols:monitoring", label: "Analitik" },
+  { to: "/teacher/analytics", icon: "material-symbols:monitoring", label: "Analisis Hasil Belajar" },
   { to: "/teacher/analytics/ml", icon: "material-symbols:psychology", label: "ML Insights" },
   // Disembunyikan untuk demo (di luar cakupan proposal):
   // { to: "/teacher/analytics/impact", icon: "material-symbols:ads-click", label: "Dampak Rekomendasi" },

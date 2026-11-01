@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-5">
-    <div v-if="loading" class="text-gray-500 text-center py-10">Memuat analitik...</div>
+    <div v-if="loading" class="text-gray-500 text-center py-10">Memuat analisis...</div>
 
     <template v-else-if="data">
       <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -112,7 +112,7 @@
       </div>
     </template>
 
-    <div v-else class="text-gray-500 text-center py-10">Tidak dapat memuat analitik.</div>
+    <div v-else class="text-gray-500 text-center py-10">Tidak dapat memuat analisis.</div>
   </div>
 </template>
 
@@ -135,7 +135,7 @@ const load = async () => {
       headers: { Authorization: `Bearer ${token}` },
     });
   } catch (e) {
-    toast.add({ title: "Gagal memuat analitik kuis", color: "red" });
+    toast.add({ title: "Gagal memuat analisis kuis", color: "red" });
   } finally {
     loading.value = false;
   }

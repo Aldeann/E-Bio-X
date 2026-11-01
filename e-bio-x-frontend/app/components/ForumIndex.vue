@@ -8,7 +8,7 @@
             <Icon name="mdi:shield-alert-outline" /> Moderasi
           </NuxtLink>
           <NuxtLink to="/teacher/forum/analytics" class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg border border-blue-300 text-blue-600 hover:bg-blue-50 dark:hover:bg-gray-800 text-xs sm:text-sm flex items-center gap-1">
-            <Icon name="mdi:chart-box-outline" /> Analitik
+            <Icon name="mdi:chart-box-outline" /> Analisis Forum
           </NuxtLink>
         </template>
         <NuxtLink v-if="canCreate" :to="`/${role}/forum/new`" class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 text-xs sm:text-sm flex items-center gap-1">

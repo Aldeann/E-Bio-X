@@ -94,7 +94,7 @@
             :to="`/teacher/quizzes/${q.id}/analytics`"
             class="border border-green-600 text-green-700 dark:text-green-400 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center hover:bg-green-50 dark:hover:bg-gray-800 transition"
           >
-            Analitik
+            Analisis
           </NuxtLink>
         </div>
       </div>

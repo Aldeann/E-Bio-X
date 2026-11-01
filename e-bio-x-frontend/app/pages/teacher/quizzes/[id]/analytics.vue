@@ -4,7 +4,7 @@
       <button class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300" @click="$router.push(`/teacher/quizzes/${quizId}`)">
         <Icon name="material-symbols:arrow-back" class="w-6 h-6" />
       </button>
-      <h2 class="text-2xl font-semibold">Analitik Kuis</h2>
+      <h2 class="text-2xl font-semibold">Analisis Kuis</h2>
     </div>
     <QuizAnalytics :quiz-id="quizId" />
   </div>

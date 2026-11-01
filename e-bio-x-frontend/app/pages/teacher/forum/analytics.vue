@@ -1,7 +1,7 @@
 <template>
   <div>
     <h1 class="text-3xl font-bold text-green-500 mb-6 flex items-center gap-2">
-      <Icon name="mdi:chart-box-outline" /> Analitik Forum
+      <Icon name="mdi:chart-box-outline" /> Analisis Forum
     </h1>
 
     <div v-if="loading" class="animate-pulse space-y-3">
@@ -120,7 +120,7 @@ const fetchData = async () => {
     data.value = res;
   } catch (err) {
     console.error(err);
-    toast.add({ title: "Gagal memuat analitik forum.", color: "red" });
+    toast.add({ title: "Gagal memuat analisis forum.", color: "red" });
   } finally {
     loading.value = false;
   }

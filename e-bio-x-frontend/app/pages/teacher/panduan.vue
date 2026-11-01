@@ -15,7 +15,7 @@
       class="rounded-xl border border-green-200 dark:border-green-800 bg-green-50/70 dark:bg-green-950/20 p-4 sm:p-5 mb-6">
       <p class="text-sm sm:text-base text-gray-700 dark:text-gray-200 leading-relaxed">
         Panduan ini menjelaskan semua menu pada sidebar guru beserta cara memakainya.
-        Alurnya: <b>Masuk</b> → <b>Dasbor</b> → <b>Analitik</b> → <b>ML Insights</b> →
+        Alurnya: <b>Masuk</b> → <b>Dasbor</b> → <b>Analisis Hasil Belajar</b> → <b>ML Insights</b> →
         <b>Materi</b> → <b>Kuis</b> → <b>Bank Soal</b> → <b>Latihan per Bagian</b> →
         <b>Forum</b> → <b>Pembahasan AI</b> → <b>Akun</b>. Semua gambar ditampilkan penuh
         langsung di halaman, tidak perlu membukanya terlebih dahulu.
@@ -112,14 +112,14 @@ const sections = [
   },
   {
     id: "analitik",
-    title: "Analitik Pembelajaran",
+    title: "Analisis Hasil Belajar",
     icon: "material-symbols:monitoring",
     desc: "Pantau progres siswa, penguasaan materi, kinerja kuis, dan topik.",
     steps: [
       "Atur filter: <b>Kelas</b>, <b>Fase</b>, <b>Topik</b>, <b>Materi</b>, cari siswa, rentang tanggal, status belajar, dan status penguasaan.",
       "Klik <b>Terapkan</b> untuk memuat data (klik <b>Reset</b> untuk mengembalikan filter).",
       "Baca kartu ringkasan dan grafik <b>Distribusi Penguasaan</b> serta <b>Distribusi Status Belajar</b>.",
-      "Telaah <b>Analitik per Topik</b> dan <b>Kinerja per Tingkat Kesulitan</b>.",
+      "Telaah <b>Analisis per Topik</b> dan <b>Kinerja per Tingkat Kesulitan</b>.",
       "Gunakan tabel siswa & peta penguasaan untuk menemukan siswa yang perlu pendampingan.",
     ],
     image: "/panduan/03-analitik.png",
@@ -149,7 +149,7 @@ const sections = [
       "Gunakan <b>Filter kelas</b> untuk menyaring daftar materi.",
       "Klik judul atau tombol <b>Edit</b> untuk membuka <b>Penyusun Materi</b> dan mengatur bagian, konten, gambar, serta tujuan pembelajaran.",
       "Lengkapi kartu <b>pengantar</b>, <b>petunjuk belajar</b>, dan <b>kebutuhan belajar</b> pada materi agar siswa tahu cara memakainya.",
-      "Manfaatkan tombol <b>Preview</b> (tampilan siswa), <b>Analitik</b> (progres), <b>Publish/Unpublish</b>, dan <b>Hapus</b>.",
+      "Manfaatkan tombol <b>Preview</b> (tampilan siswa), <b>Analisis</b> (progres), <b>Publish/Unpublish</b>, dan <b>Hapus</b>.",
     ],
     image: "/panduan/05-materi.png",
   },
@@ -162,7 +162,7 @@ const sections = [
       "Klik <b>Buat Kuis</b> (siapkan soalnya lebih dulu di <b>Bank Soal</b> bila perlu).",
       "Isi judul, deskripsi, materi terkait, durasi, dan nilai kelulusan (KKM), lalu tambahkan soal.",
       "Pada daftar kuis, lihat status (Draft/Published), jumlah soal, poin, durasi, dan statistik Peserta/Percobaan/Rata-rata.",
-      "Klik <b>Kelola</b> untuk mengatur & mempublikasikan kuis, <b>Analitik</b> untuk hasil per soal, atau ikon sampah untuk menghapus.",
+      "Klik <b>Kelola</b> untuk mengatur & mempublikasikan kuis, <b>Analisis</b> untuk hasil per soal, atau ikon sampah untuk menghapus.",
     ],
     image: "/panduan/06-kuis.png",
   },
@@ -202,7 +202,7 @@ const sections = [
       "Klik <b>Forum Baru</b> untuk membuat topik diskusi (tipe: Diskusi, Presentasi, Tanya Jawab, atau Studi Kasus).",
       "Cari/ filter forum berdasarkan tipe dan urutan; centang <b>Hanya forum saya</b> bila perlu.",
       "Klik salah satu kartu forum untuk membuka dan membalas diskusi.",
-      "Gunakan tombol <b>Moderasi</b> untuk meninjau konten dan <b>Analitik</b> untuk statistik forum.",
+      "Gunakan tombol <b>Moderasi</b> untuk meninjau konten dan <b>Analisis</b> untuk statistik forum.",
       "Gunakan ikon tempat sampah pada kartu untuk menghapus forum.",
     ],
     image: "/panduan/09-forum.png",

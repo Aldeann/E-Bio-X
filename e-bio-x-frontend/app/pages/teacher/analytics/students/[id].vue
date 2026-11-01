@@ -8,7 +8,7 @@
       <div class="mb-6">
         <NuxtLink to="/teacher/analytics" class="text-sm text-green-600 hover:underline flex items-center gap-1 mb-1">
           <Icon name="material-symbols:arrow-back" class="w-4 h-4" />
-          Kembali ke Analitik
+          Kembali ke Analisis Hasil Belajar
         </NuxtLink>
         <h2 class="text-2xl font-semibold">{{ detail.student.name }}</h2>
         <p class="text-sm text-gray-500">{{ detail.student.email }}</p>

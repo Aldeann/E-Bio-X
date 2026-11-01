@@ -296,7 +296,7 @@ const research = {
 const features = [
   "Materi interaktif dengan blok konten dan pertanyaan.",
   "Kuis dan bank soal dengan penilaian otomatis.",
-  "Analitik berbasis machine learning untuk memantau penguasaan materi.",
+  "Analisis hasil belajar berbasis machine learning untuk memantau penguasaan materi.",
   "Penjelasan jawaban berbasis AI yang divalidasi guru.",
   "Forum diskusi kelas antara siswa dan guru.",
   "Manajemen kelas, materi, dan pengguna.",

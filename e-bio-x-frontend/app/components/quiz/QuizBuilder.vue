@@ -54,7 +54,7 @@
               :to="`/teacher/quizzes/${quiz.id}/analytics`"
               class="border border-green-600 text-green-700 dark:text-green-400 px-3 py-2 rounded-lg hover:bg-green-50 dark:hover:bg-gray-800 transition flex items-center gap-1 text-sm"
             >
-              <Icon name="material-symbols:monitoring" class="w-4 h-4" /> Analitik
+              <Icon name="material-symbols:monitoring" class="w-4 h-4" /> Analisis
             </NuxtLink>
             <button
               class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition flex items-center gap-1 text-sm"

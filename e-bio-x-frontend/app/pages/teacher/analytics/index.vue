@@ -1,7 +1,7 @@
 <template>
   <div>
     <PageHeader
-      title="Analitik Pembelajaran"
+      title="Analisis Hasil Belajar"
       subtitle="Pantau progres siswa, penguasaan materi, kinerja kuis, dan topik."
     />
 
@@ -89,7 +89,7 @@
       <!-- Topics & difficulty -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
         <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
-          <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-3">Analitik per Topik</h4>
+          <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-3">Analisis per Topik</h4>
           <div v-if="topics.length" class="space-y-3">
             <div v-for="t in topics" :key="t.topic" class="flex items-center gap-3">
               <div class="flex-1 min-w-0">
@@ -179,7 +179,7 @@
                         <span class="text-xs font-semibold w-10 text-right">{{ s.completion_rate }}%</span>
                       </div>
                       <NuxtLink :to="`/teacher/materials/analytics/${materialDetail.material_id}`" class="text-xs text-green-600 hover:underline">
-                        Lihat analitik materi lengkap →
+                        Lihat analisis materi lengkap →
                       </NuxtLink>
                     </div>
                     <div>
@@ -485,7 +485,7 @@ const loadAll = async () => {
     if (mats.status === "fulfilled" && mats.value) materialSummary.value = mats.value;
     else materialSummary.value = [];
   } catch (e) {
-    toast.add({ title: "Gagal memuat analitik", color: "red" });
+    toast.add({ title: "Gagal memuat analisis hasil belajar", color: "red" });
   } finally {
     loading.value = false;
   }
