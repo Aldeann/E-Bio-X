@@ -4,7 +4,7 @@
       <div
         class="bg-surface text-body shadow-md rounded-xl overflow-hidden">
         <div class="relative bg-brand-700 text-white text-center py-4">
-          <h4 class="text-xl font-semibold">Login E Bio X</h4>
+          <h4 class="text-xl font-semibold">Masuk ke E-Bio X</h4>
           <div class="absolute top-0 right-0 pr-4 pt-5">
             <ToggleDark />
           </div>
@@ -21,7 +21,7 @@
                 class="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-brand-500 dark:bg-slate-700 dark:text-white" />
             </div>
             <div>
-              <label for="password" class="block font-medium mb-1">Password</label>
+              <label for="password" class="block font-medium mb-1">Kata sandi</label>
               <div class="relative">
                 <input
                   :type="showPassword ? 'text' : 'password'"
@@ -38,11 +38,15 @@
             <button
               type="submit"
               class="w-full bg-brand-700 hover:bg-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 text-white font-semibold py-2 rounded transition-colors">
-              Login
+              Masuk
             </button>
           </form>
 
           <p v-if="message" class="mt-4 text-red-600 text-sm text-center">{{ message }}</p>
+
+          <p class="mt-3 text-center text-xs leading-relaxed text-muted">
+            Lupa kata sandi? Hubungi guru atau admin sekolah, ya.
+          </p>
 
           <div class="flex justify-center mt-6">
             <GoogleSignInButton
@@ -120,13 +124,13 @@ const handleLogin = async () => {
     const status = error?.response?.status || error?.statusCode || error?.data?.statusCode;
 
     if (status === 401) {
-      message.value = "Email atau password salah";
+      message.value = "Email atau kata sandi belum cocok. Coba periksa lagi, ya.";
     } else if (status === 418) {
-      message.value = "Akun terdaftar dengan google. Gunakan google untuk login.";
+      message.value = "Akun ini terdaftar lewat Google. Silakan masuk dengan tombol Google di bawah.";
     } else if (status >= 500) {
-      message.value = "Server sedang bermasalah. Coba lagi nanti.";
+      message.value = "Server sedang sibuk. Coba beberapa saat lagi, ya.";
     } else {
-      message.value = `Terjadi kesalahan. Silakan coba lagi.`;
+      message.value = "Ada kendala saat masuk. Coba lagi; kalau masih gagal, hubungi guru atau admin sekolah.";
     }
   }
 };
@@ -157,18 +161,18 @@ const handleLoginSuccess = async (response: CredentialResponse) => {
     const status = error?.response?.status || error?.statusCode || error?.data?.statusCode;
 
     if (status === 401) {
-      message.value = "Email atau password salah";
+      message.value = "Email atau kata sandi belum cocok. Coba periksa lagi, ya.";
     } else if (status >= 500) {
-      message.value = "Server sedang bermasalah. Coba lagi nanti.";
+      message.value = "Server sedang sibuk. Coba beberapa saat lagi, ya.";
     } else {
-      message.value = "Terjadi kesalahan. Silakan coba lagi.";
+      message.value = "Ada kendala saat masuk. Coba lagi; kalau masih gagal, hubungi guru atau admin sekolah.";
     }
   }
 };
 
 // handle an error google login
 const handleLoginError = () => {
-  message.value = "Login Google gagal. Silakan coba lagi.";
+  message.value = "Masuk dengan Google belum berhasil. Coba lagi, ya.";
   console.error("Login failed");
 };
 </script>
