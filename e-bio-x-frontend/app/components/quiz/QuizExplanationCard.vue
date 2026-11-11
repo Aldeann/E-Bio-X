@@ -12,7 +12,7 @@
       </span>
       <span class="font-semibold">Soal {{ index + 1 }}</span>
       <span class="text-xs text-gray-500 ml-auto">
-        Jawaban Anda: {{ answer || "—" }}
+        Jawabanmu: {{ answer || "—" }}
       </span>
       <span
         class="text-xs font-medium px-2 py-0.5 rounded-full"
@@ -64,7 +64,7 @@
         v-if="personal?.analysis"
         class="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-sm text-amber-800 dark:text-amber-300"
       >
-        <span class="font-semibold">Analisis jawaban Anda: </span>{{ personal.analysis }}
+        <span class="font-semibold">Analisis jawabanmu: </span>{{ personal.analysis }}
       </div>
 
       <div
@@ -168,7 +168,7 @@ const sendFeedback = async (rating) => {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ rating }),
     });
-    toast.add({ title: "Terima kasih atas umpan balik Anda!", color: "green" });
+    toast.add({ title: "Terima kasih atas umpan balikmu!", color: "green" });
   } catch (e) {
     toast.add({ title: e?.data?.error || "Gagal mengirim umpan balik", color: "red" });
   } finally {

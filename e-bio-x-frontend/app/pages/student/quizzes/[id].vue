@@ -34,7 +34,7 @@
       />
       <div class="flex flex-wrap gap-3 justify-center">
         <NuxtLink
-          :to="`/student/quizzes/${quizId}/result`"
+          :to="`/student/quizzes/hasil/${quizId}`"
           class="border border-green-600 text-green-700 dark:text-green-400 px-5 py-2 rounded-lg hover:bg-green-50 dark:hover:bg-gray-800 transition"
         >
           Buka Halaman Hasil

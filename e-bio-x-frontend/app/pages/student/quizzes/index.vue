@@ -24,7 +24,7 @@
 
     <div v-else-if="filtered.length === 0" class="text-center py-12 sm:py-16 bg-white dark:bg-gray-900 border border-dashed border-gray-300 dark:border-gray-600 rounded-xl">
       <Icon name="material-symbols:quiz" class="w-12 h-12 sm:w-14 sm:h-14 text-gray-300 mx-auto mb-3" />
-      <p class="text-sm text-gray-500">Belum ada kuis yang tersedia untuk Anda.</p>
+      <p class="text-sm text-gray-500">Belum ada kuis yang tersedia untukmu.</p>
     </div>
 
     <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
@@ -38,6 +38,8 @@
 </template>
 
 <script setup>
+import StudentQuizCard from "~/components/quiz/StudentQuizCard.vue";
+
 const config = useRuntimeConfig();
 const token = useCookie("access_token").value;
 const toast = useToast();

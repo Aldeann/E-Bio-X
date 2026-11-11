@@ -26,7 +26,7 @@
       </div>
       <div class="bg-green-50 dark:bg-green-900/40 rounded-xl py-4">
         <p class="text-xl font-bold text-green-700 dark:text-green-500">{{ quiz.passing_grade }}%</p>
-        <p class="text-xs text-gray-500">Nilai Lulus</p>
+        <p class="text-xs text-gray-500">Batas lulus</p>
       </div>
       <div class="bg-green-50 dark:bg-green-900/40 rounded-xl py-4">
         <p class="text-xl font-bold text-green-700 dark:text-green-500">{{ quiz.attempts_used }}/{{ quiz.max_attempts }}</p>
@@ -67,11 +67,11 @@
     </button>
 
     <div v-if="quiz.student_status === 'in_progress' && quiz.attempts_used >= quiz.max_attempts" class="text-center mt-4 text-xs text-red-500">
-      Kesempatan mengerjakan tersisa, namun masih ada pengerjaan yang belum dikumpulkan.
+      Masih ada pengerjaan yang belum dikumpulkan. Selesaikan dulu agar jawabanmu tersimpan.
     </div>
 
     <p v-if="quiz.student_status === 'completed' && quiz.attempts_used >= quiz.max_attempts" class="text-center mt-4 text-sm text-gray-500">
-      Tidak ada sisa percobaan yang tersedia.
+      Kesempatan mengerjakan sudah habis. Kamu masih bisa membaca pembahasannya, ya.
     </p>
   </div>
 </template>

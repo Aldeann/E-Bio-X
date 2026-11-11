@@ -2,24 +2,27 @@
   <div v-if="result" class="space-y-5">
     <div
       class="rounded-2xl shadow-lg p-8 text-center text-white"
-      :class="result.passed ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-red-400 to-red-600'"
+      :class="result.passed ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-amber-700 to-orange-800'"
     >
       <Icon
-        :name="result.passed ? 'material-symbols:celebration' : 'material-symbols:sentiment-dissatisfied'"
+        :name="result.passed ? 'material-symbols:celebration' : 'material-symbols:lightbulb'"
         class="w-16 h-16 mx-auto mb-2"
       />
-      <h3 class="text-2xl font-bold">{{ result.passed ? "Selamat, Anda Lulus!" : "Belum Lulus" }}</h3>
+      <h3 class="text-2xl font-bold">{{ result.passed ? "Selamat, kamu lulus!" : "Belum sampai batas lulus" }}</h3>
       <p class="mt-1 opacity-90">{{ result.title }}</p>
+      <p v-if="!result.passed" class="mt-3 mx-auto max-w-md text-sm leading-relaxed opacity-95">
+        Ini bukan akhir. Pelajari lagi bagian yang belum tepat, lalu coba lagi saat kamu sudah siap.
+      </p>
 
       <div class="mt-4 inline-flex items-center gap-3 bg-white/20 rounded-2xl px-6 py-4">
         <div>
           <p class="text-4xl font-extrabold">{{ result.percentage }}%</p>
-          <p class="text-xs uppercase tracking-wide opacity-80">Nilai Akhir</p>
+          <p class="text-xs uppercase tracking-wide opacity-80">Nilai akhir</p>
         </div>
         <div class="w-px h-12 bg-white/40"></div>
         <div>
           <p class="text-xl font-semibold">{{ result.score }} poin</p>
-          <p class="text-xs uppercase tracking-wide opacity-80">Nilai Lulus {{ result.passing_grade }}%</p>
+          <p class="text-xs uppercase tracking-wide opacity-80">Batas lulus {{ result.passing_grade }}%</p>
         </div>
       </div>
 
@@ -34,7 +37,7 @@
         </div>
         <div class="bg-gray-200/30 rounded-xl py-3">
           <p class="text-2xl font-bold">{{ result.unanswered_count }}</p>
-          <p class="text-xs opacity-80">Kosong</p>
+          <p class="text-xs opacity-80">Belum dijawab</p>
         </div>
       </div>
     </div>

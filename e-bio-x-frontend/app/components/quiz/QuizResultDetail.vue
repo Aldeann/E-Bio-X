@@ -41,7 +41,7 @@
           </span>
           <span>{{ o.option_text }}</span>
           <span v-if="o.correct" class="ml-auto text-xs text-green-600 font-medium shrink-0">Kunci jawaban</span>
-          <span v-else-if="o.selected" class="ml-auto text-xs text-red-500 font-medium shrink-0">Jawaban Anda</span>
+          <span v-else-if="o.selected" class="ml-auto text-xs text-red-500 font-medium shrink-0">Jawabanmu</span>
         </div>
       </div>
 

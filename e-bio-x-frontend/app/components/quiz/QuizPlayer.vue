@@ -188,7 +188,7 @@ const confirmSubmit = async () => {
     title: "Kumpulkan kuis?",
     text: unansweredCount.value > 0
       ? `${unansweredCount.value} soal belum dijawab. Yakin ingin mengumpulkan?`
-      : "Anda tidak bisa mengubah jawaban setelah dikumpulkan.",
+      : "Kamu tidak bisa mengubah jawaban setelah dikumpulkan.",
     icon: "warning",
     showCancelButton: true,
     confirmButtonText: "Kumpulkan",

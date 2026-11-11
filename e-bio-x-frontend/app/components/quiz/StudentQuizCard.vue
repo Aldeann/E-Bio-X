@@ -39,7 +39,7 @@
     <div class="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-100 dark:border-gray-800 mt-auto">
       <div v-if="quiz.student_status === 'completed'" class="grid grid-cols-2 gap-1.5 sm:gap-2">
         <NuxtLink
-          :to="`/student/quizzes/${quiz.id}/result`"
+          :to="`/student/quizzes/hasil/${quiz.id}`"
           class="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-center transition"
         >
           Lihat Hasil
