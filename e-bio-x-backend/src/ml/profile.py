@@ -113,10 +113,10 @@ def _persist(student_id, profile, row):
 
 def _profile_message(cluster_label):
     friendly = {
-        'High Achievement': 'Profil belajar Anda menunjukkan pemahaman yang baik dan konsisten.',
-        'Active Learner': 'Profil belajar Anda menunjukkan pola belajar aktif.',
-        'Moderate Learner': 'Profil belajar Anda berada pada tingkat menengah — terus tingkatkan.',
-        'Needs Support': 'Profil belajar Anda menunjukkan bahwa Anda masih membutuhkan penguatan.',
-        'Low Activity': 'Mulai belajar secara rutin agar profil belajar Anda semakin jelas.',
+        'High Achievement': 'Profil belajarmu menunjukkan pemahaman yang baik dan konsisten.',
+        'Active Learner': 'Profil belajarmu menunjukkan pola belajar aktif.',
+        'Moderate Learner': 'Profil belajarmu berada pada tingkat menengah — terus tingkatkan.',
+        'Needs Support': 'Profil belajarmu menunjukkan bahwa kamu masih membutuhkan penguatan.',
+        'Low Activity': 'Mulai belajar secara rutin agar profil belajarmu semakin jelas.',
     }
     return friendly.get(cluster_label, '')

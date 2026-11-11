@@ -348,9 +348,9 @@ def _personal_analysis(exp, student_answer_letter, is_correct):
             correct_letter = o.get('option')
             break
     if is_correct:
-        analysis = 'Jawaban Anda benar. ' + (exp.correct_answer_explanation or '')
+        analysis = 'Jawabanmu benar. ' + (exp.correct_answer_explanation or '')
     else:
-        bits = [f'Jawaban Anda ({student_answer_letter}) kurang tepat.']
+        bits = [f'Jawabanmu ({student_answer_letter}) kurang tepat.']
         if chosen and chosen.get('explanation'):
             bits.append(f'{chosen["explanation"]}')
         if correct_letter:

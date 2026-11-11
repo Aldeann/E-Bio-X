@@ -140,8 +140,8 @@ def _scope_info(teacher_id, model_type='decision_tree', available=True):
             'teacher_name': None,
             'model_type': model_type,
             'note': (f'Angka {what} ini berasal dari model yang dilatih dari '
-                     'seluruh siswa sistem, karena kelas Anda belum punya '
-                     'model sendiri. Jadi ini belum khusus untuk kelas Anda.'),
+                     'seluruh siswa sistem, karena kelasmu belum punya '
+                     'model sendiri. Jadi ini belum khusus untuk kelasmu.'),
         }
     teacher = User.query.get(teacher_id)
     return {

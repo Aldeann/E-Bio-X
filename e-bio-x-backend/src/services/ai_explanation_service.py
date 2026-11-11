@@ -209,9 +209,9 @@ class AIExplanationService:
 
         summary = f"Kunci jawaban soal ini adalah {correct}."
         if student_answer and student_answer != correct:
-            summary += f" Jawaban Anda ({student_answer}) kurang tepat; pelajari kembali konsep yang ditanyakan."
+            summary += f" Jawabanmu ({student_answer}) kurang tepat; pelajari kembali konsep yang ditanyakan."
         elif student_answer:
-            summary += " Jawaban Anda benar."
+            summary += " Jawabanmu benar."
 
         correct_expl = f"Kunci jawaban yang benar adalah {correct}."
         if correct_text:
@@ -221,9 +221,9 @@ class AIExplanationService:
 
         if student_answer and student_answer != correct:
             sel = next((o for o in options if o[0] == student_answer), None)
-            analysis = f"Jawaban Anda ({student_answer}) kurang tepat."
+            analysis = f"Jawabanmu ({student_answer}) kurang tepat."
             if sel:
-                analysis += f" Pilihan yang Anda pilih berbunyi \"{sel[1]}\", dan bukan kunci jawaban."
+                analysis += f" Pilihan yang kamu pilih berbunyi \"{sel[1]}\", dan bukan kunci jawaban."
             analysis += f" Kunci jawaban yang benar adalah {correct}."
         else:
             analysis = ""
