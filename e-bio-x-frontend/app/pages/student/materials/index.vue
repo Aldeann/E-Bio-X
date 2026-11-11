@@ -114,7 +114,7 @@ definePageMeta({
       Materi Pembelajaran
     </h1>
     <p class="text-sm text-gray-500 mb-6">
-      Telusuri dan mulai belajar materi dari guru Anda.
+      Telusuri dan mulai belajar materi dari gurumu.
     </p>
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-6 space-y-3">

@@ -1,7 +1,7 @@
 <template>
   <div class="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
     <h1 class="text-2xl sm:text-3xl font-semibold text-green-500">Kelas {{ course.name }}</h1>
-    <span class="text-sm sm:text-lg text-gray-700 dark:text-gray-200">Bareng {{ course.teacher }}</span>
+    <span class="text-sm sm:text-lg text-gray-700 dark:text-gray-200">Bersama {{ course.teacher }}</span>
 
     <div class="flex overflow-x-auto mt-3 sm:mt-4 space-x-2 pb-2 -mx-3 px-3 sm:mx-0 sm:px-0">
       <button

@@ -179,7 +179,7 @@
       </div>
 
       <div v-else class="bg-white dark:bg-gray-900 border dark:border-gray-700 rounded-xl p-4 text-sm text-gray-500">
-        {{ forum.status === 'DRAFT' ? 'Forum ini masih draft.' : forum.status === 'CLOSED' ? 'Forum ini telah ditutup. Anda tidak dapat menambah diskusi baru.' : 'Anda tidak dapat berpartisipasi di forum ini.' }}
+        {{ forum.status === 'DRAFT' ? 'Forum ini masih draft.' : forum.status === 'CLOSED' ? `Forum ini telah ditutup. ${participantPronoun} tidak dapat menambah diskusi baru.` : `${participantPronoun} tidak dapat berpartisipasi di forum ini.` }}
       </div>
 
       <!-- Posts -->
@@ -257,6 +257,7 @@ const config = useRuntimeConfig();
 const baseUrl = config.public.backend;
 const token = useCookie("access_token").value;
 const role = useCookie("role").value;
+const participantPronoun = role === "student" ? "Kamu" : "Anda";
 const swal = useSwal();
 const toast = useToast();
 const router = useRouter();

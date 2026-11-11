@@ -77,7 +77,7 @@
         <div class="flex items-center justify-between mb-3">
           <h4 class="text-lg font-semibold text-brand-700 dark:text-brand-300 flex items-center gap-2">
             <Icon name="material-symbols:auto-awesome" class="w-5 h-5" />
-            Rekomendasi Belajar Anda
+            Saran Belajar untukmu
           </h4>
           <span class="text-xs text-gray-400">Berdasarkan perkembangan belajarmu</span>
         </div>
@@ -216,7 +216,7 @@
             </button>
           </div>
         </div>
-        <p v-else class="text-sm text-gray-500">Belum ada rekomendasi materi untuk Anda.</p>
+        <p v-else class="text-sm text-gray-500">Belum ada saran materi untukmu saat ini.</p>
 
         <!-- Rekomendasi per BAGIAN (Fase 3e) -->
         <div v-if="sectionRecs.length" class="mt-6">
@@ -225,7 +225,7 @@
             Bagian yang Perlu Diperkuat
           </h5>
           <p class="text-xs text-gray-500 mb-3">
-            Diurutkan dari jawaban Anda sendiri per bagian
+            Diurutkan dari jawabanmu sendiri per bagian
             (kuis, soal interaktif, dan latihan). Peringkatannya aturan transparan,
             bukan hasil model.
           </p>

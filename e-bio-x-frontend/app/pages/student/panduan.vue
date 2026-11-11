@@ -88,23 +88,23 @@
 const sections = [
   {
     id: "masuk",
-    title: "Masuk ke Aplikasi (Login)",
+    title: "Masuk ke Aplikasi",
     icon: "material-symbols:login",
-    desc: "Semua pengguna masuk melalui halaman <b>Login</b>. Gunakan akun siswa yang diberikan oleh guru/sekolah.",
+    desc: "Semua pengguna masuk melalui halaman <b>Masuk</b>. Gunakan akun siswa yang diberikan oleh guru/sekolah.",
     steps: [
-      "Buka alamat aplikasi E-Bio X. Halaman <b>Login</b> akan muncul otomatis.",
-      "Isi kolom <b>Email</b> dan <b>Password</b> akun siswa Anda.",
-      "Klik ikon mata di kolom password bila ingin menampilkan/menyembunyikan password.",
-      "Klik tombol <b>Login</b>. Jika berhasil, Anda diarahkan ke halaman <b>Kelas Saya</b>.",
+      "Buka alamat aplikasi E-Bio X. Halaman <b>Masuk</b> akan muncul otomatis.",
+      "Isi kolom <b>Email</b> dan <b>kata sandi</b> akunmu.",
+      "Klik ikon mata di kolom kata sandi bila ingin menampilkan/menyembunyikan kata sandi.",
+      "Klik tombol <b>Masuk</b>. Jika berhasil, kamu diarahkan ke halaman <b>Kelas Saya</b>.",
     ],
-    note: "Tersedia juga tombol masuk dengan akun Google (opsional). Jika lupa password, hubungi guru atau admin sekolah untuk direset.",
+    note: "Tersedia juga tombol masuk dengan akun Google (opsional). Jika lupa kata sandi, hubungi guru atau admin sekolah untuk direset.",
     image: "/panduan-siswa/01-login.png",
   },
   {
     id: "kelas",
     title: "Kelas Saya & Gabung Kelas",
     icon: "material-symbols:groups",
-    desc: "Halaman pertama setelah masuk. Di sini Anda bergabung ke kelas dan melihat kelas yang sudah diikuti.",
+    desc: "Halaman pertama setelah masuk. Di sini kamu bergabung ke kelas dan melihat kelas yang sudah diikuti.",
     steps: [
       "Pada bagian <b>Gabung Kelas</b>, masukkan <b>kode kelas</b> yang dibagikan gurumu, lalu klik <b>Gabung</b>.",
       "Pada bagian <b>Kelasku</b>, tiap kartu menampilkan nama kelas dan nama guru pengampu.",
@@ -135,7 +135,7 @@ const sections = [
     steps: [
       "Baca kotak <b>Langkah Berikutnya</b> — satu arahan utama yang bisa langsung diklik.",
       "Lihat <b>kartu ringkasan</b> (jumlah materi, kuis, dan capaian belajarmu).",
-      "Telaah <b>Rekomendasi Belajar Anda</b>: label penguasaan, faktor utama, dan alasan tiap saran.",
+      "Telaah <b>Saran Belajar untukmu</b>: label penguasaan, faktor utama, dan alasan tiap saran.",
       "Pada <b>Bagian yang Perlu Diperkuat</b>, klik <b>Latihan adaptif</b> untuk langsung berlatih atau <b>Buka materi</b>.",
       "Lanjutkan lewat <b>Lanjutkan Belajar</b> dan pantau <b>Progres Materi</b> (tombol <b>Buka</b>/<b>Ulangi</b>).",
     ],
@@ -245,8 +245,8 @@ const sections = [
     desc: "Atur profil dan keluar dari aplikasi.",
     steps: [
       "Klik <b>nama/avatar</b> di kanan atas, lalu pilih <b>Akun</b> (di ponsel: buka menu ☰ → <b>Akun</b>).",
-      "Klik ikon pensil untuk mengubah <b>nama</b> Anda.",
-      "Klik tombol <b>ubah password</b> untuk mengganti password.",
+      "Klik ikon pensil untuk mengubah <b>nama</b>mu.",
+      "Klik tombol <b>Ubah kata sandi</b> untuk mengganti kata sandi.",
       "Ubah tema terang/gelap lewat tombol <b>Ganti tema</b>. Untuk keluar, pilih <b>Logout</b> lalu konfirmasi.",
     ],
     image: "/panduan-siswa/12-akun.png",

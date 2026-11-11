@@ -4,7 +4,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
       <div>
         <h2 class="text-2xl font-semibold mb-3">
-          Hi, <span class="text-green-600 dark:text-green-500">{{ useCookie("username").value }}</span
+          Halo, <span class="text-green-600 dark:text-green-500">{{ useCookie("username").value }}</span
           >!
         </h2>
       </div>
@@ -50,7 +50,7 @@
                 <Icon name="ri:logout-box-line" class="w-4 h-4" />
               </button>
               <h5 class="text-lg font-semibold text-gray-800 dark:text-gray-200">{{ kelas.name }}</h5>
-              <p class="text-sm text-green-600 mb-4">Bareng {{ kelas.teacher }}</p>
+              <p class="text-sm text-green-600 mb-4">Bersama {{ kelas.teacher }}</p>
               <NuxtLink
                 :to="'/student/course/' + kelas.id"
                 class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 inline-flex items-center">
@@ -130,11 +130,11 @@ const outClass = async (code) => {
         "Content-Type": "application/json",
       },
     });
-    toast.add({title: "Berhasil keluar dengan kelas.", color: "green"});
+    toast.add({title: "Kamu sudah keluar dari kelas.", color: "green"});
     await fetchCoursesData();
     classCode.value = "";
   } catch (err) {
-    toast.add({title: "Gagal keluar dengan kelas.", color: 'red'})
+    toast.add({title: "Gagal keluar dari kelas.", color: 'red'})
   }
 };
 

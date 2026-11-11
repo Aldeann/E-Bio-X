@@ -16,7 +16,7 @@ const emit = defineEmits(["restart"]);
     </div>
     <h1 class="text-2xl font-bold text-green-700 dark:text-green-400">Materi Selesai!</h1>
     <p class="text-gray-700 dark:text-gray-200 font-semibold mt-2">{{ title }}</p>
-    <p class="text-gray-500 mt-1">Anda telah menyelesaikan materi ini.</p>
+    <p class="text-gray-500 mt-1">Kamu sudah menyelesaikan materi ini.</p>
 
     <div class="mt-6 max-w-xs mx-auto">
       <MaterialProgress :percentage="percentage" />
