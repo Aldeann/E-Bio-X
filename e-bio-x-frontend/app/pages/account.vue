@@ -10,12 +10,12 @@
         </div>
         <div class="flex items-center justify-center gap-2">
           <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2">
-            {{ userData.name || "User" }}
+            {{ userData.name || "Pengguna" }}
           </h1>
           <button
           class="w-9 h-9 p-1.5 text-yellow-400 hover:text-yellow-500 transition duration-300"
           @click="updateName"
-          aria-label="Edit Name">
+          aria-label="Ubah nama">
           <Icon name="material-symbols:edit" />
         </button>
       </div>
@@ -46,12 +46,13 @@ const userData = ref({
 
 const updateName = async () => {
   const { value: name } = await swal.fire({
-    title: "Edit Name",
+    title: "Ubah nama",
     input: "text",
     inputValue: userData.value.name,
     showCancelButton: true,
-    confirmButtonText: "Update",
-    inputValidator: (value) => !value && "Name cannot be empty",
+    confirmButtonText: "Simpan",
+    cancelButtonText: "Batal",
+    inputValidator: (value) => !value && "Nama tidak boleh kosong.",
   });
 
   if (name) {
@@ -62,12 +63,11 @@ const updateName = async () => {
         body: { name },
       });
       userData.value.name = name;
-      swal.fire("Success", "Name updated!", "success");
+      swal.fire("Berhasil", "Nama berhasil diperbarui.", "success");
 
-      userData.value.name = name;
       Cookies.set("username", name);
     } catch (e) {
-      swal.fire("Error", "Failed to update name.", "error");
+      swal.fire("Gagal", "Nama belum bisa diperbarui. Coba lagi.", "error");
     }
   }
 };
