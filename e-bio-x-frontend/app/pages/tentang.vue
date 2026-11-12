@@ -136,13 +136,12 @@
             v-if="person.photo"
             :src="person.photo"
             :alt="`Foto ${person.name}`"
-            width="144"
-            height="192"
-            loading="lazy"
-            class="h-16 w-12 shrink-0 rounded-xl object-cover object-top ring-1 ring-guru-200 dark:ring-guru-800" />
+            width="64"
+            height="80"
+            class="h-20 w-16 shrink-0 rounded-xl object-cover object-top ring-1 ring-guru-200 dark:ring-guru-800" />
           <div
             v-else
-            class="flex h-16 w-12 shrink-0 items-center justify-center rounded-xl bg-guru-50 text-sm font-bold text-guru-700 ring-1 ring-guru-200 dark:bg-guru-900/40 dark:text-guru-200 dark:ring-guru-800"
+            class="flex h-20 w-16 shrink-0 items-center justify-center rounded-xl bg-guru-50 text-sm font-bold text-guru-700 ring-1 ring-guru-200 dark:bg-guru-900/40 dark:text-guru-200 dark:ring-guru-800"
             aria-hidden="true">
             {{ person.initials }}
           </div>
@@ -303,8 +302,18 @@ const features = [
 ];
 
 const supervisors = [
-  { name: "Relsas Yogica, S.Pd., M.Pd.", role: "Dosen Pembimbing", initials: "RY" },
-  { name: "Dr. Heffi Alberida, S.Pd., M.Si.", role: "Dosen Penanggap 1", initials: "HA" },
+  {
+    name: "Relsas Yogica, S.Pd., M.Pd.",
+    role: "Dosen Pembimbing",
+    initials: "RY",
+    photo: "/images/pengembang/relsas-yogica.jpg",
+  },
+  {
+    name: "Dr. Heffi Alberida, S.Pd., M.Si.",
+    role: "Dosen Penanggap 1",
+    initials: "HA",
+    photo: "/images/pengembang/heffi-alberida.jpg",
+  },
   {
     name: "Fitri Olvia Rahmi, S.Pd., M.Pd.",
     role: "Dosen Penanggap 2",
