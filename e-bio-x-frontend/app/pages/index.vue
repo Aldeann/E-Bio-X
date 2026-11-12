@@ -25,9 +25,9 @@
         <div class="text-center max-w-4xl mx-auto">
           <!-- Badge -->
           <div
-            class="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full text-white text-sm font-medium mb-8 hover:bg-white/30 transition-all cursor-pointer">
+            class="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full text-white text-sm font-medium mb-8">
             <Icon name="heroicons:sparkles" class="w-4 h-4" />
-            Platform Pembelajaran Terdepan
+            Suplemen Belajar Biologi Fase E
           </div>
 
           <!-- Main Title -->
@@ -35,7 +35,7 @@
             E-Bio X
           </h1>
           <p class="text-lg sm:text-xl md:text-2xl text-green-100 mb-12 max-w-3xl mx-auto leading-relaxed px-4">
-            Platform pembelajaran biologi interaktif dengan teknologi AI untuk siswa dan guru masa depan
+            Media pembelajaran biologi untuk siswa dan guru SMA Fase E, dilengkapi latihan adaptif dan analisis hasil belajar.
           </p>
 
           <!-- CTA Buttons -->
@@ -43,9 +43,13 @@
             <NuxtLink to="/login"
               class="group inline-flex items-center justify-center gap-3 bg-white hover:bg-gray-100 text-green-600 px-8 py-4 rounded-full font-semibold text-lg transition-all duration-300 transform hover:scale-105 hover:shadow-2xl">
               <Icon name="heroicons:rocket-launch" class="w-6 h-6 group-hover:rotate-12 transition-transform" />
-              Mulai Sekarang
+              Masuk ke E-Bio X
             </NuxtLink>
           </div>
+          <p class="text-sm text-green-100 px-4">
+            Akses uji coba terbatas. Minta akun melalui halaman
+            <NuxtLink to="/tentang" class="font-semibold underline underline-offset-4 hover:text-white">Tentang Pengembang</NuxtLink>.
+          </p>
         </div>
       </div>
 
@@ -63,13 +67,13 @@
           <div
             class="inline-flex items-center gap-2 bg-green-100 dark:bg-green-900/50 px-4 py-2 rounded-full text-green-700 dark:text-green-300 font-medium mb-6">
             <Icon name="heroicons:star" class="w-4 h-4" />
-            Fitur Unggulan
+            Panduan Singkat
           </div>
           <h2 class="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-            Mengapa Pilih E-Bio X?
+            Mengenal Fitur E-Bio X
           </h2>
           <p class="text-lg sm:text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-            Teknologi terdepan untuk pembelajaran yang efektif dan menyenangkan
+            Tonton video singkat untuk melihat cara memakai setiap fitur.
           </p>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -81,8 +85,8 @@
               class="w-16 h-16 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-12 transition-all duration-300">
               <Icon name="heroicons:home" class="w-8 h-8 text-white" />
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Basic App</h3>
-            <p class="text-gray-600 dark:text-gray-300 text-sm">Tutorial setup dan fitur dasar aplikasi</p>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Panduan Dasar Aplikasi</h3>
+            <p class="text-gray-600 dark:text-gray-300 text-sm">Penyiapan akun dan pengenalan fitur dasar.</p>
           </a>
 
           <!-- Materi Interaktif -->
@@ -93,8 +97,8 @@
               class="w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:-rotate-12 transition-all duration-300">
               <Icon name="heroicons:book-open" class="w-8 h-8 text-white" />
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Materi Interaktif</h3>
-            <p class="text-gray-600 dark:text-gray-300 text-sm">Tutorial upload & baca materi siswa</p>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Materi Belajar</h3>
+            <p class="text-gray-600 dark:text-gray-300 text-sm">Cara mengunggah dan membaca materi.</p>
           </a>
 
           <!-- Kuis -->
@@ -106,7 +110,7 @@
               <Icon name="hugeicons:quiz-04" class="w-8 h-8 text-white" />
             </div>
             <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Kuis</h3>
-            <p class="text-gray-600 dark:text-gray-300 text-sm">Tutorial buat & kerjain kuis</p>
+            <p class="text-gray-600 dark:text-gray-300 text-sm">Cara membuat dan mengerjakan kuis.</p>
           </a>
 
           <!-- Analisis Performa -->
@@ -117,8 +121,8 @@
               class="w-16 h-16 bg-gradient-to-br from-orange-400 to-red-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:-rotate-12 transition-all duration-300">
               <Icon name="heroicons:chart-bar" class="w-8 h-8 text-white" />
             </div>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Analisis Performa</h3>
-            <p class="text-gray-600 dark:text-gray-300 text-sm">Tutorial analisis hasil kuis siswa</p>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Analisis Hasil Belajar</h3>
+            <p class="text-gray-600 dark:text-gray-300 text-sm">Cara membaca hasil kuis dan analisis belajar.</p>
           </a>
         </div>
       </div>
