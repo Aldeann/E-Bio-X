@@ -1008,17 +1008,17 @@ def create_feedback(post_id):
     if not user:
         return jsonify({'error': 'User not found'}), 404
     if user.role not in ('teacher', 'admin'):
-        return jsonify({'error': 'Hanya guru yang dapat memberikan feedback'}), 403
+        return jsonify({'error': 'Hanya guru yang dapat memberikan umpan balik'}), 403
     post = ForumPost.query.get(post_id)
     if not post or post.deleted_at is not None:
         return jsonify({'error': 'Posting tidak ditemukan'}), 404
     if not fs.can_manage_forum(post.forum, user):
-        return jsonify({'error': 'Anda tidak dapat memberi feedback pada forum ini'}), 403
+        return jsonify({'error': 'Anda tidak dapat memberi umpan balik pada forum ini'}), 403
 
     data = request.get_json(silent=True) or {}
     feedback_text = fs.sanitize_text(data.get('feedback') or '')
     if not feedback_text:
-        return jsonify({'error': 'Feedback wajib diisi'}), 400
+        return jsonify({'error': 'Umpan balik wajib diisi'}), 400
 
     fb = ForumFeedback.query.filter_by(post_id=post.id).first()
     if fb:
@@ -1032,9 +1032,9 @@ def create_feedback(post_id):
     fs.log_forum_event(user, post.forum, 'TEACHER_FEEDBACK_CREATED', {'post_id': post.id})
     if post.author_id != user.id:
         fs.notify(post.author_id, user.id, 'teacher_feedback',
-                  f'Guru memberikan feedback pada jawaban Anda di "{post.forum.title}".',
+                  f'Guru memberikan umpan balik pada jawabanmu di "{post.forum.title}".',
                   forum_id=post.forum_id, post_id=post.id)
-    return jsonify({'message': 'Feedback disimpan', 'feedback': {
+    return jsonify({'message': 'Umpan balik disimpan', 'feedback': {
         'teacher_id': user.id, 'teacher_name': user.name, 'feedback': fb.feedback,
         'created_at': fb.created_at.isoformat() + 'Z',
     }}), 201
@@ -1068,7 +1068,7 @@ def mark_best_answer(post_id):
     fs.log_forum_event(user, post.forum, 'BEST_ANSWER_SELECTED', {'post_id': post.id})
     if post.author_id != user.id:
         fs.notify(post.author_id, user.id, 'best_answer',
-                  f'Jawaban Anda ditandai sebagai Best Answer di "{post.forum.title}".',
+                  f'Jawabanmu ditandai sebagai Jawaban Terbaik di "{post.forum.title}".',
                   forum_id=post.forum_id, post_id=post.id)
     fs.award_xp(post.author_id, 'best_answer', 15, 'post', post.id)
     fs.evaluate_achievements(post.author_id)
