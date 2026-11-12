@@ -47,7 +47,7 @@ const deleteMaterial = async (material) => {
     materials.value = materials.value.filter((u) => u.id !== material.id);
     swal.fire("Berhasil", "Materi berhasil dihapus", "success");
   } catch (err) {
-    swal.fire("Gagal", "Tidak bisa hapus material", "error");
+    swal.fire("Gagal", "Materi tidak bisa dihapus", "error");
   }
 };
 

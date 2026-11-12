@@ -60,11 +60,11 @@ definePageMeta({
 const columns = [
   { header: "Nama Kelas", accessorKey: "name" },
   { header: "Pengajar", accessorKey: "teacher" },
-  { header: "Jumlah sisiwa", accessorKey: "students" },
+  { header: "Jumlah Siswa", accessorKey: "students" },
 ];
 
 const filters = computed(() => [
-  { title: "Teacher", options: teachers.value, accessorKey: "teacher" },
+  { title: "Guru", options: teachers.value, accessorKey: "teacher" },
 ]);
 </script>
 

@@ -3,7 +3,7 @@
     <h1
       class="text-2xl font-semibold text-green-700 dark:text-green-400 flex items-center gap-2 mb-6"
     >
-      <Icon name="mdi:home" class="text-green-500 dark:text-green-300" /> Dashboard Admin
+      <Icon name="mdi:home" class="text-green-500 dark:text-green-300" /> Dasbor Admin
     </h1>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
@@ -25,7 +25,7 @@
       <div
         class="bg-white dark:bg-gray-800 border border-green-200 dark:border-green-600 rounded-lg p-4 shadow flex flex-col gap-2"
       >
-        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Total Kursus</h3>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Total Kelas</h3>
         <p class="text-2xl font-bold text-green-600 dark:text-green-400">
           {{ stats.totalCourses }}
         </p>
@@ -58,7 +58,7 @@
       <h2
         class="text-xl font-semibold text-green-700 dark:text-green-400 mb-4 flex items-center gap-2"
       >
-        <Icon name="mdi:user" class="text-green-500 dark:text-green-300" /> User
+        <Icon name="mdi:user" class="text-green-500 dark:text-green-300" /> Pengguna
       </h2>
       <AdminTable
         :data="recentUsers"
@@ -124,7 +124,7 @@ const userColumns = [
 ];
 
 const courseColumns = [
-  { header: "Nama Kursus", accessorKey: "name" },
+  { header: "Nama Kelas", accessorKey: "name" },
   { header: "ID", accessorKey: "id" },
 ];
 
@@ -157,7 +157,7 @@ const fetchStats = async () => {
     recentMaterials.value = materials.slice(0, 5);
   } catch (error) {
     toast.add({
-      title: "Gagal memuat data dashboard: " + error.message,
+      title: "Gagal memuat data dasbor: " + error.message,
       color: "red",
     });
   }
@@ -171,10 +171,10 @@ const updateUser = async (user) => {
       headers: { Authorization: `Bearer ${token}` },
       body: user,
     });
-    toast.add({ title: "Sukses", description: "Pengguna diperbarui", color: "green" });
+    toast.add({ title: "Berhasil", description: "Pengguna diperbarui", color: "green" });
     await fetchStats(); // Refresh data
   } catch (error) {
-    toast.add({ title: "Error", description: "Gagal memperbarui pengguna", color: "red" });
+    toast.add({ title: "Gagal", description: "Pengguna gagal diperbarui", color: "red" });
   }
 };
 
@@ -184,10 +184,10 @@ const deleteUser = async (user) => {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
-    toast.add({ title: "Sukses", description: "Pengguna dihapus", color: "green" });
+    toast.add({ title: "Berhasil", description: "Pengguna dihapus", color: "green" });
     await fetchStats();
   } catch (error) {
-    toast.add({ title: "Error", description: "Gagal menghapus pengguna", color: "red" });
+    toast.add({ title: "Gagal", description: "Pengguna gagal dihapus", color: "red" });
   }
 };
 
@@ -197,10 +197,10 @@ const deleteCourse = async (course) => {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
-    toast.add({ title: "Sukses", description: "Kursus dihapus", color: "green" });
+    toast.add({ title: "Berhasil", description: "Kelas dihapus", color: "green" });
     await fetchStats();
   } catch (error) {
-    toast.add({ title: "Error", description: "Gagal menghapus kursus", color: "red" });
+    toast.add({ title: "Gagal", description: "Kelas gagal dihapus", color: "red" });
   }
 };
 
@@ -210,10 +210,10 @@ const deleteMaterial = async (material) => {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
-    toast.add({ title: "Sukses", description: "Materi dihapus", color: "green" });
+    toast.add({ title: "Berhasil", description: "Materi dihapus", color: "green" });
     await fetchStats();
   } catch (error) {
-    toast.add({ title: "Error", description: "Gagal menghapus materi", color: "red" });
+    toast.add({ title: "Gagal", description: "Materi gagal dihapus", color: "red" });
   }
 };
 

@@ -23,21 +23,21 @@ const fetchUsers = async () => {
       },
     });
   } catch (err) {
-    console.error("Gagal ambil user", err);
+    console.error("Gagal mengambil data pengguna", err);
   }
 };
 
 const createUser = async () => {
   const { value: formValues } = await swal.fire({
-    title: "Tambah User Baru",
+    title: "Tambah Pengguna Baru",
     html:
       '<input id="swal-input-name" class="p-2 mb-3 bg-gray-100 dark:bg-gray-700 w-full" placeholder="Nama">' +
       '<input id="swal-input-email" class="p-2 mb-3 bg-gray-100 dark:bg-gray-700 w-full" placeholder="Email" type="email">' +
-      '<input id="swal-input-password" class="p-2 mb-3 bg-gray-100 dark:bg-gray-700 w-full" placeholder="Password" type="password">' +
+      '<input id="swal-input-password" class="p-2 mb-3 bg-gray-100 dark:bg-gray-700 w-full" placeholder="Kata sandi" type="password">' +
       '<select id="swal-input-role" class="p-2 mb-3 bg-gray-100 dark:bg-gray-700 w-full">' +
-        '<option value="" disabled selected>Pilih Role</option>' +
-        '<option value="student">Student</option>' +
-        '<option value="teacher">Teacher</option>' +
+        '<option value="" disabled selected>Pilih peran</option>' +
+        '<option value="student">Siswa</option>' +
+        '<option value="teacher">Guru</option>' +
         '<option value="admin">Admin</option>' +
       '</select>',
     focusConfirm: false,
@@ -50,7 +50,7 @@ const createUser = async () => {
       const password = document.getElementById('swal-input-password').value;
       const role = document.getElementById('swal-input-role').value;
       if (!name || !email || !password || !role) {
-        swal.showValidationMessage('Semua field harus diisi');
+        swal.showValidationMessage('Semua kolom harus diisi');
         return false;
       }
       if (!/^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$/.test(email)) {
@@ -58,7 +58,7 @@ const createUser = async () => {
         return false;
       }
       if (password.length < 8) {
-        swal.showValidationMessage('Password minimal 8 karakter');
+        swal.showValidationMessage('Kata sandi minimal 8 karakter');
         return false;
       }
       return { name, email, password, role };
@@ -73,37 +73,37 @@ const createUser = async () => {
       headers: { Authorization: `Bearer ${token}` },
       body: formValues,
     });
-    toast.add({title: "User berhasil dibuat", color: "green"});
+    toast.add({title: "Pengguna berhasil dibuat", color: "green"});
     fetchUsers();
   } catch (err) {
     console.error(err);
-    toast.add({title: "Gagal membuat user.", color: "red"});
+    toast.add({title: "Pengguna gagal dibuat.", color: "red"});
   }
 };
 
 const updateUser = async (user) => {
   const confirm = await swal.fire({
     icon: "question",
-    title: `Edit User: ${user.name}`,
+    title: `Ubah pengguna: ${user.name}`,
     html: `
       <input id="swal-input-name" class="p-2 mb-3 bg-gray-100 dark:bg-gray-700 w-full" value="${user.name}" placeholder="Nama">
-      <input id="swal-input-password" class="p-2 mb-3 bg-gray-100 dark:bg-gray-700 w-full" placeholder="Password" type="password">
+      <input id="swal-input-password" class="p-2 mb-3 bg-gray-100 dark:bg-gray-700 w-full" placeholder="Kata sandi baru (opsional)" type="password">
       <select id="swal-input-role" class="p-2 mb-3 bg-gray-100 dark:bg-gray-700 w-full">
         <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
-        <option value="teacher" ${user.role === 'teacher' ? 'selected' : ''}>Teacher</option>
-        <option value="student" ${user.role === 'student' ? 'selected' : ''}>Student</option>
+        <option value="teacher" ${user.role === 'teacher' ? 'selected' : ''}>Guru</option>
+        <option value="student" ${user.role === 'student' ? 'selected' : ''}>Siswa</option>
       </select>
     `,
     showCancelButton: true,
-    confirmButtonText: "Update",
-    cancelButtonText: "Cancel",
+    confirmButtonText: "Simpan",
+    cancelButtonText: "Batal",
     preConfirm: () => {
       const name = document.getElementById('swal-input-name').value;
       const password = document.getElementById('swal-input-password').value;
       const role = document.getElementById('swal-input-role').value;
 
       if (!name.trim()) {
-        swal.showValidationMessage('Name cannot be empty');
+        swal.showValidationMessage('Nama tidak boleh kosong');
         return false;
       }
 
@@ -126,7 +126,7 @@ const updateUser = async (user) => {
     
     if (confirm.value.password) {
       if (confirm.value.password.length < 8) {
-        swal.showValidationMessage('Password minimal 8 karakter');
+        swal.showValidationMessage('Kata sandi minimal 8 karakter');
         return false;
       }
       updateData.password = confirm.value.password;
@@ -137,7 +137,7 @@ const updateUser = async (user) => {
     }
 
     if (Object.keys(updateData).length === 0) {
-      toast.add({title: "No changes to update"});
+      toast.add({title: "Tidak ada perubahan untuk disimpan"});
       return;
     }
 
@@ -147,20 +147,20 @@ const updateUser = async (user) => {
       body: updateData,
     });
     
-    toast.add({title: "User updated successfully"});
+    toast.add({title: "Data pengguna berhasil diperbarui"});
     fetchUsers();
   } catch (err) {
     console.error(err);
-    toast.add({title: "Failed to update user", color: "red"});
+    toast.add({title: "Data pengguna gagal diperbarui", color: "red"});
   }
 };
 
 const deleteUser = async (user) => {
   const confirm = await swal.fire({
     icon: "warning",
-    title: `Hapus user ini?`,
+    title: `Hapus pengguna ini?`,
     text:`${
-      user.role == "teacher" ? "Kelas dan kuis milih guru ini akan ikut terhapus." : "Seluruh data milik user ini akan ikut terhapus."
+      user.role == "teacher" ? "Kelas dan kuis milik guru ini akan ikut terhapus." : "Seluruh data milik pengguna ini akan ikut terhapus."
     }`,
     showCancelButton: true,
     confirmButtonText: "Ya",
@@ -174,10 +174,10 @@ const deleteUser = async (user) => {
       headers: { Authorization: `Bearer ${token}` },
     });
     users.value = users.value.filter((u) => u.id !== user.id);
-    swal.fire("Berhasil", "User dan seluruh data milik user ini berhasil dihapus", "success");
+    swal.fire("Berhasil", "Pengguna dan seluruh datanya berhasil dihapus", "success");
   } catch (err) {
     console.error(err);
-    swal.fire("Gagal", "Tidak bisa hapus user", "error");
+    swal.fire("Gagal", "Pengguna tidak bisa dihapus", "error");
   }
 };
 
@@ -187,23 +187,43 @@ definePageMeta({
   role: "admin",
 });
 
+const roleLabels = {
+  admin: "Admin",
+  teacher: "Guru",
+  student: "Siswa",
+};
+
 const columns = [
-  { header: "Username", accessorKey: "name" },
+  { header: "Nama", accessorKey: "name" },
   { header: "Email", accessorKey: "email" },
-  { header: "Role", accessorKey: "role" },
+  {
+    header: "Peran",
+    accessorKey: "role",
+    cell: ({ row }) => roleLabels[row.original.role] || row.original.role,
+  },
 ];
 
-const filters = [{ title: "Role", options: ["admin", "teacher", "student"], accessorKey: "role" }];
+const filters = [
+  {
+    title: "Peran",
+    options: [
+      { value: "admin", label: "Admin" },
+      { value: "teacher", label: "Guru" },
+      { value: "student", label: "Siswa" },
+    ],
+    accessorKey: "role",
+  },
+];
 </script>
 
 <template>
   <div class="p-4 pb-2">
-    <h2 class="text-2xl font-semibold text-green-600 dark:text-green-500">Data User</h2>
+    <h2 class="text-2xl font-semibold text-green-600 dark:text-green-500">Data Pengguna</h2>
     <div class="absolute top-0 right-0 mt-6 mr-6">
       <button
           class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
           @click="createUser">
-          Buat User Baru
+          Buat Pengguna Baru
       </button>
     </div>
   </div>

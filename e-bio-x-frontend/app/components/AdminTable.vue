@@ -4,7 +4,7 @@
       <input
         v-model="searchTerm"
         type="text"
-        placeholder="Search..."
+        placeholder="Cari..."
         class="border border-gray-300 focus:outline-green-500 bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded p-2 w-full max-w-xs" />
 
       <div v-if="props.filters.length" class="flex gap-4 items-center">
@@ -16,8 +16,8 @@
             v-model="activeFilters[idx]"
             class="border bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded p-2">
             <option value="" selected>Semua</option>
-            <option v-for="option in filter.options" :key="option" :value="option">
-              {{ option }}
+            <option v-for="option in filter.options" :key="option.value ?? option" :value="option.value ?? option">
+              {{ option.label ?? option }}
             </option>
           </select>
         </div>
@@ -32,7 +32,7 @@
             <th v-for="(col, index) in columns" :key="index" class="p-3 border-b border-gray-300">
               {{ col.header }}
             </th>
-            <th v-if="onUpdate || onDelete" class="p-3 border-b border-gray-300">Action</th>
+            <th v-if="onUpdate || onDelete" class="p-3 border-b border-gray-300">Aksi</th>
           </tr>
         </thead>
 
@@ -68,8 +68,8 @@
                 v-if="onUpdate"
                 @click="() => onUpdate(item)"
                 class="text-yellow-400 hover:text-yellow-600"
-                title="Edit"
-                aria-label="Edit">
+                title="Ubah"
+                aria-label="Ubah">
                 <Icon name="material-symbols:box-edit-outline" class="w-5 h-5" />
               </button>
 
@@ -104,13 +104,13 @@
           @click="currentPage = Math.max(currentPage - 1, 1)"
           :disabled="currentPage === 1"
           class="px-3 py-1 border rounded disabled:opacity-50">
-          Prev
+          Sebelumnya
         </button>
         <button
           @click="currentPage = Math.min(currentPage + 1, totalPages)"
           :disabled="currentPage === totalPages || totalPages === 0"
           class="px-3 py-1 border rounded disabled:opacity-50">
-          Next
+          Berikutnya
         </button>
       </div>
     </div>
