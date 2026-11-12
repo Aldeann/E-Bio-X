@@ -23,7 +23,7 @@ const labelClass = computed(() =>
 <template>
   <div class="w-full">
     <div class="flex items-center justify-between mb-1">
-      <span v-if="showLabel" class="text-xs text-gray-500 dark:text-gray-400">Progress</span>
+      <span v-if="showLabel" class="text-xs text-gray-500 dark:text-gray-400">Progres</span>
       <span
         v-if="showLabel"
         class="font-semibold"

@@ -92,7 +92,7 @@
           <!-- Progress -->
           <div class="mt-auto pt-2 sm:pt-3">
             <MaterialProgress v-if="m.student_progress" :percentage="m.student_progress.percentage" />
-            <p v-else class="text-[10px] sm:text-xs text-gray-400 text-center py-1">Belum ada progress</p>
+            <p v-else class="text-[10px] sm:text-xs text-gray-400 text-center py-1">Belum ada progres</p>
             <p class="text-[10px] sm:text-[11px] text-gray-400 mt-1">
               {{ m.student_progress ? `${m.student_progress.completed} dari ${m.student_progress.total} bagian selesai` : "Belum pernah dibuka" }}
             </p>

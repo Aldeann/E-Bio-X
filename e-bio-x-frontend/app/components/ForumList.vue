@@ -66,7 +66,7 @@
             <label class="block text-xs sm:text-sm font-medium mb-1 text-gray-600 dark:text-gray-300">Status</label>
             <select v-model="form.status" class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-2 sm:p-2.5 rounded-lg focus:outline-green-500 text-sm">
               <option value="ACTIVE">Aktif</option>
-              <option value="DRAFT">Draft</option>
+              <option value="DRAFT">Draf</option>
               <option value="SCHEDULED">Terjadwal</option>
             </select>
           </div>
@@ -81,7 +81,7 @@
           <label class="block text-xs sm:text-sm font-medium mb-1 text-gray-600 dark:text-gray-300">Nama Kelompok Presentasi</label>
           <input v-model="form.presentation_group_name" type="text" placeholder="cth: Kelompok 1"
             class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-2 sm:p-2.5 rounded-lg focus:outline-green-500 mb-2 text-sm" />
-          <label class="block text-xs sm:text-sm font-medium mb-1 text-gray-600 dark:text-gray-300">Pertanyaan Inti (pinned question)</label>
+          <label class="block text-xs sm:text-sm font-medium mb-1 text-gray-600 dark:text-gray-300">Pertanyaan Inti (disematkan)</label>
           <textarea v-model="form.pinned_question" rows="2" placeholder="Pertanyaan inti presentasi..."
             class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-2 sm:p-2.5 rounded-lg focus:outline-green-500 text-sm"></textarea>
         </div>
@@ -255,7 +255,7 @@ const typeBadge = (t) => {
 const statusBadge = (s) => {
   const map = {
     ACTIVE: { label: "Aktif", class: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200" },
-    DRAFT: { label: "Draft", class: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300" },
+    DRAFT: { label: "Draf", class: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300" },
     SCHEDULED: { label: "Jadwal", class: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200" },
     CLOSED: { label: "Tutup", class: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200" },
     ARCHIVED: { label: "Arsip", class: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300" },

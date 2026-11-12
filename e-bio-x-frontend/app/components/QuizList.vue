@@ -279,7 +279,7 @@ const deleteQuiz = async (quizId) => {
       fetchQuizzes();
     } catch (err) {
       console.error(err);
-      swal.fire("Error", "Gagal menghapus kuis.", "error");
+      swal.fire("Gagal", "Kuis gagal dihapus.", "error");
     }
   }
 };

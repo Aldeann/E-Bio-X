@@ -53,7 +53,7 @@
             {{ forum.status === 'CLOSED' ? 'Buka Forum' : 'Kunci Forum' }}
           </button>
           <button v-if="forum.type === 'PRESENTATION'" @click="uploadPresentationFile" class="px-3 py-1.5 rounded-lg text-sm border border-purple-300 text-purple-600 hover:bg-purple-50 dark:hover:bg-gray-800">
-            <Icon name="mdi:upload" class="w-4 h-4 inline mr-1" /> Upload Materi Presentasi
+            <Icon name="mdi:upload" class="w-4 h-4 inline mr-1" /> Unggah Materi Presentasi
           </button>
         </div>
       </div>
@@ -179,7 +179,7 @@
       </div>
 
       <div v-else class="bg-white dark:bg-gray-900 border dark:border-gray-700 rounded-xl p-4 text-sm text-gray-500">
-        {{ forum.status === 'DRAFT' ? 'Forum ini masih draft.' : forum.status === 'CLOSED' ? `Forum ini telah ditutup. ${participantPronoun} tidak dapat menambah diskusi baru.` : `${participantPronoun} tidak dapat berpartisipasi di forum ini.` }}
+        {{ forum.status === 'DRAFT' ? 'Forum ini masih draf.' : forum.status === 'CLOSED' ? `Forum ini telah ditutup. ${participantPronoun} tidak dapat menambah diskusi baru.` : `${participantPronoun} tidak dapat berpartisipasi di forum ini.` }}
       </div>
 
       <!-- Posts -->
@@ -210,8 +210,8 @@
     <div v-if="feedbackTarget" class="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-black/50" @click="feedbackTarget = null"></div>
       <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md p-6">
-        <h3 class="font-semibold mb-3 text-gray-800 dark:text-white">Feedback Guru</h3>
-        <textarea v-model="feedbackText" rows="3" placeholder="Tulis feedback konstruktif untuk siswa..." class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-2.5 rounded-lg focus:outline-green-500 mb-3"></textarea>
+        <h3 class="font-semibold mb-3 text-gray-800 dark:text-white">Umpan Balik Guru</h3>
+        <textarea v-model="feedbackText" rows="3" placeholder="Tulis umpan balik konstruktif untuk siswa..." class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-2.5 rounded-lg focus:outline-green-500 mb-3"></textarea>
         <div class="flex gap-2 justify-end">
           <button @click="feedbackTarget = null" class="px-4 py-2 rounded-lg bg-gray-300 dark:bg-gray-700">Batal</button>
           <button @click="submitFeedback" :disabled="!feedbackText.trim()" class="bg-green-600 text-white px-4 py-2 rounded-lg disabled:opacity-50">Kirim</button>
@@ -295,7 +295,7 @@ const typeBadge = (t) => {
 const statusBadge = (s) => {
   const map = {
     ACTIVE: { label: "Aktif", class: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200" },
-    DRAFT: { label: "Draft", class: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300" },
+    DRAFT: { label: "Draf", class: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300" },
     SCHEDULED: { label: "Jadwal", class: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200" },
     CLOSED: { label: "Tutup", class: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200" },
     ARCHIVED: { label: "Arsip", class: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300" },
@@ -518,11 +518,11 @@ const submitFeedback = async () => {
       },
       body: JSON.stringify({ feedback: feedbackText.value }),
     });
-    toast.add({ title: "Feedback disimpan.", color: "green" });
+    toast.add({ title: "Umpan balik disimpan.", color: "green" });
     feedbackTarget.value = null;
     fetchForum();
   } catch (err) {
-    toast.add({ title: err?.data?.error || "Gagal menyimpan feedback.", color: "red" });
+    toast.add({ title: err?.data?.error || "Gagal menyimpan umpan balik.", color: "red" });
   }
 };
 

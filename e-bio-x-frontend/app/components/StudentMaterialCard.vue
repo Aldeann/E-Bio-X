@@ -95,7 +95,7 @@ const difficultyColor = computed(() =>
 
       <div class="mt-4">
         <MaterialProgress v-if="progress" :percentage="percentage" />
-        <p v-else class="text-xs text-gray-400 text-center py-1">Belum ada progress</p>
+        <p v-else class="text-xs text-gray-400 text-center py-1">Belum ada progres</p>
         <p class="text-[11px] text-gray-400 mt-1">
           {{ progress ? `${progress.completed} dari ${progress.total} bagian selesai` : "Belum pernah dibuka" }}
         </p>

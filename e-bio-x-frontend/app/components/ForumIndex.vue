@@ -79,7 +79,7 @@
       <!-- list -->
       <div v-else-if="forums.length === 0" class="text-center py-6 sm:py-10">
         <Icon name="mdi:forum-outline" class="text-3xl sm:text-5xl mx-auto mb-1.5 sm:mb-3 text-gray-300 dark:text-gray-600" />
-        <p class="text-xs sm:text-sm text-gray-500">Tidak ada forum ditemukan.</p>
+        <p class="text-xs sm:text-sm text-gray-500">Belum ada forum.</p>
       </div>
 
       <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
@@ -172,7 +172,7 @@ const typeBadge = (t) => ({
 
 const statusBadge = (s) => ({
   ACTIVE: { label: "Aktif", class: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200" },
-  DRAFT: { label: "Draft", class: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300" },
+  DRAFT: { label: "Draf", class: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300" },
   SCHEDULED: { label: "Jadwal", class: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200" },
   CLOSED: { label: "Tutup", class: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200" },
   ARCHIVED: { label: "Arsip", class: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300" },

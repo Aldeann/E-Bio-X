@@ -1,7 +1,7 @@
 <template>
   <div class="container mx-auto px-4 py-6">
     <div class="mb-6">
-      <h2 class="text-2xl font-semibold">Dashboard Belajar</h2>
+      <h2 class="text-2xl font-semibold">Dasbor Belajar</h2>
       <p class="text-sm text-gray-500">
         Pantau progres belajarmu, lanjutkan materi, dan lihat hasil kuismu.
       </p>
@@ -755,7 +755,7 @@ const load = async () => {
       headers: { Authorization: `Bearer ${token}` },
     });
   } catch (e) {
-    toast.add({ title: "Gagal memuat dashboard", color: "red" });
+    toast.add({ title: "Gagal memuat dasbor", color: "red" });
   } finally {
     loading.value = false;
   }

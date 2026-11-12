@@ -10,7 +10,7 @@
         class="text-sm text-green-600 hover:underline flex items-center gap-1"
       >
         <Icon name="material-symbols:arrow-back" class="w-4 h-4" />
-        Kembali ke Dashboard
+        Kembali ke Dasbor
       </NuxtLink>
     </div>
 

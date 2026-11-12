@@ -12,7 +12,7 @@
               <span v-if="post.author_role === 'teacher'" class="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200 font-semibold uppercase">Guru</span>
               <Icon v-if="post.is_pinned" name="mdi:pin" class="text-red-500 w-4 h-4" title="Disematkan" />
               <span v-if="post.is_best_answer" class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200 font-semibold uppercase flex items-center gap-1">
-                <Icon name="mdi:star-circle" class="w-3 h-3" /> Best Answer
+                <Icon name="mdi:star-circle" class="w-3 h-3" /> Jawaban Terbaik
               </span>
               <span v-if="post.post_type === 'question'" class="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-200 font-semibold uppercase">Pertanyaan</span>
               <span v-if="post.is_deleted" class="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 font-semibold uppercase">Dihapus</span>
@@ -62,7 +62,7 @@
       <!-- feedback (teacher) -->
       <div v-if="post.feedback" class="mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
         <div class="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300 mb-1">
-          <Icon name="mdi:clipboard-text-outline" /> Feedback Guru
+          <Icon name="mdi:clipboard-text-outline" /> Umpan Balik Guru
           <span class="text-gray-400 font-normal">oleh {{ post.feedback.teacher_name }}</span>
         </div>
         <p class="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-line">{{ post.feedback.feedback }}</p>
@@ -94,7 +94,7 @@
         </button>
 
         <button v-if="post.can_feedback" @click="$emit('feedback', post)" class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-gray-800">
-          <Icon name="mdi:clipboard-plus-outline" class="w-4 h-4" /> Feedback
+          <Icon name="mdi:clipboard-plus-outline" class="w-4 h-4" /> Umpan Balik
         </button>
 
         <button v-if="post.can_report" @click="$emit('report', post)" class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs border border-red-200 dark:border-red-800 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-800">

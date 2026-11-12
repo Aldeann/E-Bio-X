@@ -49,7 +49,7 @@
         <div>
           <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-300">Visibilitas</label>
           <select v-model="form.visibility" class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-2.5 rounded-lg focus:outline-green-500">
-            <option value="COURSE">Kursus (semua anggota kelas)</option>
+            <option value="COURSE">Kelas (semua anggota kelas)</option>
             <option value="CLASS">Kelas</option>
             <option value="PRIVATE">Pribadi</option>
           </select>
@@ -66,7 +66,7 @@
           <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-300">Status</label>
           <select v-model="form.status" class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 p-2.5 rounded-lg focus:outline-green-500">
             <option value="ACTIVE">Aktif</option>
-            <option value="DRAFT">Draft</option>
+            <option value="DRAFT">Draf</option>
             <option value="SCHEDULED">Terjadwal</option>
           </select>
         </div>
