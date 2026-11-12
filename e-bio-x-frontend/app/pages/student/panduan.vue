@@ -18,7 +18,7 @@
       class="rounded-xl border border-green-200 dark:border-green-800 bg-green-50/70 dark:bg-green-950/20 p-4 sm:p-5 mb-6">
       <p class="text-sm sm:text-base text-gray-700 dark:text-gray-200 leading-relaxed">
         Panduan ini menjelaskan semua menu pada navigasi siswa beserta cara memakainya.
-        Alurnya: <b>Masuk</b> → <b>Kelas Saya</b> → <b>Dashboard</b> → <b>Materi</b> →
+        Alurnya: <b>Masuk</b> → <b>Kelas Saya</b> → <b>Dasbor</b> → <b>Materi</b> →
         <b>Belajar Materi</b> → <b>Latihan Adaptif</b> → <b>Asesmen Diagnostik</b> →
         <b>Kuis</b> → <b>Riwayat Belajar</b> → <b>Forum</b> → <b>Akun</b>. Semua gambar
         ditampilkan penuh langsung di halaman, tidak perlu membukanya terlebih dahulu.
@@ -129,7 +129,7 @@ const sections = [
   },
   {
     id: "dasbor",
-    title: "Dashboard Belajar",
+    title: "Dasbor Belajar",
     icon: "material-symbols:dashboard",
     desc: "Ringkasan belajar: arahan berikutnya, rekomendasi, dan progres.",
     steps: [
@@ -175,7 +175,7 @@ const sections = [
     icon: "material-symbols:fitness-center",
     desc: "Latihan yang menyesuaikan tingkat kesulitan dengan jawabanmu.",
     steps: [
-      "Dari halaman materi atau dashboard, klik tombol <b>Latihan adaptif</b> (menampilkan jumlah soal).",
+      "Dari halaman materi atau dasbor, klik tombol <b>Latihan adaptif</b> (menampilkan jumlah soal).",
       "Kerjakan satu soal per layar; tingkat soal mengikuti jawabanmu.",
       "Pilih satu opsi, lalu klik <b>Periksa Jawaban</b>.",
       "Perhatikan ikon <b>centang</b> (benar) / <b>silang</b> (salah) beserta pembahasan tiap opsi.",
@@ -190,7 +190,7 @@ const sections = [
     icon: "material-symbols:fact-check",
     desc: "Asesmen awal untuk mengukur tingkat pemahamanmu pada suatu bagian.",
     steps: [
-      "Pada halaman materi (atau dashboard), klik tombol <b>Asesmen Diagnostik</b>.",
+      "Pada halaman materi (atau dasbor), klik tombol <b>Asesmen Diagnostik</b>.",
       "Kerjakan semua soal asesmen yang muncul.",
       "Setelah selesai, lihat ringkasan: berapa soal dijawab dan berapa yang benar.",
     ],
@@ -217,7 +217,7 @@ const sections = [
     icon: "material-symbols:history",
     desc: "Rekap semua materi yang kamu ikuti beserta progres dan penguasaannya.",
     steps: [
-      "Buka dari dashboard: <b>Progres Materi</b> → <b>Lihat riwayat</b> (atau menu <b>Riwayat</b>).",
+      "Buka dari dasbor: <b>Progres Materi</b> → <b>Lihat riwayat</b> (atau menu <b>Riwayat</b>).",
       "Lihat kartu ringkasan: <b>Total Materi</b>, <b>Selesai</b>, <b>Sedang Berjalan</b>, <b>Progres Rata-rata</b>, dan <b>Total Waktu Belajar</b>.",
       "Telaah tabel materi: progres, status, dan label penguasaan.",
       "Klik judul materi untuk membuka detail progres per bagian.",
@@ -247,7 +247,7 @@ const sections = [
       "Klik <b>nama/avatar</b> di kanan atas, lalu pilih <b>Akun</b> (di ponsel: buka menu ☰ → <b>Akun</b>).",
       "Klik ikon pensil untuk mengubah <b>nama</b>mu.",
       "Klik tombol <b>Ubah kata sandi</b> untuk mengganti kata sandi.",
-      "Ubah tema terang/gelap lewat tombol <b>Ganti tema</b>. Untuk keluar, pilih <b>Logout</b> lalu konfirmasi.",
+      "Ubah tema terang/gelap lewat tombol <b>Ganti tema</b>. Untuk keluar, pilih <b>Keluar</b> lalu konfirmasi.",
     ],
     image: "/panduan-siswa/12-akun.png",
   },

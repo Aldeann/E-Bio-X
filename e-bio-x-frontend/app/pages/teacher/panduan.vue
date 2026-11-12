@@ -15,7 +15,7 @@
       class="rounded-xl border border-green-200 dark:border-green-800 bg-green-50/70 dark:bg-green-950/20 p-4 sm:p-5 mb-6">
       <p class="text-sm sm:text-base text-gray-700 dark:text-gray-200 leading-relaxed">
         Panduan ini menjelaskan semua menu pada sidebar guru beserta cara memakainya.
-        Alurnya: <b>Masuk</b> → <b>Dasbor</b> → <b>Analisis Hasil Belajar</b> → <b>ML Insights</b> →
+        Alurnya: <b>Masuk</b> → <b>Dasbor</b> → <b>Analisis Hasil Belajar</b> → <b>Wawasan ML</b> →
         <b>Materi</b> → <b>Kuis</b> → <b>Bank Soal</b> → <b>Latihan per Bagian</b> →
         <b>Forum</b> → <b>Pembahasan AI</b> → <b>Akun</b>. Semua gambar ditampilkan penuh
         langsung di halaman, tidak perlu membukanya terlebih dahulu.
@@ -85,23 +85,23 @@
 const sections = [
   {
     id: "masuk",
-    title: "Masuk ke Aplikasi (Login)",
+    title: "Masuk ke Aplikasi",
     icon: "material-symbols:login",
-    desc: "Semua pengguna masuk melalui halaman <b>Login</b>. Gunakan akun guru yang diberikan oleh admin/sekolah.",
+    desc: "Semua pengguna masuk melalui halaman <b>Masuk</b>. Gunakan akun guru yang diberikan oleh admin/sekolah.",
     steps: [
-      "Buka alamat aplikasi E-Bio X. Halaman <b>Login</b> akan muncul otomatis.",
-      "Isi kolom <b>Email</b> dan <b>Password</b> akun guru Anda.",
-      "Klik ikon mata di kolom password bila ingin menampilkan/menyembunyikan password.",
-      "Klik tombol <b>Login</b>. Jika berhasil, Anda diarahkan ke halaman <b>Dasbor Guru</b>.",
+      "Buka alamat aplikasi E-Bio X. Halaman <b>Masuk</b> akan muncul otomatis.",
+      "Isi kolom <b>Email</b> dan <b>kata sandi</b> akun guru Anda.",
+      "Klik ikon mata di kolom kata sandi bila ingin menampilkan atau menyembunyikannya.",
+      "Klik tombol <b>Masuk</b>. Jika berhasil, Anda diarahkan ke halaman <b>Dasbor Guru</b>.",
     ],
-    note: "Tersedia juga tombol masuk dengan akun Google (opsional). Jika lupa password, hubungi admin sekolah untuk direset.",
+    note: "Tersedia juga tombol masuk dengan akun Google (opsional). Jika lupa kata sandi, hubungi admin sekolah untuk direset.",
     image: "/panduan/01-login.png",
   },
   {
     id: "dasbor",
     title: "Dasbor Guru",
     icon: "material-symbols:dashboard",
-    desc: "Halaman utama setelah login. Menampilkan sapaan dan daftar kelas yang Anda ampu.",
+    desc: "Halaman utama setelah masuk. Menampilkan sapaan dan daftar kelas yang Anda ampu.",
     steps: [
       "Lihat daftar <b>Kelas Saya</b> — tiap kartu menampilkan nama kelas, jumlah siswa, dan kode kelas.",
       "Klik <b>+ Buat Kelas Baru</b>, isi nama kelas, lalu klik <b>Buat</b>.",
@@ -126,13 +126,13 @@ const sections = [
   },
   {
     id: "ml-insights",
-    title: "ML Insights (Machine Learning)",
+    title: "Wawasan ML (Machine Learning)",
     icon: "material-symbols:psychology",
     desc: "Analisis penguasaan, profil belajar, dan rekomendasi berbasis data.",
     steps: [
-      "Buka menu <b>ML Insights</b>.",
-      "Klik <b>Latih / Retrain Model</b> untuk memperbarui model dari data terbaru.",
-      "Perhatikan pesan hasil training: status <b>Decision Tree</b> dan <b>K-Means</b> beserta metriknya.",
+      "Buka menu <b>Wawasan ML</b>.",
+      "Klik <b>Latih / Latih Ulang Model</b> untuk memperbarui model dari data terbaru.",
+      "Perhatikan pesan hasil pelatihan: status <b>Decision Tree</b> dan <b>K-Means</b> beserta metriknya.",
       "Cek keterangan <b>cakupan model</b> (per kelas atau gabungan) sebelum menafsirkan hasil.",
       "Gunakan bagian penguasaan, profil belajar, dan rekomendasi untuk merancang tindak lanjut.",
     ],
@@ -147,9 +147,9 @@ const sections = [
     steps: [
       "Klik <b>Buat Materi</b>, lalu isi judul, mata pelajaran, fase, kelas, dan topik.",
       "Gunakan <b>Filter kelas</b> untuk menyaring daftar materi.",
-      "Klik judul atau tombol <b>Edit</b> untuk membuka <b>Penyusun Materi</b> dan mengatur bagian, konten, gambar, serta tujuan pembelajaran.",
+      "Klik judul atau tombol <b>Ubah</b> untuk membuka <b>Penyusun Materi</b> dan mengatur bagian, konten, gambar, serta tujuan pembelajaran.",
       "Lengkapi kartu <b>pengantar</b>, <b>petunjuk belajar</b>, dan <b>kebutuhan belajar</b> pada materi agar siswa tahu cara memakainya.",
-      "Manfaatkan tombol <b>Preview</b> (tampilan siswa), <b>Analisis</b> (progres), <b>Publish/Unpublish</b>, dan <b>Hapus</b>.",
+      "Manfaatkan tombol <b>Pratinjau</b> (tampilan siswa), <b>Analisis</b> (progres), <b>Terbitkan/Tarik</b>, dan <b>Hapus</b>.",
     ],
     image: "/panduan/05-materi.png",
   },
@@ -161,7 +161,7 @@ const sections = [
     steps: [
       "Klik <b>Buat Kuis</b> (siapkan soalnya lebih dulu di <b>Bank Soal</b> bila perlu).",
       "Isi judul, deskripsi, materi terkait, durasi, dan nilai kelulusan (KKM), lalu tambahkan soal.",
-      "Pada daftar kuis, lihat status (Draft/Published), jumlah soal, poin, durasi, dan statistik Peserta/Percobaan/Rata-rata.",
+      "Pada daftar kuis, lihat status (Draf/Terbit), jumlah soal, poin, durasi, dan statistik Peserta/Percobaan/Rata-rata.",
       "Klik <b>Kelola</b> untuk mengatur & mempublikasikan kuis, <b>Analisis</b> untuk hasil per soal, atau ikon sampah untuk menghapus.",
     ],
     image: "/panduan/06-kuis.png",
@@ -175,7 +175,7 @@ const sections = [
       "Klik <b>Tambah Soal</b> untuk menulis soal baru (pilihan ganda / benar-salah), lengkap dengan tingkat kesulitan dan jenisnya.",
       "Gunakan filter: pencarian, tipe, kesulitan, status, dan jenis (Latihan adaptif / Diagnostik).",
       "Atur <b>soal per slide</b> dan pindah halaman dengan tombol panah kiri/kanan.",
-      "Pada tiap soal tersedia aksi <b>Edit</b>, <b>Hapus</b>, dan <b>Generate Pembahasan AI</b>.",
+      "Pada tiap soal tersedia aksi <b>Ubah</b>, <b>Hapus</b>, dan <b>Buat Pembahasan AI</b>.",
     ],
     image: "/panduan/07-bank-soal.png",
   },
@@ -213,7 +213,7 @@ const sections = [
     icon: "material-symbols:lightbulb",
     desc: "Kelola pembahasan kuis. Siswa hanya dapat melihat pembahasan yang berstatus disetujui.",
     steps: [
-      "Masukkan <b>ID Soal</b> pada kolom di kanan atas, lalu klik <b>Generate</b> untuk membuat pembahasan otomatis.",
+      "Masukkan <b>ID Soal</b> pada kolom di kanan atas, lalu klik <b>Buat</b> untuk membuat pembahasan otomatis.",
       "Saring daftar berdasarkan <b>status</b> dan kata kunci, lalu klik <b>Terapkan</b>.",
       "Lihat ringkasan: Total, Disetujui, Menunggu, dan Gagal.",
       "Klik <b>Lihat</b> untuk membaca, <b>Setujui</b> bila sudah sesuai, atau <b>Tolak</b> bila perlu diperbaiki.",
@@ -228,8 +228,8 @@ const sections = [
     steps: [
       "Buka menu <b>Akun</b> pada sidebar.",
       "Klik ikon pensil untuk mengubah <b>nama</b> Anda.",
-      "Klik tombol <b>ubah password</b> untuk mengganti password.",
-      "Untuk keluar, klik <b>Logout</b> di sidebar lalu konfirmasi. Tema terang/gelap dapat diubah lewat tombol <b>Ganti tema</b>.",
+      "Klik tombol <b>Ubah kata sandi</b> untuk mengganti kata sandi.",
+      "Untuk keluar, klik <b>Keluar</b> di sidebar lalu konfirmasi. Tema terang/gelap dapat diubah lewat tombol <b>Ganti tema</b>.",
     ],
     image: "/panduan/11-akun.png",
   },

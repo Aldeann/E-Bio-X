@@ -79,7 +79,7 @@
             @click="handleLogout"
             class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
           >
-            Logout
+            Keluar
           </button>
         </div>
         <ToggleDark />
@@ -162,7 +162,7 @@
               @click="handleLogout"
             >
               <Icon name="ic:baseline-log-out" class="w-5 h-5 shrink-0" />
-              Logout
+              Keluar
             </button>
           </li>
         </ul>
@@ -215,12 +215,12 @@ const navLinks = computed(() => {
   const links = [];
   if (role.value === "student") {
     links.push({ to: "/student/panduan", icon: "mdi:book-open-page-variant-outline", label: "Petunjuk Penggunaan", desc: "Panduan memakai E-Bio X" });
-    links.push({ to: "/student/dashboard", icon: "material-symbols:dashboard", label: "Dashboard", desc: "Ringkasan belajar kamu" });
+    links.push({ to: "/student/dashboard", icon: "material-symbols:dashboard", label: "Dasbor", desc: "Ringkasan belajar kamu" });
   }
   if (role.value === "teacher") {
     links.push({ to: "/teacher", icon: "material-symbols:dashboard", label: "Dasbor", desc: "Ringkasan & pintasan fitur" });
     links.push({ to: "/teacher/analytics", icon: "material-symbols:monitoring", label: "Analisis Hasil Belajar", desc: "Progres, penguasaan & topik" });
-    links.push({ to: "/teacher/analytics/ml", icon: "material-symbols:psychology", label: "ML Insights", desc: "Profil belajar & rekomendasi" });
+    links.push({ to: "/teacher/analytics/ml", icon: "material-symbols:psychology", label: "Wawasan ML", desc: "Profil belajar & rekomendasi" });
     links.push({ to: "/teacher/analytics/impact", icon: "material-symbols:ads-click", label: "Dampak Rekomendasi", desc: "CTR, funnel & perbaikan latihan" });
   }
   links.push({ to: materialsLink.value, icon: "material-symbols:menu-book", label: "Materi", desc: "Bahan ajar & bagian materi" });

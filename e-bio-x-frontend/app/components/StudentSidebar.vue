@@ -77,7 +77,7 @@
           @click="handleLogout"
           class="flex w-full items-center gap-2 p-2 rounded-lg group hover:bg-red-500/90 transition text-left">
           <Icon name="ic:baseline-log-out" class="w-5 h-5 shrink-0" />
-          <span class="text-sm">Logout</span>
+          <span class="text-sm">Keluar</span>
         </button>
       </div>
     </div>

@@ -77,7 +77,7 @@
           @click="handleLogout"
           class="flex w-full items-center gap-2 p-2 rounded-lg group hover:bg-red-500/90 transition text-left">
           <Icon name="ic:baseline-log-out" class="w-5 h-5 shrink-0" />
-          <span class="text-sm">Logout</span>
+          <span class="text-sm">Keluar</span>
         </button>
       </div>
     </div>
@@ -103,7 +103,7 @@ const menu = [
   { to: "/teacher/panduan", icon: "mdi:book-open-page-variant-outline", label: "Petunjuk Penggunaan" },
   { to: "/teacher", icon: "material-symbols:dashboard", label: "Dasbor" },
   { to: "/teacher/analytics", icon: "material-symbols:monitoring", label: "Analisis Hasil Belajar" },
-  { to: "/teacher/analytics/ml", icon: "material-symbols:psychology", label: "ML Insights" },
+  { to: "/teacher/analytics/ml", icon: "material-symbols:psychology", label: "Wawasan ML" },
   // Disembunyikan untuk demo (di luar cakupan proposal):
   // { to: "/teacher/analytics/impact", icon: "material-symbols:ads-click", label: "Dampak Rekomendasi" },
   { to: "/teacher/materials", icon: "material-symbols:menu-book", label: "Materi" },

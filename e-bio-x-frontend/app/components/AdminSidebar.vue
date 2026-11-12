@@ -3,7 +3,7 @@
     @click="toggleSidebar"
     type="button"
     class="fixed top-0 left-0 items-center p-2 mt-2 ms-3 text-sm text-white rounded-lg sm:hidden hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-green-500">
-    <span class="sr-only">Open sidebar</span>
+    <span class="sr-only">Buka sidebar admin</span>
     <Icon name="material-symbols:menu-rounded" />
   </button>
 
@@ -57,14 +57,14 @@
           route.path === '/account' ? 'bg-green-600' : 'hover:bg-green-500',
         ]">
         <Icon name="mdi:cog" />
-        <span class="ms-3">Setting</span>
+        <span class="ms-3">Pengaturan</span>
       </RouterLink>
       <div class="flex bottom-0 mt-3 font-medium">
         <button 
           @click="handleLogout" 
           class="flex w-full items-center p-2 rounded-lg group hover:bg-red-500">
           <Icon name="ic:baseline-log-out" />
-          <span class="ms-3">Logout</span>
+          <span class="ms-3">Keluar</span>
         </button>
       </div>
     </div>
@@ -89,12 +89,12 @@ function toggleSidebar() {
 
 const navbarMenu = [
   {
-    name: "Dashbaord",
+    name: "Dasbor",
     icon: "mdi:home",
     path: "/admin",
   },
   {
-    name: "User",
+    name: "Pengguna",
     icon: "mdi:user",
     path: "/admin/users",
   },
