@@ -144,7 +144,7 @@
       <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 mb-6">
         <h4 class="font-semibold text-gray-800 dark:text-gray-100 mb-1 flex items-center gap-1.5">
           <Icon name="material-symbols:bolt" class="w-4 h-4 text-green-600" />
-          Langkah Berikutnya (Next Best Action)
+          Langkah Berikutnya
         </h4>
         <p class="text-xs text-gray-500 mb-4">
           Satu aksi yang disarankan sistem setelah siswa membaca. Diukur dari jejak tayang & klik yang sama seperti rekomendasi.

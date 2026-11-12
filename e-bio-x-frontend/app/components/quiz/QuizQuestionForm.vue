@@ -5,7 +5,7 @@
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-semibold text-green-700 dark:text-green-500 flex items-center gap-2">
           <Icon name="material-symbols:quiz" class="w-5 h-5" />
-          {{ isEdit ? "Edit Soal" : "Tambah Soal" }}
+          {{ isEdit ? "Ubah Soal" : "Tambah Soal" }}
         </h3>
         <button class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300" @click="close">
           <Icon name="material-symbols:close" class="w-6 h-6" />

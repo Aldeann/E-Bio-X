@@ -5,7 +5,7 @@
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-semibold text-green-700 dark:text-green-500 flex items-center gap-2">
           <Icon name="material-symbols:database" class="w-5 h-5" />
-          {{ isEdit ? "Edit Soal Bank" : "Tambah Soal Bank" }}
+          {{ isEdit ? "Ubah Soal Bank" : "Tambah Soal Bank" }}
         </h3>
         <button class="text-gray-500 hover:text-gray-700" @click="requestClose">
           <Icon name="material-symbols:close" class="w-6 h-6" />
@@ -374,7 +374,7 @@ const requestClose = async () => {
     icon: "warning",
     showCancelButton: true,
     confirmButtonText: "Buang",
-    cancelButtonText: "Lanjut Edit",
+    cancelButtonText: "Lanjut Ubah",
   });
   if (r.isConfirmed) close();
 };

@@ -187,8 +187,8 @@
                   <div class="flex gap-0.5 shrink-0">
                     <button
                       class="p-1.5 rounded-lg text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                      title="Generate Pembahasan AI"
-                      aria-label="Generate pembahasan AI"
+                      title="Buat Pembahasan AI"
+                      aria-label="Buat pembahasan AI"
                       :disabled="generatingId === b.id"
                       @click="generateExplanation(b)"
                     >
@@ -200,8 +200,8 @@
                     </button>
                     <button
                       class="p-1.5 rounded-lg text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-gray-800 transition"
-                      title="Edit"
-                      aria-label="Edit soal"
+                      title="Ubah"
+                      aria-label="Ubah soal"
                       @click="openForm(b)"
                     >
                       <Icon name="material-symbols:edit" class="w-4 h-4" />

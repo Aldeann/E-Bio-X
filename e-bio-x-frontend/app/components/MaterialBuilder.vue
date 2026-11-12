@@ -109,13 +109,13 @@ const selectSection = (id) => {
 // ---------- SECTIONS ----------
 const addSection = async () => {
   const { value } = await swal.fire({
-    title: "Tambah Section",
+    title: "Tambah Bagian",
     input: "text",
     inputPlaceholder: "Contoh: 01 Pengertian Virus",
     showCancelButton: true,
     confirmButtonText: "Tambah",
     cancelButtonText: "Batal",
-    inputValidator: (v) => (!v || !v.trim() ? "Nama section wajib diisi" : null),
+    inputValidator: (v) => (!v || !v.trim() ? "Nama bagian wajib diisi" : null),
   });
   if (!value) return;
   try {
@@ -125,21 +125,21 @@ const addSection = async () => {
     );
     await fetchDetail();
     activeSectionId.value = res.section.id;
-    toast.add({ title: "Section ditambahkan.", color: "green" });
+    toast.add({ title: "Bagian ditambahkan.", color: "green" });
   } catch (e) {
-    toast.add({ title: "Gagal menambah section.", color: "red" });
+    toast.add({ title: "Gagal menambah bagian.", color: "red" });
   }
 };
 
 const renameSection = async (section) => {
   const { value } = await swal.fire({
-    title: "Edit Nama Section",
+    title: "Ubah Nama Bagian",
     input: "text",
     inputValue: section.title,
     showCancelButton: true,
     confirmButtonText: "Simpan",
     cancelButtonText: "Batal",
-    inputValidator: (v) => (!v || !v.trim() ? "Nama section wajib diisi" : null),
+    inputValidator: (v) => (!v || !v.trim() ? "Nama bagian wajib diisi" : null),
   });
   if (!value) return;
   try {
@@ -149,15 +149,15 @@ const renameSection = async (section) => {
       body: { title: value },
     });
     await fetchDetail();
-    toast.add({ title: "Section diperbarui.", color: "green" });
+    toast.add({ title: "Bagian diperbarui.", color: "green" });
   } catch (e) {
-    toast.add({ title: "Gagal memperbarui section.", color: "red" });
+    toast.add({ title: "Gagal memperbarui bagian.", color: "red" });
   }
 };
 
 const deleteSection = async (section) => {
   const result = await swal.fire({
-    title: "Hapus section ini?",
+    title: "Hapus bagian ini?",
     text: `"${section.title}" beserta semua isinya akan dihapus.`,
     icon: "warning",
     showCancelButton: true,
@@ -172,9 +172,9 @@ const deleteSection = async (section) => {
     });
     if (activeSectionId.value === section.id) activeSectionId.value = null;
     await fetchDetail();
-    toast.add({ title: "Section dihapus.", color: "green" });
+    toast.add({ title: "Bagian dihapus.", color: "green" });
   } catch (e) {
-    toast.add({ title: "Gagal menghapus section.", color: "red" });
+    toast.add({ title: "Gagal menghapus bagian.", color: "red" });
   }
 };
 
@@ -286,9 +286,9 @@ const duplicateSection = async (section) => {
       headers: { Authorization: `Bearer ${token}` },
     });
     await fetchDetail();
-    toast.add({ title: "Section diduplikasi.", color: "green" });
+    toast.add({ title: "Bagian diduplikasi.", color: "green" });
   } catch (e) {
-    toast.add({ title: "Gagal menduplikasi section.", color: "red" });
+    toast.add({ title: "Gagal menduplikasi bagian.", color: "red" });
   }
 };
 
@@ -308,13 +308,13 @@ const duplicateBlock = async (content) => {
 
 const saveAsTemplate = async (content) => {
   const { value } = await swal.fire({
-    title: "Simpan sebagai Template",
+    title: "Simpan sebagai Templat",
     input: "text",
-    inputValue: `${typeLabel(content.type)} Template`,
+    inputValue: `${typeLabel(content.type)} Templat`,
     showCancelButton: true,
     confirmButtonText: "Simpan",
     cancelButtonText: "Batal",
-    inputValidator: (v) => (!v || !v.trim() ? "Nama template wajib diisi" : null),
+    inputValidator: (v) => (!v || !v.trim() ? "Nama templat wajib diisi" : null),
   });
   if (!value) return;
   savedTemplates.value = saveBlockTemplate({
@@ -322,12 +322,12 @@ const saveAsTemplate = async (content) => {
     type: content.type,
     data: content.data,
   });
-  toast.add({ title: "Template disimpan ke peramban ini.", color: "green" });
+  toast.add({ title: "Templat disimpan ke peramban ini.", color: "green" });
 };
 
 const deleteSavedTemplate = async (t) => {
   const result = await swal.fire({
-    title: "Hapus template ini?",
+    title: "Hapus templat ini?",
     icon: "warning",
     showCancelButton: true,
     confirmButtonText: "Hapus",
@@ -335,7 +335,7 @@ const deleteSavedTemplate = async (t) => {
   });
   if (!result.isConfirmed) return;
   savedTemplates.value = removeSavedTemplate(t.key);
-  toast.add({ title: "Template dihapus.", color: "green" });
+  toast.add({ title: "Templat dihapus.", color: "green" });
 };
 
 // ---------- DRAG & DROP ----------
@@ -501,7 +501,7 @@ onMounted(() => {
                 : 'bg-amber-100 text-amber-700'
             "
           >
-            {{ material.status === "published" ? "Published" : "Draft" }}
+            {{ material.status === "published" ? "Terbit" : "Draf" }}
           </span>
           <button
             @click="togglePublish"
@@ -512,7 +512,7 @@ onMounted(() => {
                 : 'bg-green-600 hover:bg-green-700'
             "
           >
-            {{ material.status === "published" ? "Unpublish" : "Publish" }}
+            {{ material.status === "published" ? "Tarik" : "Terbitkan" }}
           </button>
           <NuxtLink
             :to="`/teacher/materials/preview/${material.id}`"
@@ -521,7 +521,7 @@ onMounted(() => {
           >
             <span class="inline-flex items-center gap-1">
               <Icon name="material-symbols:visibility" class="w-4 h-4" />
-              Preview sebagai Siswa
+              Pratinjau sebagai Siswa
             </span>
           </NuxtLink>
           <NuxtLink
@@ -534,7 +534,7 @@ onMounted(() => {
             @click="showFiles = !showFiles"
             class="px-3 py-1.5 rounded-lg text-sm font-semibold bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-100"
           >
-            File
+            Berkas
           </button>
         </div>
       </div>
@@ -555,19 +555,19 @@ onMounted(() => {
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-1">
             <Icon name="material-symbols:format-list-numbered" class="w-5 h-5 text-green-500" />
-            Section Materi
+            Bagian Materi
           </h3>
           <button
             @click="addSection"
             class="text-green-600 hover:text-green-700 text-sm font-semibold"
-            title="Tambah section"
+            title="Tambah bagian"
           >
             <Icon name="material-symbols:add-circle" class="w-6 h-6" />
           </button>
         </div>
 
         <div v-if="sections.length === 0" class="text-sm text-gray-400">
-          Belum ada section. Klik + untuk menambahkan.
+          Belum ada bagian. Klik + untuk menambahkan.
         </div>
 
         <ul v-else class="space-y-2">
@@ -625,10 +625,10 @@ onMounted(() => {
                 </button>
               </div>
               <div class="flex items-center gap-1">
-                <button @click="duplicateSection(section)" class="text-violet-500 hover:text-violet-700" title="Duplikasi section">
+                <button @click="duplicateSection(section)" class="text-violet-500 hover:text-violet-700" title="Duplikasi bagian">
                   <Icon name="material-symbols:content-copy" class="w-4 h-4" />
                 </button>
-                <button @click="renameSection(section)" class="text-blue-500 hover:text-blue-700" title="Edit nama">
+                <button @click="renameSection(section)" class="text-blue-500 hover:text-blue-700" title="Ubah nama">
                   <Icon name="material-symbols:edit-square" class="w-4 h-4" />
                 </button>
                 <button @click="deleteSection(section)" class="text-red-500 hover:text-red-700" title="Hapus">
@@ -645,7 +645,7 @@ onMounted(() => {
         <template v-if="!activeSection">
           <div class="text-center py-16 text-gray-400">
             <Icon name="material-symbols:data-object" class="w-12 h-12 mx-auto mb-2" />
-            <p>Pilih sebuah section untuk mulai menyusun konten.</p>
+            <p>Pilih sebuah bagian untuk mulai menyusun konten.</p>
           </div>
         </template>
 
@@ -659,7 +659,7 @@ onMounted(() => {
 
           <div v-if="activeSection.contents.length === 0" class="text-center py-10 text-gray-400 mb-4">
             <Icon name="material-symbols:library-add" class="w-10 h-10 mx-auto mb-2" />
-            <p>Section ini masih kosong.</p>
+            <p>Bagian ini masih kosong.</p>
           </div>
 
           <div class="space-y-3">
@@ -696,7 +696,7 @@ onMounted(() => {
                 <button
                   @click="editingContentId = editingContentId === content.id ? null : content.id"
                   class="text-blue-500 hover:text-blue-700 p-0.5"
-                  :title="editingContentId === content.id ? 'Tutup editor' : 'Edit'"
+                  :title="editingContentId === content.id ? 'Tutup editor' : 'Ubah'"
                 >
                   <Icon name="material-symbols:edit-square" class="w-4 h-4" />
                 </button>
@@ -710,7 +710,7 @@ onMounted(() => {
                 <button
                   @click="saveAsTemplate(content)"
                   class="text-amber-500 hover:text-amber-700 p-0.5"
-                  title="Simpan sebagai template"
+                  title="Simpan sebagai templat"
                 >
                   <Icon name="material-symbols:bookmark-add" class="w-4 h-4" />
                 </button>
@@ -787,7 +787,7 @@ onMounted(() => {
         <div class="mt-6">
           <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1 mb-3">
             <Icon name="material-symbols:view-module" class="w-5 h-5 text-amber-500" />
-            Template
+            Templat
           </h4>
 
           <div v-if="savedTemplates.length" class="mb-3">
@@ -812,7 +812,7 @@ onMounted(() => {
                 <button
                   @click="deleteSavedTemplate(t)"
                   class="text-red-500 hover:text-red-700 shrink-0"
-                  title="Hapus template"
+                  title="Hapus templat"
                 >
                   <Icon name="material-symbols:delete-rounded" class="w-4 h-4" />
                 </button>

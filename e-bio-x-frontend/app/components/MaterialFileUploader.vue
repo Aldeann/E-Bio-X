@@ -31,7 +31,7 @@ const fetchFiles = async () => {
     );
     files.value = res.files || [];
   } catch (e) {
-    toast.add({ title: "Gagal memuat file.", color: "red" });
+    toast.add({ title: "Gagal memuat berkas.", color: "red" });
   } finally {
     loading.value = false;
   }
@@ -48,7 +48,7 @@ const onFileChange = async (e) => {
   if (!allowedFileTypes.includes(ext)) {
     swal.fire({
       icon: "error",
-      title: "Tipe file tidak diizinkan",
+      title: "Tipe berkas tidak diizinkan",
       text: "Gunakan PDF, JPG, JPEG, PNG, WEBP, atau MP4.",
     });
     return;
@@ -63,11 +63,11 @@ const onFileChange = async (e) => {
       file,
       onProgress: (p) => (progress.value = p),
     });
-    toast.add({ title: "File berhasil diunggah.", color: "green" });
+    toast.add({ title: "Berkas berhasil diunggah.", color: "green" });
     await fetchFiles();
     emit("updated", files.value);
   } catch (err) {
-    const msg = err && err.error ? err.error : "Gagal mengunggah file.";
+    const msg = err && err.error ? err.error : "Gagal mengunggah berkas.";
     swal.fire({ icon: "error", title: "Gagal", text: msg });
   } finally {
     uploading.value = false;
@@ -77,7 +77,7 @@ const onFileChange = async (e) => {
 
 const removeFile = async (f) => {
   const result = await swal.fire({
-    title: "Hapus file ini?",
+    title: "Hapus berkas ini?",
     text: f.original_name,
     icon: "warning",
     showCancelButton: true,
@@ -94,11 +94,11 @@ const removeFile = async (f) => {
         headers: { Authorization: `Bearer ${token}` },
       }
     );
-    toast.add({ title: "File dihapus.", color: "green" });
+    toast.add({ title: "Berkas dihapus.", color: "green" });
     await fetchFiles();
     emit("updated", files.value);
   } catch (e) {
-    toast.add({ title: "Gagal menghapus file.", color: "red" });
+    toast.add({ title: "Gagal menghapus berkas.", color: "red" });
   }
 };
 
@@ -112,13 +112,13 @@ onMounted(fetchFiles);
     <div class="flex items-center justify-between mb-3">
       <h4 class="font-semibold text-gray-800 dark:text-gray-100 text-sm flex items-center gap-1">
         <Icon name="material-symbols:folder-open" class="w-4 h-4 text-green-500" />
-        File Materi
+        Berkas Materi
       </h4>
       <button
         @click="pickFile"
         class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded font-semibold"
       >
-        + Upload File
+        + Unggah Berkas
       </button>
       <input ref="fileInput" type="file" class="hidden" :accept="allowedFileTypes.join(',')" @change="onFileChange" />
     </div>

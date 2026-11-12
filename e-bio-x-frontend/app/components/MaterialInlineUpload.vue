@@ -45,9 +45,9 @@ const onFileChange = async (e) => {
       onProgress: (p) => (progress.value = p),
     });
     emit("update:modelValue", res.file.file_url);
-    toast.add({ title: "File berhasil diunggah.", color: "green" });
+    toast.add({ title: "Berkas berhasil diunggah.", color: "green" });
   } catch (err) {
-    const msg = err && err.error ? err.error : "Gagal mengunggah file.";
+    const msg = err && err.error ? err.error : "Gagal mengunggah berkas.";
     swal.fire({ icon: "error", title: "Gagal", text: msg });
   } finally {
     uploading.value = false;
@@ -67,7 +67,7 @@ const clearUrl = () => emit("update:modelValue", "");
     >
       <Icon name="material-symbols:upload-rounded" class="w-8 h-8 mx-auto text-green-500" />
       <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">
-        Klik untuk pilih file
+        Klik untuk memilih berkas
       </p>
       <p class="text-xs text-gray-400">PDF, JPG, PNG, WEBP, MP4 (maks 40MB)</p>
       <input ref="fileInput" type="file" class="hidden" :accept="accept" @change="onFileChange" />
@@ -111,14 +111,14 @@ const clearUrl = () => emit("update:modelValue", "");
         <button
           @click="pickFile"
           class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded"
-          title="Ganti file"
+          title="Ganti berkas"
         >
           Ganti
         </button>
         <button
           @click="clearUrl"
           class="text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 p-1.5 rounded"
-          title="Hapus file"
+          title="Hapus berkas"
         >
           <Icon name="material-symbols:delete-rounded" class="w-4 h-4" />
         </button>

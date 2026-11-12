@@ -157,10 +157,10 @@
                 </button>
               </div>
               <div class="flex gap-1 justify-end">
-                <button class="text-blue-500 hover:text-blue-600" title="Edit" @click="openQuestionForm(q)">
+                <button class="text-blue-500 hover:text-blue-600" title="Ubah" @click="openQuestionForm(q)">
                   <Icon name="material-symbols:edit" class="w-5 h-5" />
                 </button>
-                <button v-if="q.question_id" class="text-amber-500 hover:text-amber-600" title="Generate Pembahasan AI" @click="generateExplanation(q)">
+                <button v-if="q.question_id" class="text-amber-500 hover:text-amber-600" title="Buat Pembahasan AI" @click="generateExplanation(q)">
                   <Icon name="material-symbols:auto-awesome" class="w-5 h-5" />
                 </button>
                 <button class="text-purple-500 hover:text-purple-600" title="Duplikat" @click="duplicate(q)">
@@ -296,7 +296,7 @@ const loadSections = async () => {
   }
 };
 
-const statusLabel = (s) => (s === "published" ? "Published" : s === "archived" ? "Archived" : "Draft");
+const statusLabel = (s) => (s === "published" ? "Terbit" : s === "archived" ? "Diarsipkan" : "Draf");
 const statusClass = (s) =>
   s === "published"
     ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-400"

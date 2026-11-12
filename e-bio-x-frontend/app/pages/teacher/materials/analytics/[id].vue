@@ -244,7 +244,7 @@ definePageMeta({
 
       <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
         <h3 class="font-semibold text-gray-800 dark:text-gray-100 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-          Progress per Siswa
+          Progres per Siswa
         </h3>
 
         <div v-if="students.length === 0" class="p-6 text-center text-gray-400">
@@ -255,7 +255,7 @@ definePageMeta({
           <thead>
             <tr class="text-left text-gray-500 border-b border-gray-100 dark:border-gray-800">
               <th class="px-4 py-3 font-medium">Siswa</th>
-              <th class="px-4 py-3 font-medium w-40">Progress</th>
+              <th class="px-4 py-3 font-medium w-40">Progres</th>
               <th class="px-4 py-3 font-medium text-right">Selesai</th>
             </tr>
           </thead>

@@ -12,7 +12,7 @@
           class="dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm w-28"
         />
         <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition" :disabled="busy" @click="generateForQuestion">
-          <Icon name="material-symbols:auto-awesome" class="w-4 h-4 inline" /> Generate
+          <Icon name="material-symbols:auto-awesome" class="w-4 h-4 inline" /> Buat
         </button>
       </div>
     </PageHeader>
@@ -52,7 +52,7 @@
 
     <div v-else-if="!items.length" class="text-center py-16 bg-white dark:bg-gray-900 border border-dashed border-gray-300 dark:border-gray-600 rounded-xl">
       <Icon name="material-symbols:lightbulb-outline" class="w-14 h-14 text-gray-300 mx-auto mb-3" />
-      <p class="text-gray-500">Belum ada pembahasan. Generate pembahasan dari soal di atas.</p>
+      <p class="text-gray-500">Belum ada pembahasan. Buat pembahasan dari soal di atas.</p>
     </div>
 
     <div v-else class="space-y-3">
@@ -68,7 +68,7 @@
                 {{ statusLabel(item.status) }}
               </span>
               <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-400">
-                {{ item.question_type || "multiple_choice" }}
+                {{ typeLabel(item.question_type || "multiple_choice") }}
               </span>
               <span v-if="item.edited_by_teacher" class="text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-400">
                 Disunting guru
@@ -77,7 +77,7 @@
             <p class="mt-2 font-medium">{{ item.question_text || `Soal #${item.question_id || item.bank_question_id}` }}</p>
             <div class="mt-1 text-xs text-gray-500 flex flex-wrap gap-3">
               <span>ID {{ item.question_id || item.bank_question_id }}</span>
-              <span v-if="item.generated_by">Sumber: {{ item.generated_by }}</span>
+              <span v-if="item.generated_by">Sumber: {{ sourceLabel(item.generated_by) }}</span>
               <span v-if="item.model_name">Model: {{ item.model_name }}</span>
               <span v-if="item.feedback_summary">
                 Umpan balik: {{ item.feedback_summary.helpful || 0 }} 👍 / {{ item.feedback_summary.not_helpful || 0 }} 👎
@@ -133,7 +133,12 @@ const questionIdForGen = ref("");
 const filters = reactive({ status: "ALL", q: "" });
 
 const statusLabel = (s) =>
-  ({ MISSING: "Belum Ada", AI_GENERATED: "Draft AI", REVIEW_REQUIRED: "Perlu Review", APPROVED: "Disetujui", REJECTED: "Ditolak", TEACHER_APPROVED: "Guru", FAILED: "Gagal", STALE: "Usang" })[s] || s;
+  ({ MISSING: "Belum Ada", AI_GENERATED: "Draf AI", REVIEW_REQUIRED: "Perlu Review", APPROVED: "Disetujui", REJECTED: "Ditolak", TEACHER_APPROVED: "Guru", FAILED: "Gagal", STALE: "Usang" })[s] || s;
+
+const typeLabel = (t) =>
+  ({ multiple_choice: "Pilihan Ganda", true_false: "Benar/Salah", essay: "Uraian", short_answer: "Jawaban Singkat" })[t] || t;
+
+const sourceLabel = (s) => ({ ai: "AI", teacher: "Guru" })[s] || s;
 
 const statusBadge = (s) =>
   ({

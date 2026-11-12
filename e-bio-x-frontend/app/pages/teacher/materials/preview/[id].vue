@@ -64,7 +64,7 @@ definePageMeta({
       <span class="px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
         <span class="inline-flex items-center gap-1">
           <Icon name="material-symbols:visibility" class="w-4 h-4" />
-          Preview sebagai Siswa
+          Pratinjau sebagai Siswa
         </span>
       </span>
       <NuxtLink

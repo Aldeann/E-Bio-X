@@ -174,7 +174,7 @@ const validate = () => {
       if (!d.url) return fail("Pilih video atau masukkan URL video.");
       break;
     case "pdf":
-      if (!d.url) return fail("Pilih file PDF terlebih dahulu.");
+      if (!d.url) return fail("Pilih berkas PDF terlebih dahulu.");
       break;
     case "link":
       if (!d.url) return fail("URL tautan wajib diisi.");
@@ -205,7 +205,7 @@ const validate = () => {
       break;
     }
     case "quiz": {
-      if (!d.questions || d.questions.length === 0) return fail("Quiz minimal 1 soal.");
+      if (!d.questions || d.questions.length === 0) return fail("Kuis minimal 1 soal.");
       for (const q of d.questions) {
         if (!q.question || !q.question.trim()) return fail("Ada soal yang belum diisi.");
         const t = q.qtype || "multiple_choice";
@@ -475,7 +475,7 @@ const save = () => {
     <!-- QUIZ -->
     <template v-else-if="type === 'quiz'">
       <div>
-        <label class="labelClass">Judul quiz</label>
+        <label class="labelClass">Judul kuis</label>
         <input v-model="form.title" type="text" :class="inputClass" placeholder="Contoh: Latihan Soal Virus" />
       </div>
 

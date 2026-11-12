@@ -69,7 +69,7 @@
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nilai Lulus (%) *</label>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Batas Lulus (%) *</label>
           <input
             v-model.number="form.passing_grade"
             type="number"
@@ -113,9 +113,9 @@
           v-model="form.status"
           class="w-full md:w-64 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
         >
-          <option value="draft">Draft</option>
-          <option value="published">Published</option>
-          <option value="archived">Archived</option>
+          <option value="draft">Draf</option>
+          <option value="published">Terbit</option>
+          <option value="archived">Diarsipkan</option>
         </select>
         <p v-if="form.status === 'published'" class="text-xs text-blue-600 dark:text-blue-400 mt-1">
           Kuis akan tampil di siswa yang terdaftar pada kelas materi.

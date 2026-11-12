@@ -393,7 +393,7 @@ onMounted(() => {
               class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg font-semibold text-sm disabled:opacity-50 transition flex items-center justify-center gap-2 shadow-md shadow-green-300/50"
             >
               <Icon name="material-symbols:publish" class="w-4 h-4" />
-              {{ saving ? "Menyimpan..." : "Simpan & Publish" }}
+              {{ saving ? "Menyimpan..." : "Simpan & Terbitkan" }}
             </button>
           </div>
         </div>

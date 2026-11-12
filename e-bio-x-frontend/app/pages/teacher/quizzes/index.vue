@@ -126,7 +126,7 @@ const load = async () => {
   }
 };
 
-const statusLabel = (s) => (s === "published" ? "Published" : s === "archived" ? "Archived" : "Draft");
+const statusLabel = (s) => (s === "published" ? "Terbit" : s === "archived" ? "Diarsipkan" : "Draf");
 const statusClass = (s) =>
   s === "published"
     ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-400"

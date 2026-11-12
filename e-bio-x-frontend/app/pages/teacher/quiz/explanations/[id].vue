@@ -30,7 +30,7 @@
             :disabled="expl.status === 'TEACHER_APPROVED'"
             @click="regenerate"
           >
-            <Icon name="material-symbols:refresh" class="w-4 h-4 inline" /> Ulangi Generate AI
+            <Icon name="material-symbols:refresh" class="w-4 h-4 inline" /> Buat Ulang dengan AI
           </button>
         </div>
       </div>
@@ -187,11 +187,11 @@ const regenerate = async () => {
     ? "Pembahasan guru tidak dapat ditimpa oleh AI."
     : "Generate ulang dengan AI? Versi sebelumnya akan tersimpan di riwayat versi.";
   const res = await swal.fire({
-    title: "Generate ulang?",
+    title: "Buat ulang?",
     text: msg,
     icon: "warning",
     showCancelButton: true,
-    confirmButtonText: "Generate",
+    confirmButtonText: "Buat",
     cancelButtonText: "Batal",
   });
   if (!res.isConfirmed) return;

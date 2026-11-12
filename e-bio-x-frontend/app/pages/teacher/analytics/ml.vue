@@ -1,7 +1,7 @@
 <template>
   <div>
     <PageHeader
-      title="Machine Learning Insights"
+      title="Wawasan Machine Learning"
       subtitle="Analisis penguasaan, profil belajar, dan rekomendasi berbasis data."
     >
       <button
@@ -13,7 +13,7 @@
           : 'bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-300/50'"
       >
         <Icon :name="training ? 'mdi:loading' : 'mdi:brain'" class="w-4 h-4" :class="training && 'animate-spin'" />
-        {{ training ? "Melatih Model..." : "Latih / Retrain Model" }}
+        {{ training ? "Melatih Model..." : "Latih / Latih Ulang Model" }}
       </button>
     </PageHeader>
 
@@ -25,7 +25,7 @@
       <div class="flex items-start gap-2">
         <Icon :name="trainResult.success ? 'mdi:check-circle' : 'mdi:alert-circle'" class="w-5 h-5 shrink-0 mt-0.5" />
         <div>
-          <p class="font-semibold">{{ trainResult.success ? "Training Berhasil" : "Training Gagal" }}</p>
+          <p class="font-semibold">{{ trainResult.success ? "Pelatihan Berhasil" : "Pelatihan Gagal" }}</p>
           <p v-if="trainResult.message" class="mt-1">{{ trainResult.message }}</p>
           <div v-if="trainResult.details" class="mt-2 space-y-1 text-xs">
             <p v-if="trainResult.details.scope">
@@ -169,7 +169,7 @@
               data.model && data.model.training_sample_count != null ? data.model.training_sample_count : "-"
             }}</span>
           </div>
-          <p class="text-xs text-gray-500 mt-2">Sampel Training</p>
+          <p class="text-xs text-gray-500 mt-2">Sampel Pelatihan</p>
         </div>
       </div>
 
@@ -567,7 +567,7 @@ const trainModel = async () => {
     toast.add({ title: "Model berhasil dilatih!", color: "green" });
     await load();
   } catch (e) {
-    const msg = e?.data?.error || e?.data?.message || "Training gagal. Pastikan ada data aktivitas siswa yang cukup.";
+    const msg = e?.data?.error || e?.data?.message || "Pelatihan gagal. Pastikan ada data aktivitas siswa yang cukup.";
     trainResult.value = { success: false, message: msg };
     toast.add({ title: msg, color: "red" });
   } finally {

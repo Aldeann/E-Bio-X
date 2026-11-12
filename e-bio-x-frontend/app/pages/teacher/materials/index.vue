@@ -55,7 +55,7 @@ const publishToggle = async (m) => {
         : "Materi akan disembunyikan dari siswa.",
     icon: "warning",
     showCancelButton: true,
-    confirmButtonText: target === "published" ? "Ya, Publish" : "Ya, Jadikan Draft",
+    confirmButtonText: target === "published" ? "Ya, terbitkan" : "Ya, jadikan draf",
     cancelButtonText: "Batal",
   });
   if (!result.isConfirmed) return;
@@ -66,7 +66,7 @@ const publishToggle = async (m) => {
       body: { status: target },
     });
     toast.add({
-      title: target === "published" ? "Materi dipublikasikan." : "Materi diubah menjadi draft.",
+      title: target === "published" ? "Materi dipublikasikan." : "Materi diubah menjadi draf.",
       color: "green",
     });
     fetchData();
@@ -78,7 +78,7 @@ const publishToggle = async (m) => {
 const deleteMaterial = async (m) => {
   const result = await swal.fire({
     title: "Hapus materi ini?",
-    text: `"${m.title}" beserta semua section dan file akan dihapus permanen.`,
+    text: `"${m.title}" beserta semua bagian dan file akan dihapus permanen.`,
     icon: "warning",
     showCancelButton: true,
     confirmButtonText: "Hapus",
@@ -181,7 +181,7 @@ definePageMeta({
                   : 'bg-amber-100 text-amber-700'
               "
             >
-              {{ m.status }}
+              {{ m.status === 'published' ? 'Terbit' : m.status === 'draft' ? 'Draf' : m.status === 'archived' ? 'Diarsipkan' : m.status }}
             </span>
           </div>
 
@@ -221,7 +221,7 @@ definePageMeta({
             <div class="mt-2 text-[10px] sm:text-xs text-gray-400 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span class="inline-flex items-center gap-1">
                 <Icon name="material-symbols:category" class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                {{ m.section_count || 0 }} section
+                {{ m.section_count || 0 }} bagian
               </span>
               <span
                 class="inline-flex items-center gap-1 px-1 sm:px-1.5 rounded"
@@ -261,7 +261,7 @@ definePageMeta({
                 class="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs rounded-lg font-semibold bg-green-600 hover:bg-green-700 text-white flex items-center gap-1"
               >
                 <Icon name="material-symbols:edit-square" class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                Edit
+                Ubah
               </NuxtLink>
               <NuxtLink
                 :to="`/teacher/materials/preview/${m.id}`"
@@ -269,7 +269,7 @@ definePageMeta({
                 class="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs rounded-lg font-semibold bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-1"
               >
                 <Icon name="material-symbols:visibility" class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                Preview
+                Pratinjau
               </NuxtLink>
               <NuxtLink
                 :to="`/teacher/materials/analytics/${m.id}`"
@@ -291,7 +291,7 @@ definePageMeta({
                   :name="m.status === 'published' ? 'material-symbols:visibility-off' : 'material-symbols:public'"
                   class="w-3 h-3 sm:w-3.5 sm:h-3.5"
                 />
-                {{ m.status === "published" ? "Unpublish" : "Publish" }}
+                {{ m.status === "published" ? "Tarik" : "Terbitkan" }}
               </button>
               <button
                 @click="deleteMaterial(m)"
